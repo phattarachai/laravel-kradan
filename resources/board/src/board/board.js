@@ -6,7 +6,7 @@
  *    keeps UI conveniences; the view itself (step, mode, zoom…) lives in the URL.
  */
 import { t } from './i18n.js';
-import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText, getLocal, setLocal } from './util.js';
+import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText } from './util.js';
 import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
@@ -372,7 +372,9 @@ export function mountBoard(boot, root) {
   }
   function renderView(st) {
     const v = viewLabel(st);
-    $('#viewb').innerHTML = `${v.icon}<span class="k-vt">${esc(v.text)}</span><span class="k-caret">▾</span>`;
+    /* an icon is enough (owner, 2026-10-28); what it shows is in the tooltip */
+    $('#viewb').innerHTML = v.icon;
+    $('#viewb').dataset.tip = `${t('view_menu')} · ${v.text}`;
   }
   function setMode(m) { ui.mode = m; ui.dev = []; ui.opt = ''; if (ui.mode !== 'real') { ui.w = 0; } render(); }
   function setDev(dv) {
@@ -434,41 +436,28 @@ export function mountBoard(boot, root) {
     const tip = [s.title, everyone(s)].filter(Boolean).join(' · ');
     return `<a href="#" class="r ${done ? 'done' : 'todo'}" data-step="${n}" aria-current="${n === ui.step}" title="${esc(tip)}">${mark}<span class="t">${esc(s.title)}</span>${noted ? '<i class="dot"></i>' : ''}${right}</a>`;
   }
-  /* how far each person got: "สมชาย 6 / 6" */
-  function progress() {
-    const people = new Map();
-    PICKS.forEach(p => people.set(String(p.user.id), p.user));
-    COMMENTS.forEach(c => { people.set(String(c.user.id), c.user); (c.replies || []).forEach(r => people.set(String(r.user.id), r.user)); });
-    return [...people.values()].map(u => ({ u, done: STEPS.filter(s => answeredBy(u.id, s.key)).length }))
-      .sort((a, b) => b.done - a.done);
-  }
-  /* the other boards of this panel sit on top, like Figma's Pages over Layers: this one and the updated ones, the rest
-     folded (remembered); then the steps of this board */
+  /* the open boards sit on top, like Figma's Pages over Layers, all of them (owner, 2026-10-28): a board leaves the list
+     when it is filed into history, from the title menu or a right-click here. Then the steps of this board */
   let BOARDS = null;
-  let boardsOpen = !!getLocal('kradan:boards-open');
   async function loadBoards() {
     try { BOARDS = (await api.boards())?.boards || []; } catch { BOARDS = []; }
     renderSide();
   }
   function boardRow(b) {
     const cur = b.slug === B.slug;
-    return `<a class="pg" href="${esc(b.url)}" aria-current="${cur}" title="${esc(b.label || b.title)}">${DOC}<span class="t">${esc(b.label || b.title)}</span>${b.updated && !cur ? `<span class="wt">${t('updated')}</span>` : ''}</a>`;
+    return `<a class="pg" href="${esc(b.url)}" data-board="${esc(b.slug)}" aria-current="${cur}" title="${esc(b.label || b.title)}">${DOC}<span class="t">${esc(b.label || b.title)}</span>${b.updated && !cur ? `<span class="wt">${t('updated')}</span>` : ''}</a>`;
   }
   function boardsHtml() {
     if (!BOARDS?.length) { return ''; }
-    const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug);
-    const top = open.filter(b => b.slug === B.slug || b.updated), rest = open.filter(b => !top.includes(b));
+    const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug)
+      .sort((a, b) => String(b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.round?.pushed_at || a.updated_at || '')));
     return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span><a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a></div>
-      ${top.map(boardRow).join('')}
-      ${rest.length ? `<button class="fold" data-boardsfold aria-expanded="${boardsOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('other_boards', { n: rest.length }))}</button>` : ''}
-      ${boardsOpen ? rest.map(boardRow).join('') : ''}</div><div class="divide"></div>`;
+      ${open.map(boardRow).join('')}</div><div class="divide"></div>`;
   }
   function renderSide() {
-    const prog = STEPS.length > 1 ? progress() : [];
     const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
     $('#side').innerHTML = boardsHtml()
       + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
-      + (prog.length ? `<div class="k-prog tnum">${prog.map(x => esc(t('progress', { name: x.u.name.split(/\s+/)[0], done: x.done, total: STEPS.length }))).join(' · ')}</div>` : '')
       + STEPS.map((s, i) => {
         /* a section whose only step has the section's name adds nothing, so it gets no heading */
         const alone = s.group === s.title && STEPS[i + 1]?.group !== s.group;
@@ -505,9 +494,12 @@ export function mountBoard(boot, root) {
       ${looked.upd.has(n) ? `<div class="k-sub k-upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
       ${st.sub ? `<p class="k-sub">${esc(st.sub)}</p>` : ''}
       ${st.pickable && CAN_PICK() ? `<div class="k-picktools"><button data-pickall ${keys.length === st.options.length ? 'disabled' : ''}>${t('pick_all')}</button><button data-pickclear ${keys.length ? '' : 'disabled'}>${t('clear')}</button></div>` : ''}
-      ${st.pickable ? `<div class="k-ol">${st.options.map(o => `
-        <label><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
-          <span class="lb">${esc(o.key)} ${esc(o.label)}</span>${pickers(key, o.key)}${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}</label>`).join('')}</div>` : ''}
+      ${st.pickable ? `<div class="k-ol" data-n="${st.options.length}">${st.options.map(o => `
+        <label class="k-opt"><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
+          <span class="k-optkey">${esc(o.key)}</span>
+          <span class="k-optbody"><span class="lb">${esc(o.label)}</span>${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${pickers(key, o.key)}</span>
+          <span class="k-optmark">${CHECK}</span>
+          <span class="k-optbtn"><span class="off">${esc(t('pick_k', { k: o.key }))}</span><span class="on">${CHECK}${esc(t('picked'))}</span></span></label>`).join('')}</div>` : ''}
       ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
       <div class="k-hr"></div>
       <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
@@ -962,18 +954,43 @@ export function mountBoard(boot, root) {
   }
 
   /* ---------- จัดเก็บ: a decision board becomes decided, a flow archived (the backend's decide) ---------- */
-  function openArchive() {
-    const m = modal(`<div class="box narrow"><h2>${t('archive_title')}</h2><p class="k-sub">${t('archive_decision')}</p>
+  /* file a board into history: this one from its title menu, any open one by right-clicking it in the list */
+  function openArchive(slug = B.slug) {
+    const other = BOARDS?.find(b => b.slug === slug);
+    const name = slug === B.slug ? (B.label || B.title) : (other?.label || other?.title || slug);
+    const m = modal(`<div class="box narrow"><h2>${t('archive_title')}</h2><p class="k-sub"><b>${esc(name)}</b><br>${t('archive_decision')}</p>
       <div class="row"><button class="k-btn" data-x>${t('cancel')}</button><button class="k-btn k-primary" data-yes>${t('archive')}</button></div></div>`);
     $('[data-yes]', m).onclick = async () => {
       try {
-        const r = await api.decide(B.slug);
+        const r = await api.decide(slug);
         const fresh = r?.board ?? r;
-        B = { ...B, status: fresh?.status || 'decided', decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
         m.remove();
-        render();
+        if (BOARDS) { BOARDS = BOARDS.map(b => (b.slug === slug ? { ...b, status: fresh?.status || 'decided' } : b)); }
+        if (slug === B.slug) {
+          B = { ...B, status: fresh?.status || 'decided', decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
+          render();
+        } else { renderSide(); toast(t('archived_board', { name })); }
       } catch { toast(t('save_failed')); }
     };
+  }
+  function openBoardMenu(x, y, slug) {
+    closeCtx();
+    const el = document.createElement('div');
+    el.className = 'k-ctx';
+    const b = BOARDS?.find(z => z.slug === slug);
+    el.innerHTML = `<button data-bopen><span class="ck"></span>${esc(t('open_new_tab'))}</button>`
+      + (ME.can?.manage && b?.status === 'open' ? `<hr><button data-barchive><span class="ck"></span>${esc(t('archive'))}</button>` : '');
+    document.body.appendChild(el);
+    el.style.left = Math.min(x, innerWidth - el.offsetWidth - 8) + 'px';
+    el.style.top = Math.min(y, innerHeight - el.offsetHeight - 8) + 'px';
+    ctx = el;
+    el.addEventListener('click', e => {
+      const z = e.target.closest('button');
+      if (!z) { return; }
+      closeCtx();
+      if (z.dataset.bopen !== undefined && b) { window.open(b.url, '_blank', 'noopener'); }
+      if (z.dataset.barchive !== undefined) { openArchive(slug); }
+    });
   }
 
   /* ---------- rounds: the title opens the list; ดูทุกรอบ shows every round's answers ---------- */
@@ -1108,7 +1125,6 @@ export function mountBoard(boot, root) {
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
     if (t0.dataset.ptab) { ui.ptab = t0.dataset.ptab; writeUrl(); renderPanel(); return; }
-    if (t0.dataset.boardsfold !== undefined) { boardsOpen = !boardsOpen; setLocal('kradan:boards-open', boardsOpen); renderSide(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -1180,6 +1196,8 @@ export function mountBoard(boot, root) {
     if (e.target.matches('.k-compose textarea, .k-pop textarea')) { e.target.style.height = 'auto'; e.target.style.height = Math.min(innerHeight * 0.5, e.target.scrollHeight + 2) + 'px'; }
   });
   document.addEventListener('contextmenu', e => {
+    const row = !e.shiftKey && e.target.closest('#side [data-board]');
+    if (row) { e.preventDefault(); openBoardMenu(e.clientX, e.clientY, row.dataset.board); return; }
     if (e.shiftKey || !e.target.closest('#canvas')) { return; }
     e.preventDefault();
     openCtx(e.clientX, e.clientY, frames.find(f => f.fig.contains(e.target)));
