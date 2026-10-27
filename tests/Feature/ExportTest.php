@@ -97,3 +97,12 @@ it('gives review.json the workbench fields plus who picked what', function (): v
         ->and($json['steps'][0]['edits'][0]['edit'])->toBe(['from' => 'ส่งคำสั่งซื้อ', 'to' => 'ยืนยันคำสั่งซื้อ'])
         ->and(collect($json['progress'])->pluck('answered', 'user.name')->all())->toBe(['สมชาย' => 1, 'วิภา' => 1, 'นิดา' => 1, 'ต้น' => 1]);
 });
+
+it('writes a boxed area with every text inside the box', function (): void {
+    $round = publishRound();
+    $user = kradanUser('วิภา');
+    Comment::query()->create(['round_id' => $round->id, 'step_key' => 'หน้าจอ|หน้ายืนยัน', 'user_id' => (string) $user->id, 'body' => 'ตัวเลขเล็กไป',
+        'pin' => ['option' => null, 'device' => 'phone', 'src' => 'screen.html#confirm', 'x' => 10, 'y' => 20, 'text' => null, 'box' => ['w' => 200, 'h' => 80, 'texts' => ['11,651 / 10,000', 'เกิน 1,651']]]]);
+
+    expect(ReviewBuilder::for($round)->markdown())->toContain('   ▭1 วิภา (phone) “11,651 / 10,000”, “เกิน 1,651”: ตัวเลขเล็กไป');
+});

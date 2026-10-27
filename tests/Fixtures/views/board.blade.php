@@ -1,2 +1,2 @@
-<script>window.Kradan = @json($kradan);</script>
-<script src="{{ $assets['js'] }}"></script>
+<script>window.Kradan = @json($boot);</script>
+<script src="{{ $assets }}/board.js?v={{ $boot['version'] }}"></script>

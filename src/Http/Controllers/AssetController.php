@@ -8,7 +8,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Serves the prebuilt board from the package's dist/, so the host needs no
- * vendor:publish and never serves a stale copy after an update.
+ * vendor:publish and never serves a stale copy after an update. The shells
+ * add `?v=<version>`; the short max-age covers a dist/ rebuilt in place.
  */
 final class AssetController
 {
@@ -26,16 +27,16 @@ final class AssetController
         return response()->file($path, [
             'Content-Type' => self::FILES[$file],
             'X-Content-Type-Options' => 'nosniff',
-            'Cache-Control' => 'public, max-age=31536000, immutable',
+            'Cache-Control' => 'public, max-age=3600',
         ]);
     }
 
-    public static function url(string $file): string
+    /**
+     * The folder URL the Blade shells append `/board.js` and `/board.css` to.
+     */
+    public static function base(): string
     {
-        $path = self::path($file);
-        $version = is_file($path) ? substr((string) md5_file($path), 0, 12) : 'missing';
-
-        return route('kradan.asset', ['file' => $file, 'v' => $version]);
+        return url(trim((string) config('kradan.path', 'kradan'), '/').'/assets');
     }
 
     public static function path(string $file): string

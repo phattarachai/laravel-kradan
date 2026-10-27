@@ -169,9 +169,10 @@ final class ReviewBuilder
         }
 
         if ($comment->pin !== null) {
-            $mark = ($comment->pin['box'] ?? null) ? '▭' : '📍';
+            $box = $comment->pin['box'] ?? null;
+            $mark = $box ? '▭' : '📍';
             $where = $this->where($comment->pin['option'] ?? null, $comment->pin['device'] ?? null);
-            $texts = $this->quoted($comment->pin['text'] ?? null);
+            $texts = $this->quoted($box['texts'] ?? $comment->pin['text'] ?? null);
 
             return "{$mark}{$this->pinNumbers[$comment->id]} {$name}{$where}{$texts}: {$comment->body}";
         }

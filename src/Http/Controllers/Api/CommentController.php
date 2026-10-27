@@ -44,7 +44,7 @@ final readonly class CommentController
 
         $this->activity->record($board, $this->action($comment), $this->userId(), $round, ['step' => $step, 'comment' => $comment->id]);
 
-        return response()->json(['comment' => $this->presenter->comment($comment, $this->user())], 201);
+        return response()->json($this->presenter->comment($comment, $this->user()), 201);
     }
 
     public function update(CommentUpdateRequest $request, int $comment): JsonResponse
@@ -52,7 +52,7 @@ final readonly class CommentController
         $model = $this->ownComment($comment);
         $model->update(['body' => (string) $request->validated('body')]);
 
-        return response()->json(['comment' => $this->presenter->comment($model, $this->user())]);
+        return response()->json($this->presenter->comment($model, $this->user()));
     }
 
     public function destroy(int $comment): Response

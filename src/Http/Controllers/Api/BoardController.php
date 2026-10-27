@@ -63,7 +63,7 @@ final readonly class BoardController
     {
         $board = $decide($this->findBoard($slug, Ability::Manage), $this->userId());
 
-        return response()->json(['board' => $this->presenter->summary($board)]);
+        return response()->json($this->presenter->board($board, $this->user()));
     }
 
     private function exportRound(Board $board, ?int $number): Round

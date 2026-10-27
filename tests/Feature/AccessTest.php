@@ -70,8 +70,10 @@ it('lets a user with manage on the panel mark a board decided', function (): voi
     $owner = kradanUser('owner');
     actingAs($owner)->postJson('/kradan/api/boards/t188-manual-so/decide')
         ->assertOk()
-        ->assertJsonPath('board.status', 'decided')
-        ->assertJsonPath('board.decided_by.name', 'owner');
+        ->assertJsonPath('status', 'decided')
+        ->assertJsonPath('decided_by.name', 'owner')
+        ->assertJsonPath('slug', 't188-manual-so')
+        ->assertJsonStructure(['rounds', 'current', 'picks', 'comments', 'viewers', 'seen_prints']);
 });
 
 it('sends a board opened under the wrong panel to its own panel', function (): void {

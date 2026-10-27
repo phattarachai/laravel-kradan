@@ -42,34 +42,18 @@ final readonly class PageController
         $round = $request->integer('round') ?: null;
 
         return view('kradan::board', [
-            'kradan' => $this->presenter->boot($this->user(), $board, $round),
-            'assets' => self::assets(),
+            'boot' => $this->presenter->boardPage($this->user(), $board, $round),
+            'assets' => AssetController::base(),
         ]);
     }
 
     private function indexView(Request $request, ?string $panel): View
     {
-        $kradan = $this->presenter->boot($this->user());
+        $query = (string) $request->query('q', '');
 
         return view('kradan::index', [
-            'kradan' => [
-                ...$kradan,
-                'panel' => $panel,
-                'q' => (string) $request->query('q', ''),
-                'boards' => $this->index->list($this->user(), (string) $request->query('q', ''), $panel),
-            ],
-            'assets' => self::assets(),
+            'boot' => $this->presenter->indexPage($this->user(), $this->index->list($this->user(), $query, $panel), $panel, $query),
+            'assets' => AssetController::base(),
         ]);
-    }
-
-    /**
-     * @return array{js: string, css: string}
-     */
-    public static function assets(): array
-    {
-        return [
-            'js' => AssetController::url('board.js'),
-            'css' => AssetController::url('board.css'),
-        ];
     }
 }

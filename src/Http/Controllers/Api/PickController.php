@@ -31,20 +31,30 @@ final readonly class PickController
         $options = $this->options($round, $step, (array) $request->validated('options'));
         $seen = $options === [] && $request->boolean('seen');
 
-        if ($options === [] && ! $seen) {
-            Pick::query()->where(['round_id' => $round->id, 'step_key' => $step, 'user_id' => $this->userId()])->delete();
-
-            return response()->json(['pick' => null]);
-        }
-
-        $pick = Pick::query()->updateOrCreate(
-            ['round_id' => $round->id, 'step_key' => $step, 'user_id' => $this->userId()],
-            ['options' => $options, 'seen' => $seen],
-        );
-
+        $this->save($round, $step, $options, $seen);
         $this->activity->record($board, ActivityAction::Pick, $this->userId(), $round, ['step' => $step, 'options' => $options, 'seen' => $seen]);
 
-        return response()->json(['pick' => $this->presenter->pick($pick)]);
+        return response()->json([
+            'picks' => $round->picks()->where('step_key', $step)->oldest('id')->get()->map($this->presenter->pick(...))->values()->all(),
+        ]);
+    }
+
+    /**
+     * No options and no ข้าม/อ่านแล้ว tick clears the pick.
+     *
+     * @param  list<string>  $options
+     */
+    private function save(Round $round, string $step, array $options, bool $seen): void
+    {
+        $key = ['round_id' => $round->id, 'step_key' => $step, 'user_id' => $this->userId()];
+
+        if ($options === [] && ! $seen) {
+            Pick::query()->where($key)->delete();
+
+            return;
+        }
+
+        Pick::query()->updateOrCreate($key, ['options' => $options, 'seen' => $seen]);
     }
 
     /**

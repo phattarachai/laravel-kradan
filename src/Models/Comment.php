@@ -17,7 +17,7 @@ use Override;
  * @property int|null $parent_id
  * @property string $user_id
  * @property string $body
- * @property array{option?: ?string, device?: ?string, x?: float, y?: float, text?: ?string, box?: mixed}|null $pin
+ * @property array{option?: ?string, device?: ?string, src?: ?string, x?: float, y?: float, text?: ?string, box?: array{w?: float, h?: float, texts?: list<string>}|null}|null $pin
  * @property array{from: string, to: string}|null $edit
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at

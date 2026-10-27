@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Date;
+use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Activity;
 use Phattarachai\Kradan\Models\Comment;
 use Phattarachai\Kradan\Models\Pick;
+use Phattarachai\Kradan\Tests\Fixtures\User;
 
 use function Pest\Laravel\actingAs;
 
@@ -17,20 +19,72 @@ function pickUrl(int $round = 1, string $step = QUESTION): string
     return '/kradan/api/boards/t188-manual-so/rounds/'.$round.'/picks/'.rawurlencode($step);
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function bootOf(string $html): array
+{
+    preg_match('#window\.Kradan = (.*?);</script>#s', $html, $match);
+
+    return json_decode($match[1], true);
+}
+
 it('renders the board shell with the boot payload', function (): void {
     publishRound();
 
     $html = actingAs(kradanUser())->get('/kradan/decisions/t188-manual-so')->assertOk()->getContent();
-    preg_match('#window\.Kradan = (.*?);</script>#s', $html, $match);
-    $boot = json_decode($match[1], true);
+    $boot = bootOf($html);
 
-    expect($boot)->toHaveKeys(['version', 'brand', 'locale', 'user', 'csrf', 'routes', 'presence', 'board'])
+    expect($boot)->toHaveKeys(['version', 'page', 'brand', 'locale', 'user', 'csrf', 'routes', 'presence', 'board'])
+        ->and($boot['page'])->toBe('board')
         ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true]])
         ->and($boot['routes'])->toBe(['api' => 'http://localhost/kradan/api', 'index' => 'http://localhost/kradan'])
         ->and($boot['presence']['mode'])->toBe('polling')
-        ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'kind' => 'decision', 'status' => 'open', 'task_ref' => 'T188', 'current' => 1])
+        ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'kind' => 'decision', 'status' => 'open', 'task_ref' => 'T188', 'panel' => 'decisions', 'current' => 1, 'seen_prints' => null])
+        ->and($boot['board']['rounds'][0])->toHaveKeys(['number', 'title', 'pushed_at', 'steps', 'prints', 'base_url'])
+        ->and(array_keys($boot['board']['rounds'][0]['prints']))->toBe([QUESTION, SCREEN])
         ->and($boot['board']['rounds'][0]['base_url'])->toStartWith('http://localhost/kradan/f/')
-        ->and($html)->toContain('/kradan/assets/board.js?v=');
+        ->and($html)->toContain('http://localhost/kradan/assets/board.js?v=');
+});
+
+it('renders the index shell with the panels the user may view and a row per board', function (): void {
+    publishRound();
+    $user = kradanUser();
+    Kradan::auth(fn ($user, string $panel): bool => $panel === 'decisions');
+
+    $boot = bootOf(actingAs($user)->get('/kradan')->assertOk()->getContent());
+
+    expect($boot['page'])->toBe('index')
+        ->and($boot)->not->toHaveKey('board')
+        ->and($boot['index']['panels'])->toBe([['key' => 'decisions', 'kind' => 'decision', 'title' => 'เรื่องที่ต้องตัดสินใจ', 'url' => 'http://localhost/kradan/decisions']])
+        ->and($boot['index']['boards'][0])->toMatchArray([
+            'slug' => 't188-manual-so', 'panel' => 'decisions', 'kind' => 'decision', 'status' => 'open', 'task_ref' => 'T188',
+            'url' => 'http://localhost/kradan/decisions/t188-manual-so', 'steps' => ['Block หรือเก็บไว้', 'หน้ายืนยัน'],
+            'answered' => 0, 'viewers' => [], 'updated' => false, 'decided_at' => null,
+        ])
+        ->and($boot['index']['boards'][0]['round'])->toMatchArray(['number' => 1, 'title' => 'Manual SO ก่อนยืนยัน รอบ 1']);
+});
+
+it('flags a board updated for a returning viewer whose seen prints differ, never on a first visit', function (): void {
+    publishRound();
+    $user = kradanUser();
+    $row = fn (): array => actingAs($user)->getJson('/kradan/api/boards')->json('boards.0');
+
+    expect($row()['updated'])->toBeFalse();
+
+    $prints = actingAs($user)->getJson('/kradan/api/boards/t188-manual-so')->json('rounds.0.prints');
+    actingAs($user)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['prints_seen' => $prints])->assertOk();
+
+    expect($row()['updated'])->toBeFalse();
+
+    publishRound(files: ['screen.html' => '<button>ส่ง</button>']);
+
+    expect($row()['updated'])->toBeTrue();
+
+    actingAs(kradanUser('วิภา'))->putJson(pickUrl(), ['options' => ['A']]);
+    actingAs(kradanUser('ต้น'))->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => SCREEN, 'body' => 'ok']);
+
+    expect($row()['answered'])->toBe(2);
 });
 
 it('saves a pick in option order, shows it to everyone, and clears it', function (): void {
@@ -39,7 +93,14 @@ it('saves a pick in option order, shows it to everyone, and clears it', function
 
     actingAs($somchai)->putJson(pickUrl(), ['options' => ['B', 'A']])
         ->assertOk()
-        ->assertJsonPath('pick.options', ['A', 'B']);
+        ->assertJsonPath('picks.0.options', ['A', 'B']);
+
+    actingAs(kradanUser('นิดา'))->putJson(pickUrl(), ['options' => ['B']])
+        ->assertOk()
+        ->assertJsonCount(2, 'picks')
+        ->assertJsonPath('picks.0.user.name', 'สมชาย')
+        ->assertJsonPath('picks.1.user.name', 'นิดา')
+        ->assertJsonPath('picks.1.step', QUESTION);
 
     actingAs(kradanUser('วิภา'))->getJson('/kradan/api/boards/t188-manual-so')
         ->assertOk()
@@ -48,10 +109,10 @@ it('saves a pick in option order, shows it to everyone, and clears it', function
         ->assertJsonPath('progress.0.answered', 1)
         ->assertJsonPath('progress.0.total', 2);
 
-    actingAs($somchai)->putJson(pickUrl(), ['options' => []])->assertOk()->assertJsonPath('pick', null);
+    actingAs($somchai)->putJson(pickUrl(), ['options' => [], 'seen' => false])->assertOk()->assertJsonCount(1, 'picks');
 
-    expect(Pick::query()->count())->toBe(0)
-        ->and(Activity::query()->where('action', 'pick')->count())->toBe(1);
+    expect(Pick::query()->pluck('user_id')->all())->toBe([(string) User::query()->where('name', 'นิดา')->value('id')])
+        ->and(Activity::query()->where('action', 'pick')->count())->toBe(3);
 });
 
 it('records ข้าม as seen with no options', function (): void {
@@ -59,7 +120,8 @@ it('records ข้าม as seen with no options', function (): void {
 
     actingAs(kradanUser())->putJson(pickUrl(), ['options' => [], 'seen' => true])
         ->assertOk()
-        ->assertJsonPath('pick.seen', true);
+        ->assertJsonPath('picks.0.seen', true)
+        ->assertJsonPath('picks.0.options', []);
 });
 
 it('refuses an unknown step or option', function (): void {
@@ -91,23 +153,28 @@ it('threads comments one level deep, with pins and edits', function (): void {
     $url = '/kradan/api/boards/t188-manual-so/rounds/1/comments';
 
     $parent = actingAs($nida)->postJson($url, ['step' => QUESTION, 'body' => 'ถ้า block ต้องมีทางให้ sales แก้เอง'])
-        ->assertCreated()->json('comment.id');
+        ->assertCreated()->json('id');
     $reply = actingAs(kradanUser('สมชาย'))->postJson($url, ['step' => QUESTION, 'body' => 'เห็นด้วย', 'parent_id' => $parent])
-        ->assertCreated()->json('comment.id');
+        ->assertCreated()->json('id');
 
     actingAs($nida)->postJson($url, ['step' => QUESTION, 'body' => 'ลึกไป', 'parent_id' => $reply])->assertJsonValidationErrors('parent_id');
     actingAs($nida)->postJson($url, ['step' => SCREEN, 'body' => 'ผิดข้อ', 'parent_id' => $parent])->assertJsonValidationErrors('parent_id');
 
-    actingAs($nida)->postJson($url, ['step' => SCREEN, 'body' => 'สีแดง', 'pin' => ['option' => null, 'device' => 'desktop', 'x' => 0.4, 'y' => 0.2, 'text' => 'ยืนยัน']])
-        ->assertCreated()->assertJsonPath('comment.pin.text', 'ยืนยัน');
-    actingAs($nida)->postJson($url, ['step' => QUESTION, 'edit' => ['from' => 'ส่ง', 'to' => 'ยืนยัน']])
-        ->assertCreated()->assertJsonPath('comment.body', '');
+    $pin = ['option' => null, 'device' => 'desktop', 'src' => 'screen.html#s=1', 'x' => 120, 'y' => 340, 'text' => 'ยืนยัน', 'box' => ['w' => 200, 'h' => 80, 'texts' => ['ยืนยัน', 'ยกเลิก']]];
+    $pinned = actingAs($nida)->postJson($url, ['step' => SCREEN, 'body' => 'สีแดง', 'pin' => $pin])
+        ->assertCreated()->assertJsonPath('replies', []);
+
+    expect($pinned->json('pin'))->toEqual($pin);
+    actingAs($nida)->postJson($url, ['step' => QUESTION, 'body' => null, 'edit' => ['from' => 'ส่ง', 'to' => 'ยืนยัน'], 'pin' => ['option' => 'A', 'device' => 'phone', 'src' => 'crop', 'x' => 0, 'y' => 0]])
+        ->assertCreated()->assertJsonPath('body', '')->assertJsonPath('pin.src', 'crop');
+    actingAs($nida)->postJson($url, ['step' => QUESTION, 'body' => ''])->assertJsonValidationErrors('body');
 
     actingAs($nida)->getJson('/kradan/api/boards/t188-manual-so')
         ->assertJsonCount(3, 'comments')
         ->assertJsonPath('comments.0.replies.0.body', 'เห็นด้วย')
         ->assertJsonPath('comments.0.mine', true)
-        ->assertJsonPath('comments.0.replies.0.mine', false);
+        ->assertJsonPath('comments.0.replies.0.mine', false)
+        ->assertJsonMissingPath('comments.0.replies.0.replies');
 
     expect(Activity::query()->pluck('action')->map->value->countBy()->all())
         ->toMatchArray(['comment' => 2, 'pin' => 1, 'edit' => 1]);
@@ -116,38 +183,52 @@ it('threads comments one level deep, with pins and edits', function (): void {
 it('lets only the author edit or delete a comment', function (): void {
     publishRound();
     $author = kradanUser('นิดา');
-    $id = actingAs($author)->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => QUESTION, 'body' => 'เดิม'])->json('comment.id');
+    $id = actingAs($author)->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => QUESTION, 'body' => 'เดิม'])->json('id');
 
     actingAs(kradanUser('สมชาย'))->patchJson("/kradan/api/comments/{$id}", ['body' => 'แก้'])->assertForbidden();
     actingAs(kradanUser('สมชาย'))->deleteJson("/kradan/api/comments/{$id}")->assertForbidden();
 
-    actingAs($author)->patchJson("/kradan/api/comments/{$id}", ['body' => 'แก้แล้ว'])->assertOk()->assertJsonPath('comment.body', 'แก้แล้ว');
+    actingAs($author)->patchJson("/kradan/api/comments/{$id}", ['body' => 'แก้แล้ว'])->assertOk()->assertJsonPath('body', 'แก้แล้ว');
     actingAs($author)->deleteJson("/kradan/api/comments/{$id}")->assertNoContent();
 
     expect(Comment::query()->count())->toBe(0)
         ->and(Comment::withTrashed()->count())->toBe(1);
 });
 
-it('tracks viewers on heartbeat: active, recent, and the prints each has seen', function (): void {
+it('lists viewers of the last 15 minutes on heartbeat, and merges the prints each has seen', function (): void {
     publishRound();
     $somchai = kradanUser('สมชาย');
     $wipa = kradanUser('วิภา');
+    $ton = kradanUser('ต้น');
 
+    actingAs($ton)->postJson('/kradan/api/boards/t188-manual-so/heartbeat')->assertOk();
+    Date::setTestNow(Date::now()->addMinutes(11));
     actingAs($wipa)->postJson('/kradan/api/boards/t188-manual-so/heartbeat')->assertOk();
     Date::setTestNow(Date::now()->addMinutes(5));
 
     actingAs($somchai)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['round' => 1, 'prints_seen' => [QUESTION => 'abc']])
         ->assertOk()
+        ->assertJsonCount(2, 'viewers')
         ->assertJsonPath('viewers.0.user.name', 'สมชาย')
         ->assertJsonPath('viewers.0.active', true)
         ->assertJsonPath('viewers.1.user.name', 'วิภา')
-        ->assertJsonPath('viewers.1.active', false)
-        ->assertJsonPath('viewers.1.recent', true);
+        ->assertJsonPath('viewers.1.active', false);
 
     actingAs($somchai)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['prints_seen' => [SCREEN => 'def']]);
+    actingAs($somchai)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['prints_seen' => [QUESTION => 'xyz']]);
 
     actingAs($somchai)->getJson('/kradan/api/boards/t188-manual-so')
-        ->assertJsonPath('seen_prints', [QUESTION => 'abc', SCREEN => 'def']);
+        ->assertJsonPath('seen_prints', [QUESTION => 'xyz', SCREEN => 'def']);
+});
+
+it('answers ?round=N with the same shape for that round', function (): void {
+    publishRound();
+    publishRound(title: 'Manual SO ก่อนยืนยัน รอบ 2');
+    $user = kradanUser();
+    actingAs($user)->putJson(pickUrl(2), ['options' => ['A']]);
+
+    actingAs($user)->getJson('/kradan/api/boards/t188-manual-so')->assertJsonPath('current', 2)->assertJsonCount(1, 'picks');
+    actingAs($user)->getJson('/kradan/api/boards/t188-manual-so?round=1')->assertJsonPath('current', 1)->assertJsonCount(0, 'picks')->assertJsonCount(2, 'rounds');
 });
 
 it('logs a view at most once per user, per board, per 30 minutes', function (): void {

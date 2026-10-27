@@ -35,7 +35,7 @@ final readonly class BoardIndex
             ->with('latestRound')
             ->latest('updated_at')
             ->get()
-            ->map(fn (Board $board): array => $this->row($board))
+            ->map(fn (Board $board): array => $this->row($board, $user))
             ->filter(fn (array $row): bool => $this->matches($row, $query))
             ->values()
             ->all();
@@ -44,7 +44,7 @@ final readonly class BoardIndex
     /**
      * @return array<string, mixed>
      */
-    private function row(Board $board): array
+    private function row(Board $board, Authenticatable $user): array
     {
         $round = $board->latestRound;
 
@@ -53,7 +53,29 @@ final readonly class BoardIndex
             'url' => $board->url(),
             'round' => $round instanceof Round ? ['number' => $round->number, 'title' => $round->title, 'pushed_at' => $round->pushed_at->toIso8601String()] : null,
             'steps' => $round instanceof Round ? array_column($round->steps, 'title') : [],
+            'answered' => $round instanceof Round ? $this->answered($round) : 0,
+            'viewers' => $this->presenter->viewers($board),
+            'updated' => $round instanceof Round && $this->updated($round, $this->presenter->seenPrints($board, $user)),
         ];
+    }
+
+    private function answered(Round $round): int
+    {
+        return $round->picks()->pluck('user_id')
+            ->merge($round->comments()->pluck('user_id'))
+            ->unique()
+            ->count();
+    }
+
+    /**
+     * A step whose print differs from what this viewer last saw, a new step included.
+     * Never on a first visit.
+     *
+     * @param  array<string, string>|null  $seen
+     */
+    private function updated(Round $round, ?array $seen): bool
+    {
+        return $seen !== null && collect($round->prints)->contains(fn (string $print, string $key): bool => ($seen[$key] ?? null) !== $print);
     }
 
     /**
