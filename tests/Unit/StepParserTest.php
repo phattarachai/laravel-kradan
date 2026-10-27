@@ -47,3 +47,17 @@ it('ignores the harness block and keeps duplicate step titles apart', function (
 
     expect(array_column($steps, 'key'))->toBe(['|Q', '|Q|2']);
 });
+
+it('reads a page without steps as one screen step titled after the page', function (): void {
+    $files = [
+        'index.html' => '<body data-dp="Cover flow"><h1>ใบลา</h1><div data-dp-frames data-src="screen.html"></div></body>',
+        'screen.html' => '<p>v1</p>',
+    ];
+    $parse = fn (array $files): array => new StepParser()->parse($files['index.html'], fn (string $path): ?string => $files[$path] ?? null);
+
+    $parsed = $parse($files);
+
+    expect($parsed['steps'])->toBe([['key' => '|Cover flow', 'group' => '', 'title' => 'Cover flow', 'sub' => '', 'kind' => 'screen', 'options' => []]])
+        ->and(array_keys($parsed['prints']))->toBe(['|Cover flow'])
+        ->and($parse([...$files, 'screen.html' => '<p>v2</p>'])['prints']['|Cover flow'])->not->toBe($parsed['prints']['|Cover flow']);
+});
