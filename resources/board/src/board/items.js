@@ -23,12 +23,14 @@ export function boxOf(points) {
   const x = Math.min(...xs), y = Math.min(...ys);
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, points: points.map(([a, b]) => [Math.round(a - x), Math.round(b - y)]) };
 }
+/* anchor.on as sent in a form ("1"/"0") or as JSON */
+export const isOn = it => [true, 1, '1', 'true'].includes(it.anchor?.on);
 /* does this item belong in this place? frames by option, device and src; groups by option */
 export function onFrame(it, f) {
-  return !!it.anchor?.on && (it.anchor.option ?? '') === (f.option ?? '') && it.anchor.device === f.device && it.anchor.src === f.src;
+  return isOn(it) && (it.anchor.option ?? '') === (f.option ?? '') && it.anchor.device === f.device && it.anchor.src === f.src;
 }
 export function besideGroup(it, option) {
-  return !it.anchor?.on && (it.anchor?.option ?? '') === (option ?? '');
+  return !isOn(it) && (it.anchor?.option ?? '') === (option ?? '');
 }
 /* one line per item: what the panel, the thread and the hover tip say */
 export function summary(it) {
@@ -409,7 +411,7 @@ export function createItems(ctx) {
   function rowHtml(it) {
     const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
     const file = it.kind === 'file' && it.file?.url ? ` · <a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : '';
-    const where = it.anchor?.on && it.anchor.option ? ` ${t('on_option', { o: it.anchor.option })}` : '';
+    const where = isOn(it) && it.anchor.option ? ` ${t('on_option', { o: it.anchor.option })}` : '';
     return `<div class="k-irow" data-goitem="${it.id}"><span class="ic k-i-ic-${it.kind}">${ICON[it.kind] || '•'}</span><span class="h"><b>${esc(it.user?.name || '')}</b> ${esc(when(it.created_at))}</span>
       <span class="b">${esc(summary(it))}${esc(where)}${file}</span>${thumb}</div>`;
   }

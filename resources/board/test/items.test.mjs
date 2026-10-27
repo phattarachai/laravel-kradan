@@ -41,3 +41,8 @@ test('uploads: the package lists extensions, a MIME list works too; svg is a fil
   assert.equal(kindOf(f('logo.svg', 'image/svg+xml')), 'file');
   assert.equal(kindOf(f('q4.pdf', 'application/pdf')), 'file');
 });
+
+test('anchor.on sent as a form field ("0"/"1") reads the same as JSON', () => {
+  assert.equal(besideGroup({ anchor: { option: null, on: '0' } }, ''), true);
+  assert.equal(onFrame({ anchor: { option: null, device: 'desktop', src: 'crop', on: '1' } }, { option: null, device: 'desktop', src: 'crop' }), true);
+});
