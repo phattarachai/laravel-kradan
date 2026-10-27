@@ -8,7 +8,7 @@
 <meta name="robots" content="noindex">
 <title>{{ $boot['board']['title'] ?? $boot['index']['title'] ?? $boot['brand']['name'] ?? 'Kradan' }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ $assets }}/board.css?v={{ $boot['version'] }}">
 </head>
 <body class="kradan-board">

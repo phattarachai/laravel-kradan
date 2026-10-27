@@ -6,7 +6,7 @@
 import { t } from './i18n.js';
 import { $, esc, shortDate, getLocal, setLocal } from './util.js';
 import { avatar, avatarRow } from './presence.js';
-import { MARK } from './icon.js';
+import { corner } from './icon.js';
 
 export function mountIndex(boot, root) {
   const ME = boot.user || {};
@@ -20,13 +20,12 @@ export function mountIndex(boot, root) {
     q: data.q || Q.get('q') || '',
   };
   if (!panels.some(p => p.key === ui.panel)) { ui.panel = panels[0]?.key || ''; }
-  const brand = boot.brand || {};
   const isPast = b => b.status !== 'open';
   const inPanel = b => b.panel === ui.panel;
 
   root.innerHTML = `<div class="k-index">
     <header class="k-bar">
-      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}"><span class="k-mark">${MARK}</span><span class="k-bname">${t('product')}</span></a>
+      ${corner(boot)}
       <span class="k-sp"></span><span class="k-avs">${avatar(ME, { tip: ME.name })}</span>
     </header>
     <div class="k-ibody"><nav class="k-inav" id="nav"></nav><main class="k-imain" id="main"></main></div>
@@ -49,9 +48,7 @@ export function mountIndex(boot, root) {
   }
 
   function renderNav() {
-    /* the app's own name and logo head the menu (owner, 2026-10-27); the corner is Kradan's */
-    const head = brand.name || brand.logo ? `<div class="k-ihead">${brand.logo ? `<img class="k-logo" src="${esc(brand.logo)}" alt="">` : `<span class="k-logo">${esc((brand.name || '').slice(0, 2))}</span>`}<span>${esc(brand.name || '')}</span></div>` : '';
-    $('#nav').innerHTML = head + panels.map(p => `<a href="${esc(p.url || '#')}" data-panel="${esc(p.key)}" aria-current="${p.key === ui.panel}">${esc(p.title)}<span class="n tnum">${boards.filter(b => b.panel === p.key && !isPast(b)).length}</span></a>`).join('');
+    $('#nav').innerHTML = panels.map(p => `<a href="${esc(p.url || '#')}" data-panel="${esc(p.key)}" aria-current="${p.key === ui.panel}">${esc(p.title)}<span class="n tnum">${boards.filter(b => b.panel === p.key && !isPast(b)).length}</span></a>`).join('');
   }
 
   function row(b) {
