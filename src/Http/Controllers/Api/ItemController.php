@@ -110,7 +110,19 @@ final readonly class ItemController
     {
         return collect($validated)
             ->only(['anchor', 'x', 'y', 'w', 'h', 'color', 'text', 'points', 'texts'])
+            ->when(isset($validated['anchor']['on']), fn ($attributes) => $attributes->put('anchor', self::anchor($validated['anchor'])))
             ->all();
+    }
+
+    /**
+     * A multipart upload sends `anchor[on]` as "1"/"0"; store a real boolean.
+     *
+     * @param  array<string, mixed>  $anchor
+     * @return array<string, mixed>
+     */
+    private static function anchor(array $anchor): array
+    {
+        return [...$anchor, 'on' => filter_var($anchor['on'], FILTER_VALIDATE_BOOLEAN)];
     }
 
     /**

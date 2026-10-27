@@ -78,6 +78,25 @@ it('creates every kind of item in the contract shape', function (): void {
         ->assertJsonPath('uploads.types.0', 'png');
 });
 
+it('stores anchor.on as a boolean when a multipart upload sends "1" or "0"', function (): void {
+    $user = kradanUser();
+    $on = fn (string $sent): mixed => actingAs($user)->post(ITEMS_URL, [
+        'step' => STEP, 'kind' => 'image', 'x' => 1, 'y' => 2,
+        'anchor' => ['option' => 'A', 'device' => 'desktop', 'src' => 'crop', 'on' => $sent],
+        'file' => UploadedFile::fake()->image('a.png'),
+    ], ['Accept' => 'application/json'])->assertCreated()->json('anchor.on');
+
+    expect($on('1'))->toBeTrue()
+        ->and($on('0'))->toBeFalse();
+
+    $id = Item::query()->latest('id')->value('id');
+    actingAs($user)->patch("/kradan/api/items/{$id}", ['x' => 3, 'anchor' => ['option' => 'B', 'on' => '1']], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('anchor.on', true);
+
+    actingAs($user)->getJson('/kradan/api/boards/t188-manual-so')->assertJsonPath('items.0.anchor.on', true)->assertJsonPath('items.1.anchor.on', true);
+});
+
 it('validates items by kind', function (): void {
     $user = kradanUser();
     $post = fn (array $fields) => actingAs($user)->postJson(ITEMS_URL, ['step' => STEP, 'x' => 0, 'y' => 0, ...$fields]);
