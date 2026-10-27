@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Phattarachai\Kradan\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
-use Phattarachai\Kradan\Enums\BoardKind;
 
 final class PushRequest extends FormRequest
 {
@@ -15,10 +13,8 @@ final class PushRequest extends FormRequest
     {
         return [
             'bundle' => ['required', 'file', 'max:'.config('kradan.max_bundle_kb', 20480)],
-            'slug' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9._-]*$/'],
-            'kind' => ['nullable', Rule::enum(BoardKind::class)],
+            'slug' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9._-]*$/', 'not_in:api,f,files,assets'],
             'task_ref' => ['nullable', 'string', 'max:64'],
-            'title' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

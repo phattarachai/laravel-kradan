@@ -22,14 +22,13 @@ return new class extends Migration
             $table->id();
             $table->string('slug')->unique();
             $table->string('title');
-            $table->string('kind', 16);
             $table->string('task_ref', 64)->nullable();
             $table->string('status', 16)->default('open');
             $table->timestamp('decided_at')->nullable();
             $table->string('decided_by', 64)->nullable();
             $table->timestamps();
 
-            $table->index(['kind', 'status']);
+            $table->index('status');
         });
 
         $schema->create('kradan_rounds', function (Blueprint $table): void {

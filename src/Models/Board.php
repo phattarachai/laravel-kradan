@@ -8,15 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Override;
-use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Enums\BoardStatus;
-use Phattarachai\Kradan\Kradan;
 
 /**
  * @property int $id
  * @property string $slug
  * @property string $title
- * @property BoardKind $kind
  * @property string|null $task_ref
  * @property BoardStatus $status
  * @property Carbon|null $decided_at
@@ -30,7 +27,7 @@ final class Board extends KradanModel
     protected $table = 'kradan_boards';
 
     /** @var list<string> */
-    protected $fillable = ['slug', 'title', 'kind', 'task_ref', 'status', 'decided_at', 'decided_by'];
+    protected $fillable = ['slug', 'title', 'task_ref', 'status', 'decided_at', 'decided_by'];
 
     /** @return HasMany<Round, $this> */
     public function rounds(): HasMany
@@ -54,11 +51,6 @@ final class Board extends KradanModel
     public function activity(): HasMany
     {
         return $this->hasMany(Activity::class);
-    }
-
-    public function panel(): string
-    {
-        return Kradan::panelFor($this->kind);
     }
 
     /**
@@ -88,7 +80,7 @@ final class Board extends KradanModel
 
     public function url(): string
     {
-        return route('kradan.board', ['panel' => $this->panel(), 'slug' => $this->slug]);
+        return route('kradan.board', ['slug' => $this->slug]);
     }
 
     /** @return array<string, string> */
@@ -96,7 +88,6 @@ final class Board extends KradanModel
     protected function casts(): array
     {
         return [
-            'kind' => BoardKind::class,
             'status' => BoardStatus::class,
             'decided_at' => 'datetime',
         ];

@@ -6,7 +6,6 @@ namespace Phattarachai\Kradan\Http\Controllers\Api;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
-use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Http\Requests\PushRequest;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
@@ -27,14 +26,11 @@ final readonly class TokenController
     {
         /** @var UploadedFile $file */
         $file = $request->file('bundle');
-        $kind = $request->validated('kind');
 
         $result = $publisher->publish(
             (string) $request->validated('slug'),
             Bundle::fromZip((string) $file->getRealPath()),
-            $kind === null ? null : BoardKind::from((string) $kind),
             $request->validated('task_ref'),
-            $request->validated('title'),
         );
 
         return response()->json([

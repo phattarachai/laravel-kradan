@@ -22,7 +22,7 @@ return [
     'item_stroke' => 'วาดเส้น',
     'item_near' => 'ใกล้',
     'bundle_unreadable' => 'เปิดไฟล์ zip ไม่ได้',
-    'bundle_no_index' => 'ใน zip ต้องมี index.html หรือ index.md อยู่ชั้นบนสุด',
+    'bundle_no_index' => 'ใน zip ต้องมี index.html อยู่ชั้นบนสุด กระดานรับเฉพาะหน้าที่ออกแบบแล้ว',
     'bundle_bad_path' => 'ไฟล์ :path อยู่นอกโฟลเดอร์ของหน้า',
     'bundle_too_large' => 'zip ใหญ่เกินไป',
 ];

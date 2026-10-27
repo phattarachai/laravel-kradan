@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Phattarachai\Kradan\Enums\ActivityAction;
-use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Enums\BoardStatus;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
@@ -25,15 +24,13 @@ final readonly class RoundPublisher
     /**
      * @return array{board: Board, round: Round, created: bool}
      */
-    public function publish(string $slug, Bundle $bundle, ?BoardKind $kind = null, ?string $taskRef = null, ?string $title = null): array
+    public function publish(string $slug, Bundle $bundle, ?string $taskRef = null): array
     {
-        $newKind = $bundle->isMarkdown() ? BoardKind::Flow : BoardKind::Decision;
-        $bundle = $bundle->withPage($title ?? $slug);
         $parsed = $this->parser->parse((string) $bundle->get('index.html'), $bundle->get(...));
         $title = $parsed['title'] !== '' ? $parsed['title'] : $slug;
 
-        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $kind, $newKind, $taskRef, $title, $parsed): array {
-            $board = $this->board($slug, $title, $kind, $taskRef, $newKind);
+        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $taskRef, $title, $parsed): array {
+            $board = $this->board($slug, $title, $taskRef);
             $latest = $board->latestRound()->first();
             $created = $latest === null || $latest->title !== $title;
 
@@ -51,14 +48,10 @@ final readonly class RoundPublisher
         return ['board' => $board, 'round' => $round, 'created' => $created];
     }
 
-    /**
-     * A new board without a kind is a flow when written in markdown, a decision otherwise.
-     */
-    private function board(string $slug, string $title, ?BoardKind $kind, ?string $taskRef, BoardKind $newKind): Board
+    private function board(string $slug, string $title, ?string $taskRef): Board
     {
         $board = Board::query()->firstOrNew(['slug' => $slug]);
         $board->title = self::boardTitle($title);
-        $board->kind = $kind ?? $board->kind ?? $newKind;
         $board->task_ref = $taskRef ?? $board->task_ref;
         $board->status ??= BoardStatus::Open;
         $board->save();

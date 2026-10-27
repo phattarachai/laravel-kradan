@@ -16,7 +16,7 @@ trait ResolvesBoards
     {
         $board = Board::query()->where('slug', $slug)->firstOrFail();
 
-        abort_unless(Kradan::allows($this->user(), $board->panel(), $ability), 403);
+        abort_unless(Kradan::allows($this->user(), $ability), 403);
 
         return $board;
     }

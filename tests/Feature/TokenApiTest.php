@@ -20,7 +20,6 @@ function push(array $files, array $fields = [], string $token = 'test-token'): T
 {
     return withToken($token)->post('/kradan/api/v1/push', [
         'slug' => 't188-manual-so',
-        'kind' => 'decision',
         'task_ref' => 'T188',
         ...$fields,
         'bundle' => new UploadedFile(zipOf($files), 'bundle.zip', 'application/zip', test: true),
@@ -45,7 +44,7 @@ it('accepts any token whose sha256 is listed, and is throttled', function (): vo
 it('opens round 1 on the first push, with the steps and files of the bundle', function (): void {
     push(designFiles())
         ->assertCreated()
-        ->assertJson(['board_url' => 'http://localhost/kradan/decisions/t188-manual-so', 'round' => 1, 'created' => true, 'steps' => 2]);
+        ->assertJson(['board_url' => 'http://localhost/kradan/t188-manual-so', 'round' => 1, 'created' => true, 'steps' => 2]);
 
     $board = Board::query()->sole();
     $round = Round::query()->sole();
@@ -121,9 +120,16 @@ it('refuses a bundle with an entry outside the folder, or without index.html', f
         ->and(Storage::disk('local')->allFiles())->toBe([]);
 });
 
-it('validates the slug and kind', function (): void {
-    push(designFiles(), ['slug' => '../x'])->assertJsonValidationErrors('slug');
-    push(designFiles(), ['kind' => 'poll'])->assertJsonValidationErrors('kind');
+it('validates the slug, keeping the API paths free', function (): void {
+    foreach (['../x', 'api', 'assets', 'files', 'f', 'Has Space'] as $slug) {
+        push(designFiles(), ['slug' => $slug])->assertJsonValidationErrors('slug');
+    }
+});
+
+it('refuses a markdown folder: Kradan takes designed pages only', function (): void {
+    push(['index.md' => '# ราคา'])->assertUnprocessable()->assertJsonValidationErrors('bundle');
+
+    expect(Board::query()->count())->toBe(0);
 });
 
 it('lists boards and returns every round\'s review', function (): void {
@@ -138,7 +144,7 @@ it('lists boards and returns every round\'s review', function (): void {
     $review = withToken('test-token')->getJson('/kradan/api/v1/boards/t188-manual-so/review')->assertOk();
 
     expect(array_column($review->json('rounds'), 'number'))->toBe([1, 2])
-        ->and($review->json('rounds.1.markdown'))->toStartWith('T188 Manual SO ก่อนยืนยัน · รอบ 2 · http://localhost/kradan/decisions/t188-manual-so')
+        ->and($review->json('rounds.1.markdown'))->toStartWith('T188 Manual SO ก่อนยืนยัน · รอบ 2 · http://localhost/kradan/t188-manual-so')
         ->and($review->json('rounds.1.json.title'))->toBe('Manual SO ก่อนยืนยัน รอบ 2');
 });
 

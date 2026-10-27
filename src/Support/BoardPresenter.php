@@ -37,7 +37,7 @@ final readonly class BoardPresenter
     public function boardPage(Authenticatable $user, Board $board, ?int $roundNumber = null): array
     {
         return [
-            ...$this->boot($user, 'board', $board->panel()),
+            ...$this->boot($user, 'board'),
             'presence' => $this->presence($board),
             'board' => $this->board($board, $user, $roundNumber),
         ];
@@ -47,18 +47,12 @@ final readonly class BoardPresenter
      * @param  list<array<string, mixed>>  $boards
      * @return array<string, mixed>
      */
-    public function indexPage(Authenticatable $user, array $boards, ?string $panel, string $query): array
+    public function indexPage(Authenticatable $user, array $boards): array
     {
         return [
-            ...$this->boot($user, 'index', $panel),
+            ...$this->boot($user, 'index'),
             'presence' => $this->presence(null),
-            'index' => [
-                'title' => $panel === null ? null : Kradan::panels()[$panel]['title'],
-                'panel' => $panel,
-                'q' => $query,
-                'panels' => $this->panels($user),
-                'boards' => $boards,
-            ],
+            'index' => ['boards' => $boards],
         ];
     }
 
@@ -121,8 +115,6 @@ final readonly class BoardPresenter
         return [
             'slug' => $board->slug,
             'title' => $board->title,
-            'kind' => $board->kind->value,
-            'panel' => $board->panel(),
             'status' => $board->status->value,
             'task_ref' => $board->task_ref,
             'label' => $board->label(),
@@ -271,14 +263,14 @@ final readonly class BoardPresenter
     /**
      * @return array<string, mixed>
      */
-    private function boot(Authenticatable $user, string $page, ?string $panel): array
+    private function boot(Authenticatable $user, string $page): array
     {
         return [
             'version' => AssetController::version(),
             'page' => $page,
             'brand' => (array) config('kradan.brand'),
             'locale' => (string) config('kradan.locale', 'th'),
-            'user' => [...Kradan::present($user), 'can' => ['manage' => $panel !== null && Kradan::allows($user, $panel, Ability::Manage)]],
+            'user' => [...Kradan::present($user), 'can' => ['manage' => Kradan::allows($user, Ability::Manage)]],
             'csrf' => csrf_token(),
             'routes' => ['api' => url(trim((string) config('kradan.path'), '/').'/api'), 'index' => route('kradan.index')],
         ];
@@ -334,18 +326,5 @@ final readonly class BoardPresenter
             'port' => (int) ($options['port'] ?? 443),
             'scheme' => (string) ($options['scheme'] ?? 'https'),
         ];
-    }
-
-    /**
-     * @return list<array{key: string, kind: string, title: string, url: string}>
-     */
-    public function panels(Authenticatable $user): array
-    {
-        return array_map(fn (string $panel): array => [
-            'key' => $panel,
-            'kind' => Kradan::panels()[$panel]['kind'],
-            'title' => Kradan::panels()[$panel]['title'],
-            'url' => route('kradan.panel', ['panel' => $panel]),
-        ], Kradan::viewablePanels($user));
     }
 }

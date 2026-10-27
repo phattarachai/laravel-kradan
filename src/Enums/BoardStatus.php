@@ -8,5 +8,4 @@ enum BoardStatus: string
 {
     case Open = 'open';
     case Decided = 'decided';
-    case Archived = 'archived';
 }

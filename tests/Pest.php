@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Support\Bundle;
@@ -83,9 +82,9 @@ function designFiles(string $title = 'Manual SO ก่อนยืนยัน �
 /**
  * @param  array<string, string>  $files
  */
-function publishRound(string $slug = 't188-manual-so', string $title = 'Manual SO ก่อนยืนยัน รอบ 1', array $files = [], BoardKind $kind = BoardKind::Decision, ?string $taskRef = 'T188'): Round
+function publishRound(string $slug = 't188-manual-so', string $title = 'Manual SO ก่อนยืนยัน รอบ 1', array $files = [], ?string $taskRef = 'T188'): Round
 {
-    $result = app(RoundPublisher::class)->publish($slug, new Bundle(designFiles($title, $files)), $kind, $taskRef);
+    $result = app(RoundPublisher::class)->publish($slug, new Bundle(designFiles($title, $files)), $taskRef);
 
     return $result['round'];
 }

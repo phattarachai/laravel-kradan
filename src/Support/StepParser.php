@@ -47,7 +47,7 @@ final class StepParser
     }
 
     /**
-     * A page with no `[data-dp-step]` (a flow written as one page) is one
+     * A page with no `[data-dp-step]` (a decision page that is one screen) is one
      * screen step, so comments and the export still have a step key.
      *
      * @return array{key: string, group: string, title: string, sub: string, kind: string, options: list<array{key: string, title: string}>}

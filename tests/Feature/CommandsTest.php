@@ -40,10 +40,10 @@ it('pushes a design folder as a zip without the workbench files', function (): v
         File::put("{$this->dir}/t188/{$path}", $contents);
     }
 
-    Http::fake(['staging.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://staging.example.com/kradan/decisions/t188', 'round' => 1, 'title' => 'x', 'steps' => 2, 'created' => true], 201)]);
+    Http::fake(['staging.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://staging.example.com/kradan/t188', 'round' => 1, 'title' => 'x', 'steps' => 2, 'created' => true], 201)]);
 
-    $this->artisan('kradan:push', ['dir' => "{$this->dir}/t188", '--kind' => 'decision', '--task' => 'T188'])
-        ->expectsOutputToContain('New round 1: https://staging.example.com/kradan/decisions/t188')
+    $this->artisan('kradan:push', ['dir' => "{$this->dir}/t188", '--task' => 'T188'])
+        ->expectsOutputToContain('New round 1: https://staging.example.com/kradan/t188')
         ->assertSuccessful();
 
     Http::assertSent(function (Request $request): bool {
@@ -55,7 +55,7 @@ it('pushes a design folder as a zip without the workbench files', function (): v
         $names = array_map(fn (int $i): string => (string) $archive->getNameIndex($i), range(0, $archive->numFiles - 1));
 
         return $request->hasHeader('Authorization', 'Bearer test-token')
-            && $parts['slug'] === 't188' && $parts['kind'] === 'decision' && $parts['task_ref'] === 'T188'
+            && $parts['slug'] === 't188' && $parts['task_ref'] === 'T188' && ! isset($parts['kind'])
             && collect($names)->sort()->values()->all() === ['index.html', 'screen.html', 'style.css'];
     });
 });
@@ -72,18 +72,14 @@ it('shows what a dry run would push without sending anything', function (): void
     Http::assertNothingSent();
 });
 
-it('pushes a markdown folder, sending --title for a page without a heading', function (): void {
-    File::put("{$this->dir}/index.md", "สรุปผลการตรวจ\n\n| a | b |\n|---|---|\n| 1 | 2 |\n");
+it('refuses a folder without index.html', function (): void {
+    File::put("{$this->dir}/index.md", "# ราคา\n");
 
-    $this->artisan('kradan:push', ['dir' => $this->dir, '--title' => 'ผลการตรวจ รอบ 1', '--dry-run' => true])
-        ->expectsOutputToContain('ผลการตรวจ รอบ 1')
-        ->assertSuccessful();
+    $this->artisan('kradan:push', ['dir' => $this->dir])
+        ->expectsOutputToContain('index.html not found')
+        ->assertFailed();
 
-    Http::fake(['staging.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://staging.example.com/kradan/flows/x', 'round' => 1, 'title' => 'x', 'steps' => 1, 'created' => true], 201)]);
-
-    $this->artisan('kradan:push', ['dir' => $this->dir, '--slug' => 'x', '--title' => 'ผลการตรวจ รอบ 1'])->assertSuccessful();
-
-    Http::assertSent(fn (Request $request): bool => collect($request->data())->pluck('contents', 'name')['title'] === 'ผลการตรวจ รอบ 1');
+    Http::assertNothingSent();
 });
 
 it('pulls every round into rounds/NN by data-dp title, and the latest as review.md', function (): void {
@@ -98,7 +94,7 @@ it('pulls every round into rounds/NN by data-dp title, and the latest as review.
         ],
     ])]);
 
-    $this->artisan('kradan:pull', ['board' => 'https://staging.example.com/kradan/decisions/t188-manual-so?round=2', '--to' => $this->dir])
+    $this->artisan('kradan:pull', ['board' => 'https://staging.example.com/kradan/t188-manual-so?round=2', '--to' => $this->dir])
         ->assertSuccessful();
 
     $rounds = json_decode(File::get("{$this->dir}/rounds/rounds.json"), true);
@@ -144,10 +140,10 @@ it('downloads every image and file into attachments/, at the paths the review na
 it('lists boards and marks one decided', function (): void {
     Http::fake([
         'staging.example.com/kradan/api/v1/boards' => Http::response(['boards' => [
-            ['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/decisions/t188'],
-            ['slug' => 't156', 'kind' => 'flow', 'status' => 'open', 'round' => 1, 'task_ref' => 'T156', 'title' => 'T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ', 'url' => 'https://staging.example.com/kradan/flows/t156'],
+            ['slug' => 't188', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/t188'],
+            ['slug' => 't156', 'status' => 'open', 'round' => 1, 'task_ref' => 'T156', 'title' => 'T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ', 'url' => 'https://staging.example.com/kradan/t156'],
         ]]),
-        'staging.example.com/kradan/api/v1/boards/t188/decide' => Http::response(['board' => ['slug' => 't188', 'status' => 'decided', 'url' => 'https://staging.example.com/kradan/decisions/t188']]),
+        'staging.example.com/kradan/api/v1/boards/t188/decide' => Http::response(['board' => ['slug' => 't188', 'status' => 'decided', 'url' => 'https://staging.example.com/kradan/t188']]),
     ]);
 
     $this->artisan('kradan:list')

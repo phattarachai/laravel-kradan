@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Support\ContentSigner;
-use Phattarachai\Kradan\Support\MarkdownPage;
 use Phattarachai\Kradan\Support\RoundPublisher;
 use Phattarachai\Kradan\Support\SafePath;
 use Phattarachai\Kradan\Support\StepParser;
@@ -60,10 +59,6 @@ final readonly class ContentController
 
         if ($path === ContentSigner::AGENT) {
             return $this->script(AssetController::path('agent.js'));
-        }
-
-        if ($path === MarkdownPage::MERMAID) {
-            return $this->script(MarkdownPage::mermaidPath());
         }
 
         $file = $this->file($round, $path);

@@ -45,7 +45,7 @@ it('copies the round for Claude in the exact review.md shape', function (): void
         ->getContent();
 
     expect($markdown)->toBe(<<<'MD'
-        T188 Manual SO ก่อนยืนยัน · รอบ 2 · http://localhost/kradan/decisions/t188-manual-so
+        T188 Manual SO ก่อนยืนยัน · รอบ 2 · http://localhost/kradan/t188-manual-so
 
         1. Block หรือเก็บไว้ → A: สมชาย, วิภา · B: นิดา · ข้าม: ต้น
            💬 นิดา: ถ้า block ต้องมีทางให้ sales แก้เอง

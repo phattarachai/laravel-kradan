@@ -30,7 +30,7 @@ final readonly class BoardController
     public function index(Request $request, BoardIndex $index): JsonResponse
     {
         return response()->json([
-            'boards' => $index->list($this->user(), (string) $request->query('q', ''), $request->query('panel')),
+            'boards' => $index->list($this->user(), (string) $request->query('q', '')),
         ]);
     }
 

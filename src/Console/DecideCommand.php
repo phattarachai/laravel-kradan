@@ -11,7 +11,7 @@ final class DecideCommand extends Command
 {
     protected $signature = 'kradan:decide {slug : the board, or its URL}';
 
-    protected $description = 'Mark a decision board decided (a flow board archived), moving it to history';
+    protected $description = 'Mark a board decided, moving it to history: picks lock, comments stay open';
 
     public function handle(KradanRemote $remote): int
     {

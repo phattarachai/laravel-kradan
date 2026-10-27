@@ -6,14 +6,13 @@ namespace Phattarachai\Kradan\Support;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Str;
-use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
 
 /**
- * Every board the user may view, newest first, searchable by title, task ref
- * and step titles. Open boards and the history (decided, archived) both come
- * back; the page splits them by `status`.
+ * Every board, newest first, searchable by title, task ref and step titles.
+ * Open boards and the history (decided) both come back; the page splits them
+ * by `status`.
  */
 final readonly class BoardIndex
 {
@@ -22,16 +21,9 @@ final readonly class BoardIndex
     /**
      * @return list<array<string, mixed>>
      */
-    public function list(Authenticatable $user, string $query = '', ?string $panel = null): array
+    public function list(Authenticatable $user, string $query = ''): array
     {
-        $kinds = collect(Kradan::viewablePanels($user))
-            ->when($panel !== null, fn ($panels) => $panels->intersect([$panel]))
-            ->map(fn (string $key): string => Kradan::panels()[$key]['kind'])
-            ->values()
-            ->all();
-
         return Board::query()
-            ->whereIn('kind', $kinds)
             ->with('latestRound')
             ->latest('updated_at')
             ->get()
