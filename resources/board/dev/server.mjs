@@ -302,7 +302,7 @@ async function api(req, res, url, me) {
   if ((m = p.match(/^boards\/([^/]+)\/decide$/)) && req.method === 'POST') {
     const b = find(m[1]);
     if (!USERS[me].manage) { return sendJson(res, 403, {}); }
-    Object.assign(b, { status: 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
+    Object.assign(b, { status: b.kind === 'flow' ? 'archived' : 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
     return sendJson(res, 200, boardPayload(b, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/export\.md$/)) && req.method === 'GET') {

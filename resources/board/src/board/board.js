@@ -10,6 +10,7 @@ import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText } from './ut
 import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
+import { MARK } from './icon.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -32,6 +33,8 @@ const IC = {
   arr: '<rect x="4" y="3" width="16" height="7" rx="1.5"/><rect x="4" y="14" width="16" height="7" rx="1.5"/>',
   sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   mini: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" rx="1"/>',
+  reload: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/>',
   hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 11.5V4a1.5 1.5 0 0 1 3 0v7.5"/><path d="M14 11.5V5.5a1.5 1.5 0 0 1 3 0V14"/><path d="M8 12.5 6.6 11a1.6 1.6 0 0 0-2.4 2.1L8 18.5A5 5 0 0 0 12 21h1a5 5 0 0 0 5-5v-4.5a1.5 1.5 0 0 0-3 0"/>',
   use: '<path d="M5 3l14 7-6 2-2 6z"/>',
   box: '<rect x="4" y="5" width="16" height="14" rx="1.5" stroke-dasharray="3 2.4"/>',
@@ -168,7 +171,7 @@ export function mountBoard(boot, root) {
   root.innerHTML = `<div class="k-app" id="app">
     <header class="k-bar">
       ${ib('data-act="side"', 'side', t('side'))}
-      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}">${brand.logo ? `<img class="k-logo" src="${esc(brand.logo)}" alt="">` : `<span class="k-logo">${esc((brand.name || 'K').slice(0, 2))}</span>`}<span class="k-bname">${esc(brand.name || 'Kradan')}</span></a>
+      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc([brand.name, t('product')].filter(Boolean).join(' '))}"><span class="k-mark">${MARK}</span></a>
       <span class="k-crumb">/</span>
       <button class="k-ttl" id="ttl" data-act="rounds"></button>
       <span class="k-old" id="oldr" hidden>${t('old_round')}</span>
@@ -180,14 +183,14 @@ export function mountBoard(boot, root) {
       <span class="k-sep"></span>
       <span class="k-grp" id="devs"></span>
       <span class="k-sp"></span>
-      <button class="k-btn k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh_tip'))}" data-tip-end>${t('fresh')}</button>
+      <button class="k-ib k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh'))}">${svg('reload')}</button>
       <span class="k-avs" id="avs"></span>
       <span class="k-sep"></span>
       <span class="k-zoom tnum">${ib('data-act="zout"', 'zout', t('zoom_out'))}<button class="k-pct" id="zpct" data-act="z100" data-tip="${esc(t('zoom_100'))}"></button>${ib('data-act="zin"', 'zin', t('zoom_in'))}${ib('data-act="fit" id="fitb"', 'fit', t('fit'))}</span>
       ${ib('data-act="arr" id="arr"', 'arr', t('arrange'))}${ib('data-act="sync" id="sync"', 'sync', t('sync'))}${ib('data-act="mini" id="minib"', 'mini', t('mini'), true)}
       ${ib('data-act="panel"', 'panel', t('panel'), true)}
-      <span id="decideb"></span>
-      <button class="k-btn k-primary" data-act="copy">${t('copy')}</button>
+      <span id="statusb"></span>
+      ${ib('data-act="copy"', 'copy', t('copy'), true)}
     </header>
     <nav class="k-side" id="side"></nav>
     <main class="k-canvas" id="canvas"></main>
@@ -263,7 +266,7 @@ export function mountBoard(boot, root) {
   async function wholePage(f) {
     const m = await bridge.ask(f.ifr.contentWindow, 'measure');
     if (!m) { return; }
-    f.crop = { x: 0, y: 0, w: f.size.w, h: Math.min(6000, m.height) };
+    f.crop = { x: 0, y: 0, w: f.size.w, h: Math.min(16000, m.height) };
     f.ifr.style.height = f.crop.h + 'px';
     sizeFrames();
     if (ui.zoom === 'fit' && !userMoved) { fit(); } else { applyView(); }
@@ -325,14 +328,12 @@ export function mountBoard(boot, root) {
     renderCanvas();
   }
   function renderBar() {
-    $('#ttl').innerHTML = `<span class="k-t">${esc(B.title)}</span><span class="k-round">${esc(t('round_n', { n: R.number }))}</span>${B.rounds.length > 1 ? '<span class="k-caret">▾</span>' : ''}`;
+    $('#ttl').innerHTML = `<span class="k-t">${esc(B.title)}</span><span class="k-round">${esc(t('round_n', { n: R.number }))}</span><span class="k-caret">▾</span>`;
     $('#ttl').dataset.tip = R.title;
     $('#oldr').hidden = $('#latestb').hidden = !OLD();
     $('#pos').textContent = `${ui.step}/${STEPS.length}`;
-    const canDecide = DECISION() && ME.can?.manage && B.status === 'open' && !OLD();
-    $('#decideb').innerHTML = B.status !== 'open'
-      ? `<span class="k-status">${esc(t('decided_on', { date: shortDate(B.decided_at) }))}</span>`
-      : canDecide ? `<button class="k-btn" data-act="decide">${t('decide')}</button>` : '';
+    $('#statusb').innerHTML = B.status !== 'open'
+      ? `<span class="k-status">${esc(t(B.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(B.decided_at) }))}</span>` : '';
   }
   function renderDevs(st) {
     const active = devsFor(st);
@@ -376,14 +377,15 @@ export function mountBoard(boot, root) {
       }).join('');
   }
 
-  function whoPicked(key, opt) {
-    const names = picksFor(key).filter(p => p.options.includes(opt)).map(p => (isMe(p.user) ? t('you') : p.user.name));
-    return names.length ? `<span class="k-who">${names.map(n => `<b>${esc(n)}</b>`).join(', ')}</span>` : '';
+  /* who picked an option: avatars, the name on hover (owner's pick B + C, 2026-10-27) */
+  function pickers(key, opt, cls = 'sm') {
+    const ps = picksFor(key).filter(p => p.options.includes(opt));
+    return ps.length ? `<span class="k-avs k-pickers">${ps.map(p => avatar(p.user, { cls, tip: isMe(p.user) ? `${p.user.name} (${t('you')})` : p.user.name })).join('')}</span>` : '';
   }
   function renderPanel() {
     const st = step(), n = ui.step, key = st.key;
     const keys = myKeys(key);
-    const seenBy = picksFor(key).filter(p => p.seen).map(p => (isMe(p.user) ? t('you') : p.user.name));
+    const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
     $('#panel').innerHTML = `
       ${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}
@@ -393,13 +395,14 @@ export function mountBoard(boot, root) {
       ${DECISION() && st.pickable && CAN_PICK() ? `<div class="k-picktools"><button data-pickall ${keys.length === st.options.length ? 'disabled' : ''}>${t('pick_all')}</button><button data-pickclear ${keys.length ? '' : 'disabled'}>${t('clear')}</button></div>` : ''}
       ${DECISION() && st.pickable ? `<div class="k-ol">${st.options.map(o => `
         <label><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
-          <span class="lb">${esc(o.key)} ${esc(o.label)}</span>${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${whoPicked(key, o.key)}</label>`).join('')}</div>` : ''}
-      ${DECISION() ? `<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-who">${seenBy.map(esc).join(', ')}</span>` : ''}</label>` : ''}
+          <span class="lb">${esc(o.key)} ${esc(o.label)}</span>${pickers(key, o.key)}${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}</label>`).join('')}</div>` : ''}
+      ${DECISION() ? `<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>` : ''}
       ${DECISION() ? '<div class="k-hr"></div>' : ''}
       <div class="k-lab">${threads(key).length ? esc(t('comments_n', { n: threads(key).length })) : esc(t('no_comments'))}</div>
       <div class="k-thread">${threads(key).map(c => commentHtml(c, true)).join('')}</div>
       ${CAN_WRITE() ? composer('') : ''}`;
     $('#panel').scrollTop = scroll;
+    renderThread();
   }
   function where(c) {
     const p = c.pin;
@@ -408,19 +411,21 @@ export function mountBoard(boot, root) {
     if (c.edit) { return `<div class="k-at"><span class="k-pnum edit">✎</span>${esc([p.option, dev].filter(Boolean).join(' '))} “${esc(c.edit.from)}” → “${esc(c.edit.to)}”</div>`; }
     return `<div class="k-at" data-pinref="${c.id}"><span class="k-pnum ${p.box ? 'box' : ''}">${pinNo(c)}</span>${esc([p.option, dev, p.text ? `“${p.text}”` : ''].filter(Boolean).join(' '))}</div>`;
   }
-  function commentHtml(c, top) {
+  /* in the pin's popover (pop) the reply box is always open, and editing happens in the panel */
+  function commentHtml(c, top, pop = false) {
     const mine = c.mine ?? isMe(c.user);
-    const acts = CAN_WRITE() ? [top ? `<button data-reply="${c.id}">${t('reply')}</button>` : '', mine && !c.edit ? `<button data-cedit="${c.id}">${t('edit')}</button>` : '', mine ? `<button data-cdel="${c.id}">${t('delete')}</button>` : ''].join('') : '';
+    const acts = CAN_WRITE() ? [top && !pop ? `<button data-reply="${c.id}">${t('reply')}</button>` : '', mine && !c.edit && !pop ? `<button data-cedit="${c.id}">${t('edit')}</button>` : '', mine ? `<button data-cdel="${c.id}">${t('delete')}</button>` : ''].join('') : '';
     const edited = c.updated_at && c.created_at && Date.parse(c.updated_at) - Date.parse(c.created_at) > 1000 ? ` · ${t('edited')}` : '';
-    return `<div class="k-cm" id="c-${c.id}" data-cid="${c.id}">${avatar(c.user, { tip: c.user.name })}<div class="h"><b>${esc(c.user.name)}</b><span data-tip="${esc(shortDate(c.created_at, true))}">${esc(when(c.created_at))}${edited}</span></div>
+    return `<div class="k-cm" ${pop ? '' : `id="c-${c.id}"`} data-cid="${c.id}">${avatar(c.user, { tip: c.user.name })}<div class="h"><b>${esc(c.user.name)}</b><span data-tip="${esc(shortDate(c.created_at, true))}">${esc(when(c.created_at))}${edited}</span></div>
       ${where(c)}${c.body ? `<div class="b">${esc(c.body)}</div>` : ''}${acts ? `<div class="acts">${acts}</div>` : ''}
-      ${top && (c.replies || []).length ? `<div class="k-replies">${c.replies.map(r => commentHtml(r, false)).join('')}</div>` : ''}
-      ${top ? `<div class="k-replybox" data-replybox="${c.id}" hidden></div>` : ''}</div>`;
+      ${top && (c.replies || []).length ? `<div class="k-replies">${c.replies.map(r => commentHtml(r, false, pop)).join('')}</div>` : ''}
+      ${top && !pop ? `<div class="k-replybox" data-replybox="${c.id}" hidden></div>` : ''}</div>`;
   }
   const composer = (parent, ph = t('comment_ph')) => `<form class="k-compose" data-compose="${parent}"><textarea rows="1" placeholder="${esc(ph)}"></textarea><button class="k-btn" type="submit">${t('send')}</button></form>`;
 
   function renderCanvas() {
     closePop();
+    closeThread();
     const st = step();
     const cv = $('#canvas');
     bridge.clear();
@@ -450,10 +455,9 @@ export function mountBoard(boot, root) {
   }
   function groupHtml(st, g, gi) {
     const picked = st.pickable && myKeys(st.key).includes(g.opt.key);
-    const others = picksFor(st.key).filter(p => p.options.includes(g.opt.key) && !isMe(p.user));
     const head = (ui.mode === 'options' && st.pickable)
       ? `<div class="grp-h"><span class="key">${esc(g.opt.key)}</span><span class="lbl">${esc(g.opt.label)}</span>
-         ${DECISION() ? `<span class="k-headwho">${others.length ? `${others.length + (picked ? 1 : 0)} ${t('picked')}` : ''}</span>` : ''}
+         ${DECISION() ? `<span class="k-headwho">${pickers(st.key, g.opt.key, '')}</span>` : ''}
          ${DECISION() && CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>`
       : (g.shotCap ? `<div class="grp-h"><span class="lbl">${esc(g.shotCap)}</span></div>` : '');
     const cells = g.cells.map((c, ci) => `<figure class="k-fr" data-g="${gi}" data-c="${ci}">
@@ -471,7 +475,7 @@ export function mountBoard(boot, root) {
       const b = $('.pick', g);
       if (b) { b.textContent = on ? t('picked') : t('pick'); }
       const w = $('.k-headwho', g);
-      if (w) { const c = picksFor(st.key).filter(p => p.options.includes(g.dataset.key)).length; w.textContent = c && (c > 1 || !on) ? `${c} ${t('picked')}` : ''; }
+      if (w) { w.innerHTML = pickers(st.key, g.dataset.key, ''); }
     });
     renderSide();
     renderPanel();
@@ -534,7 +538,9 @@ export function mountBoard(boot, root) {
     if (ui.mode !== 'real' && board.children.length > 1) {
       if (ui.arr === 'col') { col = true; } else if (ui.arr === 'auto') { const zr = measure(false), zc = measure(true); col = zr < 0.6 && zc > zr * 1.3; }
     }
-    view.z = ui.mode === 'real' ? 1 : measure(col);
+    /* a whole page (a flow without steps) reads like a document: fit its width, start at the top */
+    const whole = frames.length > 0 && frames.every(f => f.cell.shot.whole);
+    view.z = ui.mode === 'real' ? 1 : whole ? Math.min(1, cw / board.offsetWidth) : measure(col);
     board.classList.toggle('col', col);
     cv.style.setProperty('--z', view.z);
     view.x = Math.max(pad, (cv.clientWidth - board.offsetWidth * view.z) / 2);
@@ -554,7 +560,9 @@ export function mountBoard(boot, root) {
   }
   function zoomCenter(factor) { const r = $('#canvas').getBoundingClientRect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, factor); }
   function pan(dx, dy) { view.x += dx; view.y += dy; userMoved = true; applyView(); }
-  const peers = f => frames.filter(p => p !== f && !p.crop && p.cell.shot.raw?.split('#')[0] === f.cell.shot.raw?.split('#')[0]);
+  /* frames that started on the same hash move together, as in the workbench */
+  const hashOf = f => (f.cell.shot.raw || '').split('#')[1] || '';
+  const peers = f => frames.filter(p => p !== f && !p.crop && hashOf(p) === hashOf(f));
 
   /* ---------- pins and boxes: comments with a place on a frame ---------- */
   function framePoint(f, ev) {
@@ -571,6 +579,32 @@ export function mountBoard(boot, root) {
         : `<span class="pinmark" data-pin="${c.id}" style="left:${+c.pin.x}px;top:${+c.pin.y - sy}px" title="${esc(c.user.name)}">${pinNo(c)}</span>`).join('');
     });
   }
+  /* a pin's thread opens next to it on the canvas (owner's pick C), and stays in the panel too (A) */
+  let threadPop = null;
+  function closeThread() { threadPop?.el.remove(); threadPop = null; }
+  function openThread(id, anchor) {
+    closeThread();
+    closePop(true);
+    const el = document.createElement('div');
+    el.className = 'k-pop k-tpop';
+    document.body.appendChild(el);
+    threadPop = { el, id, anchor };
+    renderThread();
+    $('textarea', el)?.focus();
+  }
+  function renderThread() {
+    if (!threadPop) { return; }
+    const c = COMMENTS.find(x => x.id === threadPop.id);
+    if (!c) { closeThread(); return; }
+    const typing = threadPop.el.contains(document.activeElement) ? document.activeElement.value : null;
+    threadPop.el.innerHTML = `<div class="k-thread">${commentHtml(c, true, true)}</div>${CAN_WRITE() ? composer(c.id, t('reply_ph')) : ''}`;
+    if (typing !== null) { const ta = $('textarea', threadPop.el); if (ta) { ta.value = typing; ta.focus(); } }
+    const r = (threadPop.anchor.isConnected ? threadPop.anchor : $(`[data-pin="${c.id}"]`) || threadPop.anchor).getBoundingClientRect();
+    const el = threadPop.el;
+    el.style.left = Math.max(8, Math.min(innerWidth - el.offsetWidth - 8, r.right + 10)) + 'px';
+    el.style.top = Math.max(60, Math.min(innerHeight - el.offsetHeight - 8, r.top - 8)) + 'px';
+  }
+
   let pop = null;
   function closePop(save = false) {
     if (!pop) { return; }
@@ -802,15 +836,15 @@ export function mountBoard(boot, root) {
     };
   }
 
-  /* ---------- ตัดสินใจแล้ว ---------- */
-  function openDecide() {
-    const m = modal(`<div class="box narrow"><h2>${t('decide_title')}</h2><p class="k-sub">${t('decide_body')}</p>
-      <div class="row"><button class="k-btn" data-x>${t('cancel')}</button><button class="k-btn k-primary" data-yes>${t('decide_ok')}</button></div></div>`);
+  /* ---------- จัดเก็บ: a decision board becomes decided, a flow archived (the backend's decide) ---------- */
+  function openArchive() {
+    const m = modal(`<div class="box narrow"><h2>${t('archive_title')}</h2><p class="k-sub">${t(DECISION() ? 'archive_decision' : 'archive_flow')}</p>
+      <div class="row"><button class="k-btn" data-x>${t('cancel')}</button><button class="k-btn k-primary" data-yes>${t('archive')}</button></div></div>`);
     $('[data-yes]', m).onclick = async () => {
       try {
         const r = await api.decide(B.slug);
         const fresh = r?.board ?? r;
-        B = { ...B, status: fresh?.status || 'decided', decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
+        B = { ...B, status: fresh?.status || (DECISION() ? 'decided' : 'archived'), decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
         m.remove();
         render();
       } catch { toast(t('save_failed')); }
@@ -824,7 +858,8 @@ export function mountBoard(boot, root) {
     const el = document.createElement('div');
     el.className = 'k-ctx k-rmenu';
     el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
-      + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`;
+      + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
+      + (ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
     document.body.appendChild(el);
     const b = anchor.getBoundingClientRect();
     el.style.left = Math.min(b.left, innerWidth - el.offsetWidth - 8) + 'px';
@@ -835,6 +870,7 @@ export function mountBoard(boot, root) {
       if (!x) { return; }
       closeCtx();
       if (x.dataset.allrounds !== undefined) { openAllRounds(); return; }
+      if (x.dataset.archive !== undefined) { openArchive(); return; }
       const r = B.rounds.find(y => y.number === +x.dataset.round);
       if (r && r.number !== R.number) { location.href = roundUrl(r); }
     });
@@ -921,7 +957,8 @@ export function mountBoard(boot, root) {
     userMoved = true;
     applyView();
   }
-  function focusComment(id) {
+  function focusComment(id, open = true) {
+    if (!ui.panel && !open) { return; }
     if (!ui.panel) { ui.panel = true; $('#app').classList.remove('nopanel'); }
     const el = $(`#c-${id}`);
     if (!el) { return; }
@@ -934,14 +971,14 @@ export function mountBoard(boot, root) {
   document.addEventListener('click', e => {
     const t0 = e.target.closest('button, a, .pinlayer, .pinmark, .boxmark');
     if (!t0) { return; }
-    if (t0.matches('.pinmark, .boxmark') && t0.dataset.pin) { focusComment(t0.dataset.pin); return; }
+    if (t0.matches('.pinmark, .boxmark') && t0.dataset.pin) { openThread(+t0.dataset.pin, t0); focusComment(t0.dataset.pin, false); return; }
     if (t0.classList.contains('pinlayer')) {
       const f = frames.find(x => x.fig.contains(t0));
       if (f && ui.tool === 'pin') { dropPin(f, e); }
       if (f && ui.tool === 'edit') { startEdit(f, e); }
       return;
     }
-    if (t0.closest('.k-pop, .k-modal, .k-ctx')) { return; }
+    if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -982,8 +1019,7 @@ export function mountBoard(boot, root) {
     if (act === 'side') { ui.side = !ui.side; $('#app').classList.toggle('noside', !ui.side); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'panel') { ui.panel = !ui.panel; $('#app').classList.toggle('nopanel', !ui.panel); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'copy') { openCopy(); }
-    if (act === 'decide') { openDecide(); }
-    if (act === 'rounds' && B.rounds.length > 1) { openRounds(t0); }
+    if (act === 'rounds') { openRounds(t0); }
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
   });
@@ -1008,7 +1044,7 @@ export function mountBoard(boot, root) {
     if (e.key === 'ArrowLeft') { go(ui.step - 1); }
     if (e.shiftKey && e.code === 'Digit1') { ui.zoom = 'fit'; writeUrl(); fit(); }
     if (e.shiftKey && e.code === 'Digit0') { zoomCenter(1 / view.z); }
-    if (e.key === 'Escape') { closeCtx(); closePop(false); $$('.k-modal').pop()?.remove(); }
+    if (e.key === 'Escape') { closeCtx(); closePop(false); closeThread(); $$('.k-modal').pop()?.remove(); }
   });
   document.addEventListener('keyup', e => { if (e.code === 'Space') { spacePan(false); } });
   document.addEventListener('change', e => {
@@ -1033,8 +1069,9 @@ export function mountBoard(boot, root) {
   }, { passive: false });
   document.addEventListener('pointerdown', e => {
     if (pop && !e.target.closest('.k-pop') && !e.target.closest('.pinlayer')) { closePop(true); }
+    if (threadPop && !e.target.closest('.k-tpop, .pinmark, .boxmark')) { closeThread(); }
     const layer = e.target.closest('.pinlayer');
-    if (layer && ui.tool === 'box' && e.button === 0) {
+    if (layer && ui.tool === 'box' && e.button === 0 && !e.target.closest('.pinmark, .boxmark[data-pin]')) {
       e.preventDefault();
       const f = frames.find(x => x.fig.contains(layer));
       if (f) { drawBox(f, e); }
@@ -1061,7 +1098,7 @@ export function mountBoard(boot, root) {
       addEventListener('pointerup', up);
       return;
     }
-    if (!e.target.closest('#canvas') || e.target.closest('button, .pinlayer, .handle, .k-tools')) { return; }
+    if (!e.target.closest('#canvas') || e.target.closest('button, .pinlayer, .pinmark, .boxmark, .handle, .k-tools')) { return; }
     const onBackground = e.target === cv || e.target.id === 'board' || e.target.matches('.grp, .shots, .k-hint');
     const handy = cv.classList.contains('tool-hand') || cv.classList.contains('spacepan');
     if (!(handy || onBackground || e.button === 1)) { return; }

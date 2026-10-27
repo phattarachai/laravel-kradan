@@ -6,8 +6,8 @@ const th = {
   sync: 'เลื่อนและแตะพร้อมกัน', mini: 'แผนที่ย่อ (M)',
   tool_hand: 'มือจับ', tool_use: 'กดในจอ', tool_box: 'กรอบ', tool_edit: 'แก้คำ', tool_pin: 'ปักโน้ต',
   copy: 'คัดลอกให้ Claude', copied: 'คัดลอกแล้ว', copy_manual: 'กด ⌘C เพื่อคัดลอก', close: 'ปิด', cancel: 'ยกเลิก',
-  decide: 'ตัดสินใจแล้ว', decided_on: 'ตัดสินใจแล้ว {date}', decide_title: 'ปิดกระดานนี้เป็นตัดสินใจแล้ว',
-  decide_body: 'ย้ายไปประวัติ เลือกตัวเลือกเพิ่มไม่ได้ ความเห็นยังเขียนต่อได้', decide_ok: 'ตัดสินใจแล้ว',
+  archive: 'จัดเก็บ', decided_on: 'ตัดสินใจแล้ว {date}', archived_on: 'จัดเก็บแล้ว {date}', archive_title: 'จัดเก็บกระดานนี้',
+  archive_decision: 'ย้ายไปประวัติเป็นตัดสินใจแล้ว เลือกตัวเลือกเพิ่มไม่ได้ ความเห็นยังเขียนต่อได้', archive_flow: 'ย้ายไปประวัติ ยังเปิดดูและเขียนความเห็นได้', product: 'กระดาน',
   old_round: 'รอบเก่า ดูอย่างเดียว', latest_round: 'กลับไปรอบล่าสุด', rounds: 'รอบของกระดานนี้', all_rounds: 'ดูทุกรอบ',
   round_n: 'รอบ {n}', open_round: 'เปิดรอบนี้', steps_n: '{n} ข้อ', answered_people: 'ตอบแล้ว {n} คน', loading: 'กำลังโหลด',
   fresh: 'มีอัปเดต โหลดใหม่', fresh_tip: 'Claude ส่งรอบนี้มาใหม่ตอนเปิดอยู่',
@@ -29,7 +29,7 @@ const th = {
   /* index */
   search: 'ค้นหาชื่อ เลขงาน หรือหัวข้อ', open: 'เปิดอยู่', history: 'ประวัติ', board: 'กระดาน', last_push: 'ส่งล่าสุด',
   answered: 'ตอบแล้ว', viewers: 'คนดู', no_boards: 'ยังไม่มีกระดาน', no_match: 'ไม่พบกระดานที่ตรงกับ “{q}”',
-  people_n: '{n} คน', nobody: 'ยังไม่มีคนตอบ', archived: 'เก็บแล้ว',
+  people_n: '{n} คน', nobody: 'ยังไม่มีคนตอบ',
 };
 
 const en = {
@@ -39,8 +39,8 @@ const en = {
   sync: 'Scroll and tap together', mini: 'Minimap (M)',
   tool_hand: 'Hand', tool_use: 'Interact', tool_box: 'Box', tool_edit: 'Edit text', tool_pin: 'Pin a note',
   copy: 'Copy for Claude', copied: 'Copied', copy_manual: 'Press ⌘C to copy', close: 'Close', cancel: 'Cancel',
-  decide: 'Mark decided', decided_on: 'Decided {date}', decide_title: 'Mark this board decided',
-  decide_body: 'It moves to history. Picks lock; comments stay open.', decide_ok: 'Mark decided',
+  archive: 'Archive', decided_on: 'Decided {date}', archived_on: 'Archived {date}', archive_title: 'Archive this board',
+  archive_decision: 'It moves to history as decided. Picks lock; comments stay open.', archive_flow: 'It moves to history. It stays readable and open to comments.', product: 'Kradan',
   old_round: 'Old round, read only', latest_round: 'Back to the latest round', rounds: 'Rounds of this board', all_rounds: 'All rounds',
   round_n: 'Round {n}', open_round: 'Open this round', steps_n: '{n} steps', answered_people: '{n} answered', loading: 'Loading',
   fresh: 'Updated, reload', fresh_tip: 'Claude pushed this round again while it was open',
@@ -61,7 +61,7 @@ const en = {
   read_only: 'Read only',
   search: 'Search title, task or step', open: 'Open', history: 'History', board: 'Board', last_push: 'Last push',
   answered: 'Answered', viewers: 'Viewers', no_boards: 'No boards yet', no_match: 'No board matches “{q}”',
-  people_n: '{n} people', nobody: 'No answers yet', archived: 'Archived',
+  people_n: '{n} people', nobody: 'No answers yet',
 };
 
 const MAPS = { th, en };

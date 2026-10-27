@@ -6,6 +6,7 @@
 import { t } from './i18n.js';
 import { $, esc, shortDate, getLocal, setLocal } from './util.js';
 import { avatar, avatarRow } from './presence.js';
+import { MARK } from './icon.js';
 
 export function mountIndex(boot, root) {
   const ME = boot.user || {};
@@ -25,7 +26,7 @@ export function mountIndex(boot, root) {
 
   root.innerHTML = `<div class="k-index">
     <header class="k-bar">
-      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}">${brand.logo ? `<img class="k-logo" src="${esc(brand.logo)}" alt="">` : `<span class="k-logo">${esc((brand.name || 'K').slice(0, 2))}</span>`}<span class="k-bname">${esc(brand.name || 'Kradan')}</span></a>
+      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}"><span class="k-mark">${MARK}</span><span class="k-bname">${t('product')}</span></a>
       <span class="k-sp"></span><span class="k-avs">${avatar(ME, { tip: ME.name })}</span>
     </header>
     <div class="k-ibody"><nav class="k-inav" id="nav"></nav><main class="k-imain" id="main"></main></div>
@@ -48,13 +49,15 @@ export function mountIndex(boot, root) {
   }
 
   function renderNav() {
-    $('#nav').innerHTML = panels.map(p => `<a href="${esc(p.url || '#')}" data-panel="${esc(p.key)}" aria-current="${p.key === ui.panel}">${esc(p.title)}<span class="n tnum">${boards.filter(b => b.panel === p.key && !isPast(b)).length}</span></a>`).join('');
+    /* the app's own name and logo head the menu (owner, 2026-10-27); the corner is Kradan's */
+    const head = brand.name || brand.logo ? `<div class="k-ihead">${brand.logo ? `<img class="k-logo" src="${esc(brand.logo)}" alt="">` : `<span class="k-logo">${esc((brand.name || '').slice(0, 2))}</span>`}<span>${esc(brand.name || '')}</span></div>` : '';
+    $('#nav').innerHTML = head + panels.map(p => `<a href="${esc(p.url || '#')}" data-panel="${esc(p.key)}" aria-current="${p.key === ui.panel}">${esc(p.title)}<span class="n tnum">${boards.filter(b => b.panel === p.key && !isPast(b)).length}</span></a>`).join('');
   }
 
   function row(b) {
-    const date = b.status === 'decided' && b.decided_at ? t('decided_on', { date: shortDate(b.decided_at) }) : shortDate(b.round?.pushed_at || b.updated_at);
+    const date = b.status !== 'open' && b.decided_at ? t(b.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(b.decided_at) }) : shortDate(b.round?.pushed_at || b.updated_at);
     const answered = typeof b.answered === 'number' ? (b.answered ? t('people_n', { n: b.answered }) : t('nobody')) : '';
-    return `<tr><td><a class="t" href="${esc(b.url)}">${esc(b.title)}</a><div class="r">${esc([b.task_ref, b.round ? t('round_n', { n: b.round.number }) : '', b.status === 'archived' ? t('archived') : ''].filter(Boolean).join(' · '))}</div></td>
+    return `<tr><td><a class="t" href="${esc(b.url)}">${esc(b.title)}</a><div class="r">${esc([b.task_ref, b.round ? t('round_n', { n: b.round.number }) : ''].filter(Boolean).join(' · '))}</div></td>
       <td class="g tnum">${esc(date)}</td><td class="g tnum">${esc(answered)}</td>
       <td><span class="k-avs">${avatarRow(b.viewers || [], { me: ME.id, max: 4 })}</span></td>
       <td class="u">${b.updated ? `<span class="k-upd">${t('updated')}</span>` : ''}</td></tr>`;

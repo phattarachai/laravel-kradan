@@ -3,6 +3,7 @@ import { setLocale, t } from './i18n.js';
 import { esc, tint } from './util.js';
 import { mountBoard } from './board.js';
 import { mountIndex } from './index.js';
+import { setFavicon } from './icon.js';
 
 const boot = window.Kradan || {};
 setLocale(boot.locale || 'th');
@@ -14,6 +15,8 @@ if (accent && /^#[0-9a-f]{6}$/i.test(accent)) {
   document.documentElement.style.setProperty('--k-accent', accent);
   document.documentElement.style.setProperty('--k-accent-bg', tint(accent, 0.1));
 }
+
+setFavicon();
 
 const root = document.getElementById('kradan');
 try {

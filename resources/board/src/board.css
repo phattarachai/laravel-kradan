@@ -28,12 +28,14 @@ a { color: inherit; }
 
 /* ---------- top bar ---------- */
 .k-bar { grid-area: bar; display: flex; align-items: center; gap: 6px; height: 52px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; position: relative; z-index: 30; }
-.k-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; white-space: nowrap; flex: none; padding: 4px 6px; border-radius: 8px; }
+.k-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; white-space: nowrap; flex: none; padding: 3px; border-radius: 8px; }
+.k-mark, .k-mark svg { width: 26px; height: 26px; display: block; }
+.k-index .k-brand { padding-right: 8px; }
 .k-brand:hover { background: var(--hover); }
 .k-logo { width: 26px; height: 26px; border-radius: 7px; background: var(--k-accent); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; object-fit: contain; }
 img.k-logo { background: none; }
 .k-crumb { color: var(--faint); flex: none; }
-.k-ttl { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; border: 0; background: none; padding: 4px 8px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
+.k-ttl { display: flex; align-items: baseline; gap: 6px; min-width: 60px; max-width: 420px; flex: 0 1 auto; border: 0; background: none; padding: 4px 8px; border-radius: 8px; font-weight: 600; white-space: nowrap; }
 .k-ttl:hover { background: var(--hover); }
 .k-ttl .k-t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .k-ttl .k-round { color: var(--mute); font-weight: 400; flex: none; }
@@ -56,6 +58,7 @@ img.k-logo { background: none; }
 .k-btn:disabled { opacity: .5; cursor: default; }
 .k-primary, .k-primary:hover { border-color: var(--ink); background: var(--ink); color: #fff; font-weight: 500; }
 .k-fresh, .k-fresh:hover { border-color: transparent; background: var(--upd-bg); color: var(--upd); font-weight: 500; }
+.k-ib.k-fresh:hover { color: var(--upd); }
 .k-fresh[hidden], .k-old[hidden] { display: none; }
 
 /* ---------- avatars: grey initials or the app's photo; faded = seen in the last 15 min ---------- */
@@ -66,6 +69,13 @@ img.k-logo { background: none; }
 .k-av.away { opacity: .4; }
 .k-av.away:hover { opacity: 1; }
 .k-more { font-size: 12px; color: var(--mute); margin-left: 6px; }
+.k-av.sm { width: 22px; height: 22px; font-size: 9px; border-width: 1.5px; margin-left: -5px; }
+.k-av.sm:first-child { margin-left: 0; }
+.k-pickers { justify-self: end; }
+.k-ol label { grid-template-columns: 22px 1fr auto; }
+.k-ol .k-pickers { grid-column: 3; grid-row: 1; }
+.grp-h .k-pickers .k-av { width: 1.7em; height: 1.7em; font-size: .7em; border-width: .12em; margin-left: -.4em; }
+.grp-h .k-pickers .k-av:first-child { margin-left: 0; }
 
 /* ---------- side: steps ---------- */
 .k-side { grid-area: side; background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 8px; min-width: 0; }
@@ -144,13 +154,13 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-ol label:has(input:checked) { border-color: var(--k-accent); background: var(--k-accent-bg); }
 .k-ol input, .k-seen input { margin: 3px 0 0; accent-color: var(--k-accent); }
 .k-ol .lb { font-weight: 500; }
-.k-ol .tr, .k-ol .k-who { grid-column: 2; font-size: 13px; color: var(--mute); line-height: 1.5; }
+.k-ol .tr { grid-column: 2 / 4; font-size: 13px; color: var(--mute); line-height: 1.5; }
 .k-who { font-size: 12px; color: var(--mute); }
 .k-who b { font-weight: 500; color: var(--ink); }
 .k-seen { display: flex; gap: 8px; align-items: flex-start; padding: 8px; border: 1px dashed var(--line); border-radius: 10px; cursor: pointer; font-size: 14px; }
 .k-seen:has(input:checked) { border-style: solid; border-color: var(--k-accent); background: var(--k-accent-bg); }
 .k-seen .tr { font-size: 12px; color: var(--mute); }
-.k-seen .k-who { margin-left: auto; text-align: right; }
+.k-seen .k-pickers { margin-left: auto; }
 .ro .k-ol label, .ro .k-seen, .k-ol label:has(input:disabled), .k-seen:has(input:disabled) { cursor: default; }
 .k-hr { border-top: 1px solid var(--line); }
 .k-lab { font-size: 12px; color: var(--mute); }
@@ -181,6 +191,7 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 /* ---------- popover, menus, dialogs ---------- */
 .k-pop { position: fixed; z-index: 60; width: 280px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.15); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .k-pop .at { font-size: 12px; color: var(--mute); }
+.k-tpop { width: 320px; max-height: 60vh; overflow: auto; gap: 12px; }
 .k-pop textarea { width: 100%; min-height: 64px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: inherit; font-size: 14px; resize: vertical; }
 .k-pop .row { display: flex; gap: 6px; justify-content: flex-end; }
 .k-ctx { position: fixed; z-index: 90; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 32px rgba(0,0,0,.16); padding: 5px; font-size: 13px; }
@@ -231,6 +242,8 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-inav a:hover { background: var(--soft); }
 .k-inav a[aria-current="true"] { background: var(--k-accent-bg); color: var(--k-accent); font-weight: 500; }
 .k-inav .n { color: var(--faint); font-weight: 400; }
+.k-ihead { display: flex; align-items: center; gap: 8px; margin: 4px 10px 12px; font-weight: 600; }
+.k-ihead .k-logo { width: 22px; height: 22px; border-radius: 6px; font-size: 10px; }
 .k-imain { padding: 24px 32px; min-width: 0; }
 .k-imain h1 { font-size: 20px; margin: 0 0 16px; }
 .k-tool { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
