@@ -9,13 +9,14 @@ import { avatar, avatarRow } from './presence.js';
 
 export function mountIndex(boot, root) {
   const ME = boot.user || {};
-  const panels = boot.panels || [];
-  const boards = boot.boards || [];
+  const data = boot.index || boot;
+  const panels = data.panels || [];
+  const boards = data.boards || [];
   const Q = new URLSearchParams(location.search);
   const ui = {
-    panel: boot.panel || Q.get('panel') || getLocal('kradan:panel') || panels[0]?.key || '',
+    panel: data.panel || Q.get('panel') || getLocal('kradan:panel') || panels[0]?.key || '',
     tab: Q.get('tab') === 'history' ? 'history' : 'open',
-    q: boot.q || Q.get('q') || '',
+    q: data.q || Q.get('q') || '',
   };
   if (!panels.some(p => p.key === ui.panel)) { ui.panel = panels[0]?.key || ''; }
   const brand = boot.brand || {};

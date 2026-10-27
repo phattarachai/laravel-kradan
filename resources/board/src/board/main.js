@@ -17,7 +17,7 @@ if (accent && /^#[0-9a-f]{6}$/i.test(accent)) {
 
 const root = document.getElementById('kradan');
 try {
-  if (boot.board) { mountBoard(boot, root); } else { mountIndex(boot, root); }
+  if (boot.page === 'board' || boot.board) { mountBoard(boot, root); } else { mountIndex(boot, root); }
 } catch (err) {
   root.innerHTML = `<div class="k-empty">${esc(t('cant_open', { why: err.message }))}</div>`;
   throw err;

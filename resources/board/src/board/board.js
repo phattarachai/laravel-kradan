@@ -672,7 +672,9 @@ export function mountBoard(boot, root) {
     refreshPicks();
     try {
       const r = await api.pick(B.slug, R.number, st.key, { options, seen: mine.seen });
-      PICKS = [...PICKS.filter(p => !(p.step === st.key && isMe(p.user))), ...(r?.pick ? [r.pick] : [])];
+      /* {picks} is every pick on the step (2-board-payload.md); a lone {pick} is only mine */
+      PICKS = Array.isArray(r?.picks) ? [...PICKS.filter(p => p.step !== st.key), ...r.picks]
+        : [...PICKS.filter(p => !(p.step === st.key && isMe(p.user))), ...(r?.pick ? [r.pick] : [])];
       refreshPicks();
     } catch { PICKS = before; refreshPicks(); toast(t('save_failed')); }
   }
@@ -680,7 +682,8 @@ export function mountBoard(boot, root) {
 
   async function postComment(body) {
     try {
-      const { comment: c } = await api.comment(B.slug, R.number, body);
+      const res = await api.comment(B.slug, R.number, body);
+      const c = res?.comment ?? res;
       if (body.parent_id) {
         const top = COMMENTS.find(x => x.id === body.parent_id);
         if (top) { top.replies = [...(top.replies || []), c]; }
@@ -698,7 +701,8 @@ export function mountBoard(boot, root) {
   }
   async function patchComment(id, text) {
     try {
-      const { comment: c } = await api.editComment(id, text);
+      const res = await api.editComment(id, text);
+      const c = res?.comment ?? res;
       COMMENTS = COMMENTS.map(x => (x.id === id ? { ...x, ...c, replies: x.replies } : { ...x, replies: (x.replies || []).map(r => (r.id === id ? { ...r, ...c } : r)) }));
       renderPanel();
     } catch { toast(t('save_failed')); }

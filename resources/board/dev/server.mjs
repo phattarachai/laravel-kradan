@@ -5,7 +5,7 @@
  *   KRADAN_DEV_CONTENT=c npm run dev    → round files from http://127.0.0.1:5179 (option C)
  *
  * It renders the real Blade shells (resources/views/*.blade.php, a few Blade expressions only) with a mock
- * boot payload in the backend's shape (1-architecture.md, "Views and payload as built"), answers the board JSON API from memory, and serves round files the way the package does:
+ * boot payload in the contract's shape (2-board-payload.md), answers the board JSON API from memory, and serves round files the way the package does:
  * a path-signed prefix, `Content-Security-Policy: sandbox allow-scripts`, the harness block stripped and
  * agent.js injected. So the isolation the board relies on is the browser's, not a mock.
  *
@@ -192,10 +192,10 @@ function indexRows(me) {
     };
   });
 }
-function boot(me, extra) {
+function boot(me, page, extra) {
   const u = USERS[me];
   return {
-    version: 'dev', locale: process.env.KRADAN_LOCALE || 'th', panels: PANELS, board: null,
+    version: mtime('board.js'), page, locale: process.env.KRADAN_LOCALE || 'th',
     brand: { name: 'RR Admin', logo: null, accent: '#ba1a1a' },
     user: { id: u.id, name: u.name, avatar: u.avatar, can: { manage: u.manage } },
     csrf: CSRF, routes: { api: '/kradan/api', index: '/kradan' },
@@ -268,7 +268,7 @@ async function api(req, res, url, me) {
     if (r !== b.rounds.at(-1) || b.status !== 'open' || b.kind !== 'decision') { return sendJson(res, 409, { message: 'read only' }); }
     const body = await readBody(req);
     pick(b, r, step, me, Array.isArray(body?.options) ? body.options.map(String) : [], !!body?.seen);
-    return sendJson(res, 200, { pick: b.picks[r.number]?.[`${step}\u0000${me}`] || null });
+    return sendJson(res, 200, { picks: Object.values(b.picks[r.number] || {}).filter(x => x.step === step) });
   }
   if ((m = p.match(/^boards\/([^/]+)\/rounds\/(\d+)\/comments$/)) && req.method === 'POST') {
     const b = find(m[1]), r = b?.rounds.find(x => x.number === +m[2]);
@@ -278,7 +278,7 @@ async function api(req, res, url, me) {
     if (!body?.step || (!String(body.body || '').trim() && !body.edit)) { return sendJson(res, 422, { message: 'body required' }); }
     const parent = body.parent_id ? b.comments.find(c => c.id === +body.parent_id) : null;
     const c = comment(b, r, { step: body.step, body: String(body.body || ''), parent_id: parent ? (parent.parent_id || parent.id) : null, pin: body.pin || null, edit: body.edit || null, user: me });
-    return sendJson(res, 201, { comment: { ...commentOut(c, me), replies: [] } });
+    return sendJson(res, 201, { ...commentOut(c, me), replies: [] });
   }
   if ((m = p.match(/^comments\/(\d+)$/)) && (req.method === 'PATCH' || req.method === 'DELETE')) {
     const c = BOARDS.flatMap(b => b.comments).find(x => x.id === +m[1] && !x.deleted);
@@ -288,7 +288,7 @@ async function api(req, res, url, me) {
     const body = await readBody(req);
     c.body = String(body?.body || c.body);
     c.updated_at = new Date().toISOString();
-    return sendJson(res, 200, { comment: commentOut(c, me) });
+    return sendJson(res, 200, commentOut(c, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/heartbeat$/)) && req.method === 'POST') {
     const b = find(m[1]);
@@ -303,7 +303,7 @@ async function api(req, res, url, me) {
     const b = find(m[1]);
     if (!USERS[me].manage) { return sendJson(res, 403, {}); }
     Object.assign(b, { status: 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
-    return sendJson(res, 200, { board: boardPayload(b, me) });
+    return sendJson(res, 200, boardPayload(b, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/export\.md$/)) && req.method === 'GET') {
     const b = find(m[1]);
@@ -359,16 +359,17 @@ async function app(req, res) {
   }
   if (url.pathname.startsWith('/kradan/api/')) { return api(req, res, url, USERS[me] ? me : 0); }
   if (url.pathname === '/' ) { return send(res, 302, '', { Location: '/kradan' }); }
-  const assets = { js: `${APP}/kradan/assets/board.js?v=${mtime('board.js')}`, css: `${APP}/kradan/assets/board.css?v=${mtime('board.css')}` };
+  const assets = `${APP}/kradan/assets`;
   const panel = url.pathname.match(/^\/kradan(?:\/(\w+))?\/?$/);
   if (panel && (!panel[1] || PANELS.some(p => p.key === panel[1]))) {
-    const data = { kradan: boot(me, { panel: panel[1] || null, q: url.searchParams.get('q') || '', boards: indexRows(me) }), assets };
+    const title = PANELS.find(p => p.key === panel[1])?.title || null;
+    const data = { boot: boot(me, 'index', { index: { title, panel: panel[1] || null, q: url.searchParams.get('q') || '', panels: PANELS, boards: indexRows(me) } }), assets };
     return send(res, 200, blade('index', data), { 'Content-Type': TYPES['.html'], 'Set-Cookie': setCookie });
   }
   const m = url.pathname.match(/^\/kradan\/(\w+)\/([^/]+)$/);
   const b = m && BOARDS.find(x => x.panel === m[1] && x.slug === m[2]);
   if (b) {
-    const data = { kradan: boot(me, { board: boardPayload(b, me, url.searchParams.get('round')) }), assets };
+    const data = { boot: boot(me, 'board', { board: boardPayload(b, me, url.searchParams.get('round')) }), assets };
     return send(res, 200, blade('board', data), { 'Content-Type': TYPES['.html'], 'Set-Cookie': setCookie });
   }
   send(res, 404, 'not found');
