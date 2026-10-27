@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
@@ -74,16 +75,29 @@ function parse(html) {
     const st = steps.at(-1);
     if (st) { st.kind = 'question'; st.options.push({ key: attr(tag, 'data-key'), title: attr(tag, 'data-label') }); }
   });
+  /* a page without data-dp-step is one screen step, as the backend's StepParser gives it */
+  if (!steps.length) {
+    const key = `|${title}`;
+    steps.push({ key, group: '', title, sub: '', kind: 'screen', options: [] });
+    prints[key] = sha(html);
+  }
   return { title, steps, prints };
 }
 
 let roundSeq = 0;
 const ROUNDS = {};   // id → { dir }
+/* a markdown flow: index.md becomes index.html through the package's own renderer (needs composer install) */
+function pageOf(dir) {
+  const md = path.join(dir, 'index.md');
+  if (exists(path.join(dir, 'index.html')) || !exists(md)) { return null; }
+  return JSON.parse(execFileSync('php', [path.join(HERE, 'markdown.php'), md], { encoding: 'utf8' })).html;
+}
 function round(dir, number, pushedMinsAgo, retitle) {
-  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const rendered = pageOf(dir);
+  const html = rendered ?? fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
   const p = parse(html);
   const id = ++roundSeq;
-  ROUNDS[id] = { dir };
+  ROUNDS[id] = { dir, html: rendered };
   return { id, number, title: retitle || p.title, pushed_at: minsAgo(pushedMinsAgo), steps: p.steps, prints: p.prints };
 }
 function baseUrl(r) {
@@ -117,6 +131,9 @@ board('demo-decided', 'decisions', 'decision', 'Demo ปุ่มยืนยั
   { status: 'decided', decided_at: minsAgo(60 * 24 * 7), decided_by: userOf(1) });
 board('demo-flow', 'flows', 'flow', 'Demo flow ตะกร้า', 'T002', [round(demo, 1, 60 * 24 * 3)]);
 board('isolation-probe', 'flows', 'flow', 'Isolation probe', 'T192', [round(path.join(FIX, 'security'), 1, 5)]);
+if (exists(path.join(ROOT, 'vendor/autoload.php'))) {
+  board('demo-markdown', 'flows', 'flow', 'ตะกร้ายืนยันอย่างไร', 'T188', [round(path.join(FIX, 'markdown'), 1, 15)]);
+}
 
 /* seed answers from other people on the newest round of the first boards */
 let commentSeq = 0;
@@ -235,14 +252,16 @@ function serveContent(req, res, url) {
   const [, id, expires, sig, rel] = m;
   const r = ROUNDS[id];
   const ok = r && sig === sign(+id, +expires) && +expires > Date.now() / 1000;
-  const agent = rel === '__kradan/agent.js';
-  const file = agent ? path.join(ROOT, 'dist/agent.js') : path.resolve(r?.dir || '/', decodeURIComponent(rel || 'index.html'));
-  if (!ok || (!agent && !file.startsWith(r.dir + path.sep)) || !exists(file) || fs.statSync(file).isDirectory()) { send(res, ok ? 404 : 403, ok ? 'not found' : 'bad signature'); return true; }
+  const ours = { '__kradan/agent.js': path.join(ROOT, 'dist/agent.js'), '__kradan/mermaid.js': path.join(ROOT, 'resources/content/mermaid.min.js') };
+  const agent = !!ours[rel];
+  const file = ours[rel] || path.resolve(r?.dir || '/', decodeURIComponent(rel || 'index.html'));
+  const page = r?.html && (rel === '' || rel === 'index.html') ? r.html : null;
+  if (!ok || (!agent && !page && !file.startsWith(r.dir + path.sep)) || (!page && (!exists(file) || fs.statSync(file).isDirectory()))) { send(res, ok ? 404 : 403, ok ? 'not found' : 'bad signature'); return true; }
   const ext = path.extname(file);
   const headers = { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Content-Security-Policy': 'sandbox allow-scripts', 'X-Content-Type-Options': 'nosniff' };
   if (ext === '.html') {
     const tag = `<script src="${CONTENT}/kradan/f/${id}/${expires}/${sig}/__kradan/agent.js" data-parent="${APP}"></script>`;
-    let html = stripHarness(fs.readFileSync(file, 'utf8'));
+    let html = stripHarness(page ?? fs.readFileSync(file, 'utf8'));
     html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
     send(res, 200, html, headers);
   } else {
