@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Demo: frames and a cropped step</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; background: #f6f7f9; color: #1d2127; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; max-width: 420px; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f1f3; }
+  .btn { display: inline-block; margin-top: 12px; background: #1d2127; color: #fff; border-radius: 8px; padding: 6px 14px; }
+</style>
+</head>
+<body data-dp="Demo ตะกร้า รอบ 1">
+<div data-dp-group data-title="รายการ">
+  <section data-dp-step data-title="หน้ารายการตะกร้า" data-sub="หน้าจอเดียว เปิดได้ทั้งเดสก์ท็อปและมือถือ">
+    <div data-dp-option data-key="A" data-label="ตาราง" data-trade="เห็นหลายคอลัมน์พร้อมกัน แต่บนมือถือต้องเลื่อนข้าง">
+      <div data-dp-frames data-src="screen.html?v=A#s=list" data-show="desktop phone"></div>
+    </div>
+    <div data-dp-option data-key="B" data-label="การ์ด" data-trade="อ่านง่ายบนมือถือ แต่เทียบตัวเลขข้ามแถวยาก">
+      <div data-dp-frames data-src="screen.html?v=B#s=list" data-show="desktop phone"></div>
+    </div>
+  </section>
+</div>
+<div data-dp-group data-title="ยืนยัน">
+  <section data-dp-step data-title="กล่องยืนยันตะกร้า" data-sub="กดยืนยันจากหน้าตะกร้า">
+    <div class="card">
+      <div class="row"><span>ตะกร้า</span><span>RRC000123</span></div>
+      <div class="row"><span>ยอดรวม</span><span>12,450.00</span></div>
+      <div class="row"><span>สถานะ</span><span>แผนสั่งซื้อ</span></div>
+      <span class="btn">ยืนยันตะกร้า</span>
+    </div>
+  </section>
+  <section data-dp-step data-title="ปุ่มยืนยัน" data-sub="สีของปุ่มยืนยัน">
+    <div data-dp-option data-key="A" data-label="ดำ"><span class="btn">ยืนยันตะกร้า</span></div>
+    <div data-dp-option data-key="B" data-label="แดง"><span class="btn" style="background:#ba1a1a">ยืนยันตะกร้า</span></div>
+  </section>
+</div>
+</body>
+</html>
