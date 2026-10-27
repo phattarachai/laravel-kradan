@@ -38,7 +38,23 @@ final class StepParser
             $prints[$step['key']] = $this->print($document, $element, $read);
         }
 
+        if ($steps === [] && $document->body !== null) {
+            $steps[] = $this->wholePage($this->title($document));
+            $prints[$steps[0]['key']] = $this->print($document, $document->body, $read);
+        }
+
         return ['title' => $this->title($document), 'steps' => $steps, 'prints' => $prints];
+    }
+
+    /**
+     * A page with no `[data-dp-step]` (a flow written as one page) is one
+     * screen step, so comments and the export still have a step key.
+     *
+     * @return array{key: string, group: string, title: string, sub: string, kind: string, options: list<array{key: string, title: string}>}
+     */
+    private function wholePage(string $title): array
+    {
+        return ['key' => "|{$title}", 'group' => '', 'title' => $title, 'sub' => '', 'kind' => 'screen', 'options' => []];
     }
 
     private function title(HTMLDocument $document): string
