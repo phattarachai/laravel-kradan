@@ -124,9 +124,7 @@ final class ReviewBuilder
 
     private function header(): string
     {
-        $title = trim("{$this->board->task_ref} {$this->board->title}");
-
-        return implode(' · ', [$title, Kradan::trans('round', ['number' => $this->round->number]), $this->board->url()]);
+        return implode(' · ', [$this->board->label(), Kradan::trans('round', ['number' => $this->round->number]), $this->board->url()]);
     }
 
     /**

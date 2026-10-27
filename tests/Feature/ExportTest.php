@@ -59,6 +59,14 @@ it('copies the round for Claude in the exact review.md shape', function (): void
         MD);
 });
 
+it('names the task ref once when the title already starts with it', function (): void {
+    $round = publishRound('t156-price', 'T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ รอบ 1', taskRef: 'T156');
+
+    expect(ReviewBuilder::for($round)->markdown())->toStartWith('T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ · รอบ 1 · ');
+
+    actingAs(kradanUser())->getJson('/kradan/api/boards')->assertJsonPath('boards.0.label', 'T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ');
+});
+
 it('exports an earlier round on request, and says when nobody answered', function (): void {
     answeredRound();
 

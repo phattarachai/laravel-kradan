@@ -38,6 +38,10 @@ With `KRADAN_ENABLED=false` (the default) no route is registered at all, so ever
 The board's JavaScript and CSS ship prebuilt and are served by the package, so there is no `vendor:publish` and
 no frontend build in your app. `php artisan kradan:doctor` checks the install.
 
+If your app uses [Laravel Boost](https://github.com/laravel/boost), `composer require` runs `boost:update`, which
+rewrites the host's Boost skills. In a checkout without `node_modules` it can drop skills of unrelated packages;
+check `git status` afterwards and restore them.
+
 ## Access
 
 Register who may open each panel in a service provider. `$ability` is `view` or `manage`; `manage` may mark a
@@ -56,7 +60,14 @@ Kradan::userUsing(fn ($user): array => [
 ]);
 ```
 
-Without a callback only the `local` environment lets signed-in users in. A guest is sent to your `login` route.
+Without a callback only the `local` environment lets signed-in users in. A guest is sent to your `login` route;
+if your login route has another name, set it, or guests get a 403. For a Filament admin panel:
+
+```dotenv
+KRADAN_LOGIN_ROUTE=filament.admin.auth.login
+```
+
+`kradan:doctor` reports a route name that does not exist.
 
 ## What it does
 
@@ -162,6 +173,7 @@ php artisan vendor:publish --tag=kradan-config
 | `signed_ttl` | `KRADAN_SIGNED_TTL` | `240` | Minutes a content URL stays valid |
 | `panels` | | flows, decisions | Key, kind and title of each panel |
 | `brand` | `KRADAN_BRAND`, `KRADAN_LOGO`, `KRADAN_ACCENT` | app name | |
+| `redirect_guests_to` | `KRADAN_LOGIN_ROUTE` | `login` | Route name or URL a guest is sent to; null 403s |
 | `presence` | `KRADAN_PRESENCE` | `auto` | `auto`, `reverb`, `polling` or `off` |
 | `uploads.max_kb` | `KRADAN_UPLOAD_MAX_KB` | `20480` | Largest image or file a user may add |
 | `uploads.types` | | images, pdf, office, csv, txt, zip | Allowed file extensions |

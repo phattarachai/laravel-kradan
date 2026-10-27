@@ -36,6 +36,7 @@ final class DoctorCommand extends Command
         $failures += $this->check('Disk ['.config('kradan.disk').'] writable', $this->disk(...));
         $failures += $this->check('Board assets built', $this->assets(...));
         $failures += $this->check('Views', fn (): ?string => View::exists('kradan::board') && View::exists('kradan::index') ? null : 'kradan::board or kradan::index is missing.');
+        $failures += $this->check('Guest login route', $this->loginRoute(...));
         $failures += $this->check('Panels', fn (): ?string => Kradan::panels() === [] ? 'kradan.panels is empty.' : null);
         $failures += $this->check('Token API', fn (): ?string => config('kradan.tokens') === [] ? 'KRADAN_TOKEN_HASHES is empty, so kradan:push cannot reach this app (fine on a developer checkout).' : null);
 
@@ -74,6 +75,21 @@ final class DoctorCommand extends Command
         }
 
         return 0;
+    }
+
+    /**
+     * A guest is sent to `redirect_guests_to`; a name that is not a route
+     * leaves them on a 403 instead.
+     */
+    private function loginRoute(): ?string
+    {
+        $target = config('kradan.redirect_guests_to');
+
+        if (! is_string($target) || $target === '' || Route::has($target) || str_contains($target, '/')) {
+            return null;
+        }
+
+        return "redirect_guests_to [{$target}] is not a route, so guests get a 403. Set KRADAN_LOGIN_ROUTE to your login route (Filament: filament.admin.auth.login).";
     }
 
     private function tables(): ?string
