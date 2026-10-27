@@ -38,6 +38,10 @@ const IC = {
   sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   mini: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" rx="1"/>',
   reload: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
+  pencil: '<path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 7l3 3"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',
   copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/>',
   hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 11.5V4a1.5 1.5 0 0 1 3 0v7.5"/><path d="M14 11.5V5.5a1.5 1.5 0 0 1 3 0V14"/><path d="M8 12.5 6.6 11a1.6 1.6 0 0 0-2.4 2.1L8 18.5A5 5 0 0 0 12 21h1a5 5 0 0 0 5-5v-4.5a1.5 1.5 0 0 0-3 0"/>',
   use: '<path d="M5 3l14 7-6 2-2 6z"/>',
@@ -61,16 +65,16 @@ export function mountBoard(boot, root) {
   const LATEST = () => B.rounds.at(-1)?.number;
   let R = B.rounds.find(r => r.number === B.current) || B.rounds.at(-1);
   const OLD = () => R.number !== LATEST();
-  const DECISION = () => B.kind === 'decision';
-  const CAN_PICK = () => DECISION() && !OLD() && B.status === 'open' && !B.picks_locked;
+  const CAN_PICK = () => !OLD() && B.status === 'open' && !B.picks_locked;
   const CAN_WRITE = () => !OLD();
 
   const ui = {
     step: Math.max(1, +Q.get('step') || 1),
     mode: ['options', 'sizes', 'real'].includes(Q.get('mode')) ? Q.get('mode') : 'options',
     dev: (Q.get('dev') || '').split(',').filter(d => DEV[d]),
-    zoom: Q.get('zoom') || 'fit',
-    arr: Q.get('arr') || 'auto',
+    /* a board opens at 100% with the options stacked (owner, 2026-10-28) */
+    zoom: Q.get('zoom') || '100',
+    arr: ['row', 'col', 'auto'].includes(Q.get('arr')) ? Q.get('arr') : 'col',
     opt: Q.get('opt') || '',
     w: +Q.get('w') || 0,
     sync: Q.get('sync') !== 'off',
@@ -164,8 +168,8 @@ export function mountBoard(boot, root) {
       p.set('step', ui.step);
       if (ui.mode !== 'options') { p.set('mode', ui.mode); }
       if (ui.dev.length) { p.set('dev', ui.dev.join(',')); }
-      if (ui.zoom !== 'fit') { p.set('zoom', ui.zoom); }
-      if (ui.arr !== 'auto') { p.set('arr', ui.arr); }
+      if (ui.zoom !== '100') { p.set('zoom', ui.zoom); }
+      if (ui.arr !== 'col') { p.set('arr', ui.arr); }
       if (ui.opt) { p.set('opt', ui.opt); }
       if (ui.mode === 'real' && ui.w) { p.set('w', ui.w); }
       if (!ui.sync) { p.set('sync', 'off'); }
@@ -190,9 +194,7 @@ export function mountBoard(boot, root) {
       <span class="k-sep"></span>
       <span class="k-pager tnum">${ib('data-act="prev"', 'prev', t('prev'))}<span id="pos"></span>${ib('data-act="next"', 'next', t('next'))}</span>
       <span class="k-sep"></span>
-      <span class="k-grp" id="mode">${ib('data-mode="options"', 'options', t('mode_options'))}${ib('data-mode="sizes"', 'sizes', t('mode_sizes'))}<button class="k-ib" data-mode="real" data-tip="${esc(t('mode_real'))}"><span class="k-one">1:1</span></button></span>
-      <span class="k-sep"></span>
-      <span class="k-grp" id="devs"></span>
+      <button class="k-viewb" id="viewb" data-act="view" data-tip="${esc(t('view_menu'))}"></button>
       <span class="k-sp"></span>
       <button class="k-ib k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh'))}">${svg('reload')}</button>
       <span class="k-avs" id="avs"></span>
@@ -279,13 +281,14 @@ export function mountBoard(boot, root) {
     applyEdits(f);
   }
   /* a page with no steps shows whole, at its own height */
+  /* a page without steps opens fitted to its width, like a document, unless the URL asks for a zoom */
   async function wholePage(f) {
     const m = await bridge.ask(f.ifr.contentWindow, 'measure');
     if (!m) { return; }
     f.crop = { x: 0, y: 0, w: f.size.w, h: Math.min(16000, m.height) };
     f.ifr.style.height = f.crop.h + 'px';
     sizeFrames();
-    if (ui.zoom === 'fit' && !userMoved) { fit(); } else { applyView(); }
+    if ((ui.zoom === 'fit' || !Q.get('zoom')) && !userMoved) { fit(); } else { applyView(); }
   }
   /* the whole page grew after load (a mermaid diagram, an image): the frame follows its height */
   function growWhole(f, height) {
@@ -342,13 +345,11 @@ export function mountBoard(boot, root) {
     app.classList.toggle('noside', !ui.side);
     app.classList.toggle('nopanel', !ui.panel);
     app.classList.toggle('ro', OLD());
-    app.classList.toggle('flow', !DECISION());
     renderBar();
-    $$('#mode button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === ui.mode));
     $('#sync').setAttribute('aria-pressed', ui.sync);
     $('#minib').setAttribute('aria-pressed', ui.mini);
     $('#arr').style.display = ui.mode === 'real' ? 'none' : '';
-    renderDevs(st);
+    renderView(st);
     renderSide();
     renderPanel();
     renderCanvas();
@@ -361,9 +362,53 @@ export function mountBoard(boot, root) {
     $('#statusb').innerHTML = B.status !== 'open'
       ? `<span class="k-status">${esc(t(B.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(B.decided_at) }))}</span>` : '';
   }
-  function renderDevs(st) {
-    const active = devsFor(st);
-    $('#devs').innerHTML = DEV_ORDER.map(d => `<button class="k-ib" data-dev="${d}" data-tip="${esc(devName(d))} ${DEV[d].w}" aria-pressed="${active.includes(d) && !(ui.mode === 'real' && ui.w)}">${svg(d, DEV[d].icon)}</button>`).join('');
+  /* mode and device fold into one button (owner, 2026-10-28): it shows the current device, and opens to choose, like
+     Chrome DevTools' device toolbar. Most boards never touch it */
+  function viewLabel(st) {
+    if (ui.mode === 'sizes') { return { icon: svg('sizes'), text: t('mode_sizes') }; }
+    const d = ui.mode === 'real' && ui.w ? null : devsFor(st)[0];
+    const text = d ? `${devName(d)}${ui.mode === 'real' ? ' 1:1' : ''}` : `1:1 ${ui.w}`;
+    return { icon: d ? svg(d, DEV[d].icon) : '<span class="k-one">1:1</span>', text };
+  }
+  function renderView(st) {
+    const v = viewLabel(st);
+    $('#viewb').innerHTML = `${v.icon}<span class="k-vt">${esc(v.text)}</span><span class="k-caret">▾</span>`;
+  }
+  function setMode(m) { ui.mode = m; ui.dev = []; ui.opt = ''; if (ui.mode !== 'real') { ui.w = 0; } render(); }
+  function setDev(dv) {
+    if (ui.mode === 'sizes') {
+      const cur = devsFor(step());
+      ui.dev = cur.includes(dv) ? cur.filter(x => x !== dv) : DEV_ORDER.filter(x => x === dv || cur.includes(x));
+      if (!ui.dev.length) { ui.dev = [dv]; }
+    } else { ui.dev = [dv]; ui.w = 0; }
+    render();
+  }
+  function openView(anchor) {
+    closeCtx();
+    const el = document.createElement('div');
+    el.className = 'k-ctx k-viewmenu';
+    const row = (attr, val, label, ic, on, kb = '') => `<button ${attr}="${val}" class="${on ? 'on' : ''}"><span class="ck">${on ? '✓' : ''}</span><span class="ic">${ic}</span>${esc(label)}<span class="kb">${esc(kb)}</span></button>`;
+    const draw = () => {
+      el.innerHTML = `<div class="lab">${esc(t('view_mode'))}</div>`
+        + row('data-vmode', 'options', t('mode_options'), svg('options'), ui.mode === 'options')
+        + row('data-vmode', 'sizes', t('mode_sizes'), svg('sizes'), ui.mode === 'sizes')
+        + row('data-vmode', 'real', t('mode_real_short'), '<span class="k-one">1:1</span>', ui.mode === 'real')
+        + `<hr><div class="lab">${esc(t('view_device'))}</div>`
+        + DEV_ORDER.map(d => row('data-vdev', d, devName(d), svg(d, DEV[d].icon), devsFor(step()).includes(d) && !(ui.mode === 'real' && ui.w), `${DEV[d].w}`)).join('');
+    };
+    draw();
+    document.body.appendChild(el);
+    const b = anchor.getBoundingClientRect();
+    el.style.left = Math.min(b.left, innerWidth - el.offsetWidth - 8) + 'px';
+    el.style.top = b.bottom + 4 + 'px';
+    ctx = el;
+    el.addEventListener('click', e => {
+      const x = e.target.closest('button');
+      if (!x) { return; }
+      if (x.dataset.vmode) { setMode(x.dataset.vmode); closeCtx(); return; }
+      /* in เทียบขนาดจอ several devices toggle, so the menu stays open */
+      if (x.dataset.vdev) { setDev(x.dataset.vdev); if (ui.mode === 'sizes') { draw(); } else { closeCtx(); } }
+    });
   }
 
   /* one line under each step in the list: picks (grey), and มีอัปเดต (the one coloured state) */
@@ -384,8 +429,8 @@ export function mountBoard(boot, root) {
     const noted = threads(s.key).length + (items?.forStep(s.key).length || 0) > 0;
     const mark = done && !upd ? `<span class="st done">${CHECK}</span>` : `<span class="st tnum ${upd ? 'upd' : ''}">${n}</span>`;
     const right = upd ? `<span class="key upd">${isNew(s) ? t('new_step') : t('updated')}</span>`
-      : DECISION() && s.pickable && keys.length ? `<span class="key">${esc(pickLabel(s, keys))}</span>`
-      : DECISION() && mySeen(s.key) ? `<span class="key plain">${s.pickable ? t('skipped') : t('read')}</span>` : '';
+      : s.pickable && keys.length ? `<span class="key">${esc(pickLabel(s, keys))}</span>`
+      : mySeen(s.key) ? `<span class="key plain">${s.pickable ? t('skipped') : t('read')}</span>` : '';
     const tip = [s.title, everyone(s)].filter(Boolean).join(' · ');
     return `<a href="#" class="r ${done ? 'done' : 'todo'}" data-step="${n}" aria-current="${n === ui.step}" title="${esc(tip)}">${mark}<span class="t">${esc(s.title)}</span>${noted ? '<i class="dot"></i>' : ''}${right}</a>`;
   }
@@ -402,7 +447,7 @@ export function mountBoard(boot, root) {
   let BOARDS = null;
   let boardsOpen = !!getLocal('kradan:boards-open');
   async function loadBoards() {
-    try { BOARDS = (await api.boards(B.panel))?.boards || []; } catch { BOARDS = []; }
+    try { BOARDS = (await api.boards())?.boards || []; } catch { BOARDS = []; }
     renderSide();
   }
   function boardRow(b) {
@@ -419,13 +464,11 @@ export function mountBoard(boot, root) {
       ${boardsOpen ? rest.map(boardRow).join('') : ''}</div><div class="divide"></div>`;
   }
   function renderSide() {
-    const prog = DECISION() && STEPS.length > 1 ? progress() : [];
-    const viewers = !DECISION() ? (presence?.state.viewers || B.viewers || []) : [];
+    const prog = STEPS.length > 1 ? progress() : [];
     const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
     $('#side').innerHTML = boardsHtml()
-      + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${DECISION() && STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
+      + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
       + (prog.length ? `<div class="k-prog tnum">${prog.map(x => esc(t('progress', { name: x.u.name.split(/\s+/)[0], done: x.done, total: STEPS.length }))).join(' · ')}</div>` : '')
-      + (viewers.length ? `<div class="k-prog">${viewers.slice(0, 4).map(v => `${esc(v.user.name.split(/\s+/)[0])} ${esc(shortDate(v.last_seen_at))}`).join(' · ')}</div>` : '')
       + STEPS.map((s, i) => {
         /* a section whose only step has the section's name adds nothing, so it gets no heading */
         const alone = s.group === s.title && STEPS[i + 1]?.group !== s.group;
@@ -461,12 +504,12 @@ export function mountBoard(boot, root) {
       <h2>${esc(st.title)}</h2>
       ${looked.upd.has(n) ? `<div class="k-sub k-upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
       ${st.sub ? `<p class="k-sub">${esc(st.sub)}</p>` : ''}
-      ${DECISION() && st.pickable && CAN_PICK() ? `<div class="k-picktools"><button data-pickall ${keys.length === st.options.length ? 'disabled' : ''}>${t('pick_all')}</button><button data-pickclear ${keys.length ? '' : 'disabled'}>${t('clear')}</button></div>` : ''}
-      ${DECISION() && st.pickable ? `<div class="k-ol">${st.options.map(o => `
+      ${st.pickable && CAN_PICK() ? `<div class="k-picktools"><button data-pickall ${keys.length === st.options.length ? 'disabled' : ''}>${t('pick_all')}</button><button data-pickclear ${keys.length ? '' : 'disabled'}>${t('clear')}</button></div>` : ''}
+      ${st.pickable ? `<div class="k-ol">${st.options.map(o => `
         <label><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
           <span class="lb">${esc(o.key)} ${esc(o.label)}</span>${pickers(key, o.key)}${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}</label>`).join('')}</div>` : ''}
-      ${DECISION() ? `<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>` : ''}
-      ${DECISION() ? '<div class="k-hr"></div>' : ''}
+      ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
+      <div class="k-hr"></div>
       <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
       <div class="k-thread">${entries.map(x => x.html).join('')}</div>
       ${CAN_WRITE() ? composer('') : ''}`;
@@ -483,10 +526,12 @@ export function mountBoard(boot, root) {
   /* in the pin's popover (pop) the reply box is always open, and editing happens in the panel */
   function commentHtml(c, top, pop = false) {
     const mine = c.mine ?? isMe(c.user);
-    const acts = CAN_WRITE() ? [top && !pop ? `<button data-reply="${c.id}">${t('reply')}</button>` : '', mine && !c.edit && !pop ? `<button data-cedit="${c.id}">${t('edit')}</button>` : '', mine ? `<button data-cdel="${c.id}">${t('delete')}</button>` : ''].join('') : '';
+    /* small actions are icons with a tooltip (owner, 2026-10-28) */
+    const act = (attr, k, label) => `<button ${attr}="${c.id}" data-tip="${esc(label)}" aria-label="${esc(label)}">${svg(k)}</button>`;
+    const acts = CAN_WRITE() ? [top && !pop ? act('data-reply', 'reply', t('reply')) : '', mine && !c.edit && !pop ? act('data-cedit', 'pencil', t('edit')) : '', mine ? act('data-cdel', 'trash', t('delete')) : ''].join('') : '';
     const edited = c.updated_at && c.created_at && Date.parse(c.updated_at) - Date.parse(c.created_at) > 1000 ? ` · ${t('edited')}` : '';
-    return `<div class="k-cm" ${pop ? '' : `id="c-${c.id}"`} data-cid="${c.id}">${avatar(c.user, { tip: c.user.name })}<div class="h"><b>${esc(c.user.name)}</b><span data-tip="${esc(shortDate(c.created_at, true))}">${esc(when(c.created_at))}${edited}</span></div>
-      ${where(c)}${c.body ? `<div class="b">${esc(c.body)}</div>` : ''}${acts ? `<div class="acts">${acts}</div>` : ''}
+    return `<div class="k-cm" ${pop ? '' : `id="c-${c.id}"`} data-cid="${c.id}">${avatar(c.user, { tip: c.user.name })}<div class="h"><b>${esc(c.user.name)}</b><span data-tip="${esc(shortDate(c.created_at, true))}">${esc(when(c.created_at))}${edited}</span>${acts ? `<span class="acts">${acts}</span>` : ''}</div>
+      ${where(c)}${c.body ? `<div class="b">${esc(c.body)}</div>` : ''}
       ${top && (c.replies || []).length ? `<div class="k-replies">${c.replies.map(r => commentHtml(r, false, pop)).join('')}</div>` : ''}
       ${top && !pop ? `<div class="k-replybox" data-replybox="${c.id}" hidden></div>` : ''}</div>`;
   }
@@ -520,7 +565,7 @@ export function mountBoard(boot, root) {
     });
     sizeFrames();
     userMoved = false;
-    if (ui.zoom === 'fit') { fit(); } else { view.z = clamp(+ui.zoom / 100 || 1, 0.05, 4); view.x = 32; view.y = 32; applyView(); }
+    if (ui.zoom === 'fit') { fit(); } else { $('#board').classList.toggle('col', ui.mode !== 'real' && ui.arr !== 'row'); view.z = clamp(+ui.zoom / 100 || 1, 0.05, 4); view.x = 32; view.y = 32; applyView(); }
     items.render();
     paintColor();
   }
@@ -562,8 +607,8 @@ export function mountBoard(boot, root) {
     const picked = st.pickable && myKeys(st.key).includes(g.opt.key);
     const head = (ui.mode === 'options' && st.pickable)
       ? `<div class="grp-h"><span class="key">${esc(g.opt.key)}</span><span class="lbl">${esc(g.opt.label)}</span>
-         ${DECISION() ? `<span class="k-headwho">${pickers(st.key, g.opt.key, '')}</span>` : ''}
-         ${DECISION() && CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>`
+         <span class="k-headwho">${pickers(st.key, g.opt.key, '')}</span>
+         ${CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>`
       : (g.shotCap ? `<div class="grp-h"><span class="lbl">${esc(g.shotCap)}</span></div>` : '');
     const cells = g.cells.map((c, ci) => `<figure class="k-fr" data-g="${gi}" data-c="${ci}">
         <figcaption><span class="cap">${esc(ui.mode === 'sizes' ? '' : c.shot.cap)}</span><span class="dim tnum"></span></figcaption>
@@ -918,13 +963,13 @@ export function mountBoard(boot, root) {
 
   /* ---------- จัดเก็บ: a decision board becomes decided, a flow archived (the backend's decide) ---------- */
   function openArchive() {
-    const m = modal(`<div class="box narrow"><h2>${t('archive_title')}</h2><p class="k-sub">${t(DECISION() ? 'archive_decision' : 'archive_flow')}</p>
+    const m = modal(`<div class="box narrow"><h2>${t('archive_title')}</h2><p class="k-sub">${t('archive_decision')}</p>
       <div class="row"><button class="k-btn" data-x>${t('cancel')}</button><button class="k-btn k-primary" data-yes>${t('archive')}</button></div></div>`);
     $('[data-yes]', m).onclick = async () => {
       try {
         const r = await api.decide(B.slug);
         const fresh = r?.board ?? r;
-        B = { ...B, status: fresh?.status || (DECISION() ? 'decided' : 'archived'), decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
+        B = { ...B, status: fresh?.status || 'decided', decided_at: fresh?.decided_at || new Date().toISOString(), picks_locked: true };
         m.remove();
         render();
       } catch { toast(t('save_failed')); }
@@ -1067,7 +1112,6 @@ export function mountBoard(boot, root) {
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
-    if (d.mode) { ui.mode = d.mode; ui.dev = []; ui.opt = ''; if (ui.mode === 'real') { ui.zoom = '100'; } else { ui.w = 0; ui.zoom = 'fit'; } render(); return; }
     if (d.pick) { togglePick(d.pick); return; }
     if (d.pickall !== undefined) { setPicks(step().options.map(o => o.key)); return; }
     if (d.pickclear !== undefined) { setPicks([]); return; }
@@ -1081,22 +1125,12 @@ export function mountBoard(boot, root) {
       $('textarea', b).focus();
       return;
     }
-    if (d.dev) {
-      const dv = d.dev;
-      if (ui.mode === 'sizes') {
-        const cur = devsFor(step());
-        ui.dev = cur.includes(dv) ? cur.filter(x => x !== dv) : DEV_ORDER.filter(x => x === dv || cur.includes(x));
-        if (!ui.dev.length) { ui.dev = [dv]; }
-      } else { ui.dev = [dv]; ui.w = 0; }
-      render();
-      return;
-    }
     const act = d.act;
     if (act === 'prev') { go(ui.step - 1); }
     if (act === 'next') { go(ui.step + 1); }
     if (act === 'sync') { ui.sync = !ui.sync; $('#sync').setAttribute('aria-pressed', ui.sync); writeUrl(); }
     if (act === 'mini') { toggleMini(); }
-    if (act === 'arr') { ui.arr = $('#board')?.classList.contains('col') ? 'row' : 'col'; ui.zoom = 'fit'; writeUrl(); fit(); }
+    if (act === 'arr') { ui.arr = $('#board')?.classList.contains('col') ? 'row' : 'col'; writeUrl(); if (ui.zoom === 'fit') { fit(); } else { $('#board')?.classList.toggle('col', ui.arr === 'col'); applyView(); } }
     if (act === 'fit') { ui.zoom = 'fit'; writeUrl(); fit(); }
     if (act === 'z100') { zoomCenter(1 / view.z); }
     if (act === 'zin') { zoomCenter(1.25); }
@@ -1105,6 +1139,7 @@ export function mountBoard(boot, root) {
     if (act === 'panel') { ui.panel = !ui.panel; $('#app').classList.toggle('nopanel', !ui.panel); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'copy') { openCopy(); }
     if (act === 'colors') { openColors(t0); }
+    if (act === 'view') { openView(t0); }
     if (act === 'rounds') { openRounds(t0); }
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
@@ -1168,7 +1203,7 @@ export function mountBoard(boot, root) {
       const f = frames[0], startX = e.clientX, startW = f.size.w;
       f.ifr.style.pointerEvents = 'none';
       const move = ev => { ui.w = Math.round(clamp(startW + (ev.clientX - startX) / view.z, 320, 1920)); f.size.w = ui.w; f.cell.dev = 'custom'; sizeFrames(); applyView(); };
-      const up = () => { f.ifr.style.pointerEvents = ''; removeEventListener('pointermove', move); removeEventListener('pointerup', up); writeUrl(); renderDevs(step()); };
+      const up = () => { f.ifr.style.pointerEvents = ''; removeEventListener('pointermove', move); removeEventListener('pointerup', up); writeUrl(); renderView(step()); };
       addEventListener('pointermove', move);
       addEventListener('pointerup', up);
       return;
@@ -1213,7 +1248,6 @@ export function mountBoard(boot, root) {
   let lastChanged = B.changed_at || null;
   function renderAvatars(viewers, online) {
     $('#avs').innerHTML = avatarRow(viewers, { me: ME.id, online });
-    if (!DECISION()) { renderSide(); }
   }
 
   /* ---------- what people add to the board (item 11) ---------- */

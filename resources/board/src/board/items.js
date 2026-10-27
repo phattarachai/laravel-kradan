@@ -16,6 +16,15 @@ export const STROKES = { ink: '#1d2127', red: '#d6336c', orange: '#e8590c', gree
 export const STICKIES = { yellow: '#fff3bf', pink: '#ffdeeb', green: '#d3f9d8', blue: '#d0ebff' };
 const ICON = { note: '🗒', text: '🗒', image: '🖼', file: '📎', arrow: '➚', rect: '▭', ellipse: '◯', stroke: '〰' };
 const PAD = 8;
+/* small actions are icons with a tooltip (owner, 2026-10-28) */
+const ICONS = {
+  reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
+  pencil: '<path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 7l3 3"/>',
+  trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
+  download: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+};
+const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
+const iconLink = url => `<a class="k-ia" href="${esc(url)}" download rel="noopener" data-tip="${esc(t('download'))}" aria-label="${esc(t('download'))}">${icon('download')}</a>`;
 
 /* the bounding box of points, and the points relative to it */
 export function boxOf(points) {
@@ -97,7 +106,7 @@ export function createItems(ctx) {
     if (it.kind === 'file') {
       const ext = extOf(it.file?.name);
       return `<div ${base} style="${pos}"><span class="ic" data-ext="${esc(ext)}">${esc(ext || 'FILE')}</span><span class="nm">${esc(it.file?.name || '')}</span>
-        <span class="mt tnum">${it.file?.size ? kb(it.file.size) : ''}${it.pending ? ` · ${t('uploading')}` : it.file?.url ? ` · <a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : ''}</span>${it.pending ? `<div class="prog"><i style="width:${it.progress || 0}%"></i></div>` : ''}</div>`;
+        <span class="mt tnum">${it.file?.size ? kb(it.file.size) : ''}${it.pending ? ` · ${t('uploading')}` : ''}</span>${!it.pending && it.file?.url ? iconLink(it.file.url) : ''}${it.pending ? `<div class="prog"><i style="width:${it.progress || 0}%"></i></div>` : ''}</div>`;
     }
     /* drawings: an svg the size of the item plus a margin for the stroke */
     const w = Math.max(+it.w || 0, 1), h = Math.max(+it.h || 0, 1);
@@ -376,10 +385,10 @@ export function createItems(ctx) {
     bar.innerHTML = mine
       ? Object.entries(palette).map(([k, c]) => `<button class="sw ${k === it.color ? 'on' : ''}" data-icolor="${k}" style="background:${c}" aria-label="${k}"></button>`).join('')
         + (Object.keys(palette).length ? '<span class="vr"></span>' : '')
-        + (['note', 'text'].includes(it.kind) ? `<button data-iedit>${t('edit')}</button>` : '')
-        + (it.file?.url ? `<a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : '')
-        + `<button data-idel>${t('delete')}</button>`
-      : `<span class="note">${esc(t('item_of', { name: it.user?.name || '', date: shortDate(it.created_at, true) }))}</span>${it.file?.url ? `<a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : ''}`;
+        + (['note', 'text'].includes(it.kind) ? `<button data-iedit data-tip="${esc(t('edit'))}" aria-label="${esc(t('edit'))}">${icon('pencil')}</button>` : '')
+        + (it.file?.url ? iconLink(it.file.url) : '')
+        + `<button data-idel data-tip="${esc(t('delete'))}" aria-label="${esc(t('delete'))}">${icon('trash')}</button>`
+      : `<span class="note">${esc(t('item_of', { name: it.user?.name || '', date: shortDate(it.created_at, true) }))}</span>${it.file?.url ? iconLink(it.file.url) : ''}`;
     document.body.appendChild(bar);
     bar.style.left = `${clamp(r.left, 8, innerWidth - bar.offsetWidth - 8)}px`;
     bar.style.top = `${r.bottom + 8 + bar.offsetHeight > innerHeight ? r.top - bar.offsetHeight - 8 : r.bottom + 8}px`;
@@ -427,10 +436,10 @@ export function createItems(ctx) {
   /* ---------- the panel: the ข้อมูลเพิ่มเติม tab (pick B) and items in the thread (pick C) ---------- */
   function rowHtml(it) {
     const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
-    const file = it.kind === 'file' && it.file?.url ? ` · <a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : '';
+    const file = it.kind === 'file' && it.file?.url ? iconLink(it.file.url) : '';
     const where = isOn(it) && it.anchor.option ? ` ${t('on_option', { o: it.anchor.option })}` : '';
     return `<div class="k-irow" data-goitem="${it.id}"><span class="ic k-i-ic-${it.kind}">${ICON[it.kind] || '•'}</span><span class="h"><b>${esc(it.user?.name || '')}</b> ${esc(when(it.created_at))}</span>
-      <span class="b">${esc(summary(it))}${esc(where)}${file}</span>${thumb}</div>`;
+      <span class="b">${esc(summary(it))}${esc(where)}</span>${file ? `<span class="acts">${file}</span>` : ''}${thumb}</div>`;
   }
   function tabHtml(key) {
     const list = forStep(key);
@@ -440,10 +449,10 @@ export function createItems(ctx) {
   function threadEntry(it, comments, commentHtml, composer) {
     const replies = comments.filter(c => String(c.item_id) === String(it.id));
     const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
-    const file = it.kind === 'file' && it.file?.url ? ` · <a href="${esc(it.file.url)}" download rel="noopener">${t('download')}</a>` : '';
-    return `<div class="k-cm k-icm" data-goitem="${it.id}">${avatar(it.user, { tip: it.user?.name })}<div class="h"><b>${esc(it.user?.name || '')}</b><span>${esc(when(it.created_at))} · ${esc(t(`added_${it.kind}`))}</span></div>
-      <div class="b"><span class="k-i-ic">${ICON[it.kind] || ''}</span> ${esc(summary(it))}${file}</div>${thumb ? `<div class="b">${thumb}</div>` : ''}
-      ${ctx.canWrite() && it.id > 0 ? `<div class="acts"><button data-ireply="${it.id}">${t('reply')}</button></div>` : ''}
+    const file = it.kind === 'file' && it.file?.url ? iconLink(it.file.url) : '';
+    const reply = ctx.canWrite() && it.id > 0 ? `<span class="acts">${file}<button data-ireply="${it.id}" data-tip="${esc(t('reply'))}" aria-label="${esc(t('reply'))}">${icon('reply')}</button></span>` : file ? `<span class="acts">${file}</span>` : '';
+    return `<div class="k-cm k-icm" data-goitem="${it.id}">${avatar(it.user, { tip: it.user?.name })}<div class="h"><b>${esc(it.user?.name || '')}</b><span>${esc(when(it.created_at))} · ${esc(t(`added_${it.kind}`))}</span>${reply}</div>
+      <div class="b"><span class="k-i-ic">${ICON[it.kind] || ''}</span> ${esc(summary(it))}</div>${thumb ? `<div class="b">${thumb}</div>` : ''}
       ${replies.length ? `<div class="k-replies">${replies.map(r => commentHtml(r, false)).join('')}</div>` : ''}
       <div class="k-replybox" data-ireplybox="${it.id}" hidden>${composer(`item:${it.id}`, t('reply_ph'))}</div></div>`;
   }

@@ -1,7 +1,8 @@
 /* Every string the board shows. Thai is the default; `locale: "en"` in the boot payload switches. */
 const th = {
   side: 'รายการข้อ', panel: 'ตัวเลือกและความเห็น', prev: 'ก่อนหน้า', next: 'ถัดไป',
-  mode_options: 'เทียบแบบ', mode_sizes: 'เทียบขนาดจอ', mode_real: 'ขนาดจริง ลากขอบขวาปรับความกว้าง',
+  mode_options: 'เทียบแบบ', mode_sizes: 'เทียบขนาดจอ', mode_real: 'ขนาดจริง ลากขอบขวาปรับความกว้าง', mode_real_short: 'ขนาดจริง',
+  view_menu: 'มุมมองและขนาดจอ', view_mode: 'มุมมอง', view_device: 'ขนาดจอ',
   zoom_out: 'ย่อ', zoom_in: 'ขยาย', zoom_100: 'กดเพื่อดู 100%', fit: 'พอดีจอ (Shift 1)', arrange: 'วางข้างกัน หรือบนล่าง',
   sync: 'เลื่อนและแตะพร้อมกัน', mini: 'แผนที่ย่อ (M)',
   tool_hand: 'มือจับ', tool_use: 'กดในจอ', tool_edit: 'แก้คำ', tool_pin: 'ปักโน้ต',
@@ -12,7 +13,7 @@ const th = {
   added_note: 'โน้ต', added_text: 'ข้อความ', added_image: 'วางรูป', added_file: 'วางไฟล์', added_arrow: 'ลูกศร', added_rect: 'ตีกรอบ', added_ellipse: 'วงรี', added_stroke: 'วาดเส้น',
   copy: 'คัดลอกให้ Claude', copied: 'คัดลอกแล้ว', copy_manual: 'กด ⌘C เพื่อคัดลอก', close: 'ปิด', cancel: 'ยกเลิก',
   archive: 'จัดเก็บ', decided_on: 'ตัดสินใจแล้ว {date}', archived_on: 'จัดเก็บแล้ว {date}', archive_title: 'จัดเก็บกระดานนี้',
-  archive_decision: 'ย้ายไปประวัติเป็นตัดสินใจแล้ว เลือกตัวเลือกเพิ่มไม่ได้ ความเห็นยังเขียนต่อได้', archive_flow: 'ย้ายไปประวัติ ยังเปิดดูและเขียนความเห็นได้', product: 'กระดาน',
+  archive_decision: 'ย้ายไปประวัติเป็นตัดสินใจแล้ว เลือกตัวเลือกเพิ่มไม่ได้ ความเห็นยังเขียนต่อได้', product: 'กระดาน',
   old_round: 'รอบเก่า ดูอย่างเดียว', latest_round: 'กลับไปรอบล่าสุด', rounds: 'รอบของกระดานนี้', all_rounds: 'ดูทุกรอบ',
   round_n: 'รอบ {n}', open_round: 'เปิดรอบนี้', steps_n: '{n} ข้อ', answered_people: 'ตอบแล้ว {n} คน', loading: 'กำลังโหลด',
   fresh: 'มีอัปเดต โหลดใหม่', fresh_tip: 'Claude ส่งรอบนี้มาใหม่ตอนเปิดอยู่',
@@ -39,7 +40,8 @@ const th = {
 
 const en = {
   side: 'Steps', panel: 'Options and comments', prev: 'Previous', next: 'Next',
-  mode_options: 'Compare options', mode_sizes: 'Compare screen sizes', mode_real: 'Real size, drag the right edge to resize',
+  mode_options: 'Compare options', mode_sizes: 'Compare screen sizes', mode_real: 'Real size, drag the right edge to resize', mode_real_short: 'Real size',
+  view_menu: 'View and screen size', view_mode: 'View', view_device: 'Screen',
   zoom_out: 'Zoom out', zoom_in: 'Zoom in', zoom_100: 'Click for 100%', fit: 'Fit (Shift 1)', arrange: 'Side by side or stacked',
   sync: 'Scroll and tap together', mini: 'Minimap (M)',
   tool_hand: 'Hand', tool_use: 'Interact', tool_edit: 'Edit text', tool_pin: 'Pin a note',
@@ -50,7 +52,7 @@ const en = {
   added_note: 'note', added_text: 'text', added_image: 'image', added_file: 'file', added_arrow: 'arrow', added_rect: 'box', added_ellipse: 'ellipse', added_stroke: 'drawing',
   copy: 'Copy for Claude', copied: 'Copied', copy_manual: 'Press ⌘C to copy', close: 'Close', cancel: 'Cancel',
   archive: 'Archive', decided_on: 'Decided {date}', archived_on: 'Archived {date}', archive_title: 'Archive this board',
-  archive_decision: 'It moves to history as decided. Picks lock; comments stay open.', archive_flow: 'It moves to history. It stays readable and open to comments.', product: 'Kradan',
+  archive_decision: 'It moves to history as decided. Picks lock; comments stay open.', product: 'Kradan',
   old_round: 'Old round, read only', latest_round: 'Back to the latest round', rounds: 'Rounds of this board', all_rounds: 'All rounds',
   round_n: 'Round {n}', open_round: 'Open this round', steps_n: '{n} steps', answered_people: '{n} answered', loading: 'Loading',
   fresh: 'Updated, reload', fresh_tip: 'Claude pushed this round again while it was open',
