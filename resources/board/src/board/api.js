@@ -23,6 +23,7 @@ export function createApi(boot) {
   }
   const seg = s => encodeURIComponent(s);
   return {
+    boards: panel => call('GET', `boards${panel ? `?panel=${seg(panel)}` : ''}`),
     board: (slug, round) => call('GET', `boards/${seg(slug)}${round ? `?round=${round}` : ''}`),
     pick: (slug, round, step, body) => call('PUT', `boards/${seg(slug)}/rounds/${round}/picks/${seg(step)}`, body),
     comment: (slug, round, body) => call('POST', `boards/${seg(slug)}/rounds/${round}/comments`, body),

@@ -6,7 +6,7 @@
  *    keeps UI conveniences; the view itself (step, mode, zoom…) lives in the URL.
  */
 import { t } from './i18n.js';
-import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText } from './util.js';
+import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText, getLocal, setLocal } from './util.js';
 import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
@@ -367,20 +367,27 @@ export function mountBoard(boot, root) {
   }
 
   /* one line under each step in the list: picks (grey), and มีอัปเดต (the one coloured state) */
-  function stepMark(s, n) {
+  /* one line per step, as in the design workbench (2026-10-30): a ring with the number until this viewer answered
+     it, then a check; their own answer on the right; มีอัปเดต in orange; everyone's counts in the title */
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>';
+  const GRID = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>';
+  function everyone(s) {
     const ps = picksFor(s.key);
-    let ans;
-    if (DECISION() && s.pickable) {
-      const counts = s.options.map(o => [o.key, ps.filter(p => p.options.includes(o.key)).length]).filter(([, c]) => c);
-      const skip = ps.filter(p => p.seen).length;
-      ans = [...counts.map(([k, c]) => `<b>${esc(k)}</b> ${c}`), skip ? `${t('skipped')} ${skip}` : ''].filter(Boolean).join(' · ');
-    } else if (DECISION()) {
-      const read = ps.filter(p => p.seen).length;
-      ans = read ? `${t('read')} ${read}` : '';
-    }
+    const counts = s.options.filter(o => o.key).map(o => [o.key, ps.filter(p => p.options.includes(o.key)).length]).filter(([, c]) => c);
+    const seen = ps.filter(p => p.seen).length;
     const cm = threads(s.key).length + (items?.forStep(s.key).length || 0);
-    ans = [ans, cm ? t('comments_n', { n: cm }) : ''].filter(Boolean).join(' · ') || (DECISION() ? (s.pickable ? t('not_picked') : t('not_read')) : '');
-    return looked.upd.has(n) ? `<span class="k-upd">${isNew(s) ? t('new_step') : t('updated')}</span>${ans ? ' · ' + ans : ''}` : ans;
+    return [...counts.map(([k, c]) => `${k} ${c}`), seen ? `${s.pickable ? t('skipped') : t('read')} ${seen}` : '', cm ? t('comments_n', { n: cm }) : ''].filter(Boolean).join(' · ');
+  }
+  function stepRow(s, n) {
+    const done = answeredBy(ME.id, s.key), upd = looked.upd.has(n), keys = myKeys(s.key);
+    const noted = threads(s.key).length + (items?.forStep(s.key).length || 0) > 0;
+    const mark = done && !upd ? `<span class="st done">${CHECK}</span>` : `<span class="st tnum ${upd ? 'upd' : ''}">${n}</span>`;
+    const right = upd ? `<span class="key upd">${isNew(s) ? t('new_step') : t('updated')}</span>`
+      : DECISION() && s.pickable && keys.length ? `<span class="key">${esc(pickLabel(s, keys))}</span>`
+      : DECISION() && mySeen(s.key) ? `<span class="key plain">${s.pickable ? t('skipped') : t('read')}</span>` : '';
+    const tip = [s.title, everyone(s)].filter(Boolean).join(' · ');
+    return `<a href="#" class="r ${done ? 'done' : 'todo'}" data-step="${n}" aria-current="${n === ui.step}" title="${esc(tip)}">${mark}<span class="t">${esc(s.title)}</span>${noted ? '<i class="dot"></i>' : ''}${right}</a>`;
   }
   /* how far each person got: "สมชาย 6 / 6" */
   function progress() {
@@ -390,16 +397,40 @@ export function mountBoard(boot, root) {
     return [...people.values()].map(u => ({ u, done: STEPS.filter(s => answeredBy(u.id, s.key)).length }))
       .sort((a, b) => b.done - a.done);
   }
+  /* the other boards of this panel sit on top, like Figma's Pages over Layers: this one and the updated ones, the rest
+     folded (remembered); then the steps of this board */
+  let BOARDS = null;
+  let boardsOpen = !!getLocal('kradan:boards-open');
+  async function loadBoards() {
+    try { BOARDS = (await api.boards(B.panel))?.boards || []; } catch { BOARDS = []; }
+    renderSide();
+  }
+  function boardRow(b) {
+    const cur = b.slug === B.slug;
+    return `<a class="pg" href="${esc(b.url)}" aria-current="${cur}" title="${esc(b.label || b.title)}">${DOC}<span class="t">${esc(b.label || b.title)}</span>${b.updated && !cur ? `<span class="wt">${t('updated')}</span>` : ''}</a>`;
+  }
+  function boardsHtml() {
+    if (!BOARDS?.length) { return ''; }
+    const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug);
+    const top = open.filter(b => b.slug === B.slug || b.updated), rest = open.filter(b => !top.includes(b));
+    return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span><a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a></div>
+      ${top.map(boardRow).join('')}
+      ${rest.length ? `<button class="fold" data-boardsfold aria-expanded="${boardsOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('other_boards', { n: rest.length }))}</button>` : ''}
+      ${boardsOpen ? rest.map(boardRow).join('') : ''}</div><div class="divide"></div>`;
+  }
   function renderSide() {
     const prog = DECISION() && STEPS.length > 1 ? progress() : [];
     const viewers = !DECISION() ? (presence?.state.viewers || B.viewers || []) : [];
-    $('#side').innerHTML = (prog.length ? `<div class="k-prog tnum">${prog.map(x => esc(t('progress', { name: x.u.name.split(/\s+/)[0], done: x.done, total: STEPS.length }))).join(' · ')}</div>` : '')
+    const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
+    $('#side').innerHTML = boardsHtml()
+      + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${DECISION() && STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
+      + (prog.length ? `<div class="k-prog tnum">${prog.map(x => esc(t('progress', { name: x.u.name.split(/\s+/)[0], done: x.done, total: STEPS.length }))).join(' · ')}</div>` : '')
       + (viewers.length ? `<div class="k-prog">${viewers.slice(0, 4).map(v => `${esc(v.user.name.split(/\s+/)[0])} ${esc(shortDate(v.last_seen_at))}`).join(' · ')}</div>` : '')
       + STEPS.map((s, i) => {
-        const n = i + 1;
-        const head = s.group && s.group !== STEPS[i - 1]?.group ? `<h4 class="k-sec">${esc(s.group)}</h4>` : '';
-        const mark = stepMark(s, n);
-        return `${head}<a href="#" data-step="${n}" aria-current="${n === ui.step}"><span class="n tnum">${n}</span><span class="t">${esc(s.title)}${mark ? `<br><span class="k">${mark}</span>` : ''}</span></a>`;
+        /* a section whose only step has the section's name adds nothing, so it gets no heading */
+        const alone = s.group === s.title && STEPS[i + 1]?.group !== s.group;
+        const head = s.group && s.group !== STEPS[i - 1]?.group && !alone ? `<h4 class="k-sec">${esc(s.group)}</h4>` : '';
+        return head + stepRow(s, i + 1);
       }).join('');
   }
 
@@ -1032,6 +1063,7 @@ export function mountBoard(boot, root) {
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
     if (t0.dataset.ptab) { ui.ptab = t0.dataset.ptab; writeUrl(); renderPanel(); return; }
+    if (t0.dataset.boardsfold !== undefined) { boardsOpen = !boardsOpen; setLocal('kradan:boards-open', boardsOpen); renderSide(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -1223,6 +1255,7 @@ export function mountBoard(boot, root) {
       },
     });
     presence.start(B.viewers || []);
+    loadBoards();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); } });
   });
 }

@@ -333,6 +333,10 @@ async function api(req, res, url, me) {
   if (write && req.headers['x-csrf-token'] !== CSRF) { return sendJson(res, 419, { message: 'CSRF token mismatch.' }); }
   let m;
   const find = slug => BOARDS.find(b => b.slug === slug);
+  if (p === 'boards' && req.method === 'GET') {
+    const panel = url.searchParams.get('panel');
+    return sendJson(res, 200, { boards: indexRows(me).filter(b => !panel || b.panel === panel) });
+  }
   if ((m = p.match(/^boards\/([^/]+)$/)) && req.method === 'GET') {
     const b = find(m[1]);
     return b ? sendJson(res, 200, boardPayload(b, me, url.searchParams.get('round'))) : sendJson(res, 404, {});
