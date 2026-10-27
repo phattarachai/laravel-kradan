@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Phattarachai\Kradan\Console;
 
 use Illuminate\Console\Command;
+use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Support\KradanRemote;
 
 final class ListCommand extends Command
@@ -22,7 +23,7 @@ final class ListCommand extends Command
                 $board['kind'],
                 $board['status'],
                 $board['round'] ?? '-',
-                trim(($board['task_ref'] ?? '').' '.$board['title']),
+                $board['label'] ?? Board::labelFor($board['task_ref'] ?? null, (string) $board['title']),
                 $board['url'],
             ], $remote->boards()),
         );

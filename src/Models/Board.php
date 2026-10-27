@@ -61,6 +61,26 @@ final class Board extends KradanModel
         return Kradan::panelFor($this->kind);
     }
 
+    /**
+     * "T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ": the task ref before the title, unless
+     * the title already starts with it.
+     */
+    public function label(): string
+    {
+        return self::labelFor($this->task_ref, $this->title);
+    }
+
+    public static function labelFor(?string $taskRef, string $title): string
+    {
+        $ref = trim((string) $taskRef);
+
+        if ($ref === '' || preg_match('/^'.preg_quote($ref, '/').'(?![\pL\pN])/iu', ltrim($title)) === 1) {
+            return trim($title);
+        }
+
+        return "{$ref} ".trim($title);
+    }
+
     public function isOpen(): bool
     {
         return $this->status === BoardStatus::Open;

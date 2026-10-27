@@ -124,6 +124,7 @@ final readonly class BoardPresenter
             'panel' => $board->panel(),
             'status' => $board->status->value,
             'task_ref' => $board->task_ref,
+            'label' => $board->label(),
             'decided_at' => $board->decided_at?->toIso8601String(),
             'decided_by' => $board->decided_by === null ? null : Kradan::userById($board->decided_by),
             'updated_at' => $board->updated_at?->toIso8601String(),

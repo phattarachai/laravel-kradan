@@ -143,11 +143,18 @@ it('downloads every image and file into attachments/, at the paths the review na
 
 it('lists boards and marks one decided', function (): void {
     Http::fake([
-        'staging.example.com/kradan/api/v1/boards' => Http::response(['boards' => [['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/decisions/t188']]]),
+        'staging.example.com/kradan/api/v1/boards' => Http::response(['boards' => [
+            ['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/decisions/t188'],
+            ['slug' => 't156', 'kind' => 'flow', 'status' => 'open', 'round' => 1, 'task_ref' => 'T156', 'title' => 'T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ', 'url' => 'https://staging.example.com/kradan/flows/t156'],
+        ]]),
         'staging.example.com/kradan/api/v1/boards/t188/decide' => Http::response(['board' => ['slug' => 't188', 'status' => 'decided', 'url' => 'https://staging.example.com/kradan/decisions/t188']]),
     ]);
 
-    $this->artisan('kradan:list')->expectsOutputToContain('T188 Manual SO')->assertSuccessful();
+    $this->artisan('kradan:list')
+        ->expectsOutputToContain('T188 Manual SO')
+        ->expectsOutputToContain('T156 ราคาหลังลูกค้าส่งคำสั่งซื้อ')
+        ->doesntExpectOutputToContain('T156 T156')
+        ->assertSuccessful();
     $this->artisan('kradan:decide', ['slug' => 't188'])->expectsOutputToContain('t188 is now decided')->assertSuccessful();
 });
 
@@ -155,6 +162,18 @@ it('says what to set when the remote is not configured', function (): void {
     config()->set('kradan.remote.token', null);
 
     expect(fn () => $this->artisan('kradan:list')->run())->toThrow(RuntimeException::class, 'kradan:token --write');
+});
+
+it('warns when the guest login route does not exist', function (): void {
+    config()->set('kradan.redirect_guests_to', 'login');
+
+    $this->artisan('kradan:doctor')->doesntExpectOutputToContain('is not a route');
+
+    config()->set('kradan.redirect_guests_to', 'filament.admin.auth.login');
+
+    $this->artisan('kradan:doctor')
+        ->expectsOutputToContain('redirect_guests_to [filament.admin.auth.login] is not a route')
+        ->assertFailed();
 });
 
 it('runs the doctor and names what is missing', function (): void {
