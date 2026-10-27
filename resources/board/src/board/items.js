@@ -24,7 +24,19 @@ export function boxOf(points) {
   return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y, points: points.map(([a, b]) => [Math.round(a - x), Math.round(b - y)]) };
 }
 /* anchor.on as sent in a form ("1"/"0") or as JSON */
-export const isOn = it => [true, 1, '1', 'true'].includes(it.anchor?.on);
+const anchorOn = a => [true, 1, '1', 'true'].includes(a?.on);
+export const isOn = it => anchorOn(it.anchor);
+/* the same place: the same frame (option, device, screen), or beside the same option group */
+export function sameAnchor(a, b) {
+  if (anchorOn(a) !== anchorOn(b) || (a?.option ?? null) !== (b?.option ?? null)) { return false; }
+  return !anchorOn(a) || (a.device === b.device && a.src === b.src);
+}
+/* what a move sends: x/y, plus the new anchor when the item was dropped onto a frame, off it, or onto another
+   group (x/y are then in the new anchor's space) */
+export function movePatch(it, tg) {
+  if (!tg || sameAnchor(it.anchor, tg.anchor)) { return { x: Math.round(it.x), y: Math.round(it.y) }; }
+  return { anchor: { ...tg.anchor, on: anchorOn(tg.anchor) }, x: Math.round(tg.x), y: Math.round(tg.y) };
+}
 /* does this item belong in this place? frames by option, device and src; groups by option */
 export function onFrame(it, f) {
   return isOn(it) && (it.anchor.option ?? '') === (f.option ?? '') && it.anchor.device === f.device && it.anchor.src === f.src;
@@ -119,12 +131,13 @@ export function createItems(ctx) {
 
   /* ---------- where a point on the canvas lands: on a frame, or beside a group ---------- */
   const inside = (r, x, y) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  function targetAt(cx, cy) {
+  /* (cx, cy) picks the place; `at` is the screen point whose coordinates come back (the point itself by default) */
+  function targetAt(cx, cy, at = { x: cx, y: cy }) {
     const z = ctx.view.z;
     const f = ctx.frames().find(x => inside(x.scr.getBoundingClientRect(), cx, cy));
     if (f) {
       const r = f.scr.getBoundingClientRect();
-      return { f, layer: $('.k-flin', f.fig), anchor: { ...where(f), on: true }, x: (cx - r.left) / z, y: (cy - r.top) / z + (f.crop ? 0 : f.scrollY) };
+      return { f, layer: $('.k-flin', f.fig), anchor: { ...where(f), on: true }, x: (at.x - r.left) / z, y: (at.y - r.top) / z + (f.crop ? 0 : f.scrollY) };
     }
     const shots = $$('#board .shots');
     if (!shots.length) { return null; }
@@ -132,7 +145,7 @@ export function createItems(ctx) {
     const s = shots.reduce((a, b) => (dist(b) < dist(a) ? b : a));
     const r = s.getBoundingClientRect(), g = s.closest('.grp');
     const first = ctx.frames().find(x => g.contains(x.fig));
-    return { layer: $('.k-ilayer', s), anchor: { option: g.dataset.key || null, device: first?.cell.dev || 'desktop', src: first ? ctx.frameSrc(first) : 'crop', on: false }, x: (cx - r.left) / z, y: (cy - r.top) / z };
+    return { layer: $('.k-ilayer', s), anchor: { option: g.dataset.key || null, device: first?.cell.dev || 'desktop', src: first ? ctx.frameSrc(first) : 'crop', on: false }, x: (at.x - r.left) / z, y: (at.y - r.top) / z };
   }
   /* a frame point in the coordinates the agent uses (viewport of the frame's document) */
   function agentPoint(tg, x, y) {
@@ -401,7 +414,11 @@ export function createItems(ctx) {
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
       dragging = null;
-      if (moved && it.id > 0) { patch(it, resizing ? { w: it.w, h: it.h } : { x: it.x, y: it.y }); } else { renderSelection(); }
+      if (!moved || it.id <= 0) { renderSelection(); return; }
+      if (resizing) { patch(it, { w: it.w, h: it.h }); return; }
+      /* where it was dropped decides its anchor: its middle picks the frame or group, its top-left becomes x/y there */
+      const r = el.getBoundingClientRect(), pad = el.tagName.toLowerCase() === 'svg' ? PAD * ctx.view.z : 0;
+      patch(it, movePatch(it, targetAt(r.left + r.width / 2, r.top + r.height / 2, { x: r.left + pad, y: r.top + pad })));
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);

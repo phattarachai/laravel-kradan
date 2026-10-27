@@ -420,6 +420,8 @@ async function api(req, res, url, me) {
     const authorOnly = ['text', 'color', 'points', 'texts'].filter(k => k in body);
     if (authorOnly.length && !own) { return sendJson(res, 403, { message: 'only the author edits' }); }
     ['x', 'y', 'w', 'h'].forEach(k => { if (k in body) { it[k] = +body[k]; } });
+    /* anyone may move an item to another frame or group (the backend's rule) */
+    if (body.anchor && typeof body.anchor === 'object') { it.anchor = { option: body.anchor.option ?? null, device: body.anchor.device, src: body.anchor.src, on: !!body.anchor.on }; }
     authorOnly.forEach(k => { it[k] = body[k]; });
     it.updated_at = new Date().toISOString();
     touch(b);
