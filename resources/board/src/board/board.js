@@ -6,7 +6,7 @@
  *    keeps UI conveniences; the view itself (step, mode, zoom…) lives in the URL.
  */
 import { t } from './i18n.js';
-import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText } from './util.js';
+import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText, getLocal, setLocal } from './util.js';
 import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
@@ -81,7 +81,6 @@ export function mountBoard(boot, root) {
     side: Q.get('side') !== 'off',
     panel: Q.get('panel') !== 'off',
     tool: TOOLS.includes(Q.get('tool')) ? Q.get('tool') : 'hand',
-    ptab: Q.get('tab') === 'items' ? 'items' : 'step',
     mini: Q.get('mini') !== 'off',
   };
   const view = { x: 32, y: 32, z: 1 };
@@ -177,7 +176,6 @@ export function mountBoard(boot, root) {
       if (!ui.mini) { p.set('mini', 'off'); }
       if (!ui.side) { p.set('side', 'off'); }
       if (!ui.panel) { p.set('panel', 'off'); }
-      if (ui.ptab === 'items') { p.set('tab', 'items'); }
       history.replaceState(null, '', '?' + p.toString());
     }, 150);
   }
@@ -477,18 +475,13 @@ export function mountBoard(boot, root) {
     const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
     const added = items.forStep(key);
-    const tabs = `<div class="k-ptabs"><button data-ptab="step" aria-pressed="${ui.ptab !== 'items'}">${t('tab_step')}</button><button data-ptab="items" aria-pressed="${ui.ptab === 'items'}">${t('tab_items')}${added.length ? ` <span class="tnum">${added.length}</span>` : ''}</button></div>`;
-    if (ui.ptab === 'items') {
-      $('#panel').innerHTML = `${tabs}${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}<h2>${esc(st.title)}</h2>${items.tabHtml(key)}`;
-      $('#panel').scrollTop = scroll;
-      renderThread();
-      return;
-    }
+    /* what people added sits in its own section at the end, folded like a Figma section (owner, 2026-10-28) */
+    const extra = `<div class="k-hr"></div><button class="k-fold" data-addedfold aria-expanded="${addedOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('tab_items'))}${added.length ? ` <span class="tnum">${added.length}</span>` : ''}</button>${addedOpen ? items.tabHtml(key) : ''}`;
     /* comments and what people added, one thread by time (owner's pick C) */
     const entries = [...threads(key).map(c => ({ at: c.created_at, html: commentHtml(c, true) })),
       ...added.filter(it => !it.draft).map(it => ({ at: it.created_at, html: items.threadEntry(it, COMMENTS, commentHtml, composer) }))]
       .sort((a, b) => String(a.at).localeCompare(String(b.at)));
-    $('#panel').innerHTML = `${tabs}
+    $('#panel').innerHTML = `
       ${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}
       <h2>${esc(st.title)}</h2>
       ${looked.upd.has(n) ? `<div class="k-sub k-upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
@@ -498,16 +491,17 @@ export function mountBoard(boot, root) {
         <label class="k-opt"><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
           <span class="k-optkey">${esc(o.key)}</span>
           <span class="k-optbody"><span class="lb">${esc(o.label)}</span>${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${pickers(key, o.key)}</span>
-          <span class="k-optmark">${CHECK}</span>
-          <span class="k-optbtn"><span class="off">${esc(t('pick_k', { k: o.key }))}</span><span class="on">${CHECK}${esc(t('picked'))}</span></span></label>`).join('')}</div>` : ''}
+          <span class="k-optmark">${CHECK}</span></label>`).join('')}</div>` : ''}
       ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
       <div class="k-hr"></div>
       <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
       <div class="k-thread">${entries.map(x => x.html).join('')}</div>
-      ${CAN_WRITE() ? composer('') : ''}`;
+      ${CAN_WRITE() ? composer('') : ''}
+      ${extra}`;
     $('#panel').scrollTop = scroll;
     renderThread();
   }
+  let addedOpen = !!getLocal('kradan:added-open');
   function where(c) {
     const p = c.pin;
     if (!p) { return ''; }
@@ -1124,7 +1118,7 @@ export function mountBoard(boot, root) {
     }
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
-    if (t0.dataset.ptab) { ui.ptab = t0.dataset.ptab; writeUrl(); renderPanel(); return; }
+    if (t0.dataset.addedfold !== undefined) { addedOpen = !addedOpen; setLocal('kradan:added-open', addedOpen); renderPanel(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
