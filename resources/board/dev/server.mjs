@@ -231,6 +231,8 @@ function commentOut(c, me) {
   const { round, deleted, ...rest } = c;
   return { ...rest, mine: c.user.id === me };
 }
+/* the title with the task in front, unless the title already starts with it (the backend's label) */
+const labelOf = b => (b.task_ref && !b.title.startsWith(b.task_ref) ? `${b.task_ref} ${b.title}` : b.title);
 function boardPayload(b, me, number) {
   const latest = b.rounds.at(-1).number;
   const cur = b.rounds.find(r => r.number === +number) || b.rounds.at(-1);
@@ -240,7 +242,7 @@ function boardPayload(b, me, number) {
   const items = b.items.filter(it => !it.deleted).map(it => itemOut(it, b, me));
   const people = new Map([...picks.map(p => [p.user.id, p.user]), ...live.map(c => [c.user.id, c.user])]);
   return {
-    slug: b.slug, title: b.title, kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
+    slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
     decided_at: b.decided_at, decided_by: b.decided_by, updated_at: b.rounds.at(-1).pushed_at, url: boardUrl(b),
     rounds: b.rounds.map(r => ({ number: r.number, title: r.title, pushed_at: r.pushed_at, steps: r.steps, prints: r.prints, base_url: baseUrl(r), readonly: r.number !== latest })),
     current: cur.number, latest, picks_locked: b.status !== 'open' || cur.number !== latest,
@@ -255,7 +257,7 @@ function indexRows(me) {
   return BOARDS.map(b => {
     const r = b.rounds.at(-1), seen = b.viewers[me]?.seen_prints;
     return {
-      slug: b.slug, title: b.title, kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
+      slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
       decided_at: b.decided_at, decided_by: b.decided_by, updated_at: r.pushed_at, url: boardUrl(b),
       round: { number: r.number, title: r.title, pushed_at: r.pushed_at }, steps: r.steps.map(s => s.title),
       answered: answeredIn(b, r).size, viewers: viewersOf(b).filter(v => v.recent),
@@ -459,7 +461,7 @@ function exportMd(b, me) {
         image: `🖼 ${it.user.name}: ${it.file?.name} (attachments/${b.slug}/${it.file?.name})`,
         file: `📎 ${it.user.name}: ${it.file?.name} (attachments/${b.slug}/${it.file?.name})`,
         arrow: `➚ ${it.user.name}${where} ชี้ที่ ${said}`, rect: `▭ ${it.user.name}${where} ตีกรอบ ${said}`,
-        ellipse: `◯ ${it.user.name}${where} วงไว้ ${said}`, stroke: `〰 ${it.user.name}${where} วาดเส้น`,
+        ellipse: `▭ ${it.user.name}${where} วงไว้ ${said}`, stroke: `〰 ${it.user.name}${where} วาดเส้น`,
       }[it.kind];
       lines.push(`   ${line.trimEnd()}`);
       pl.comments.filter(c => c.item_id === it.id).forEach(x => lines.push(`      ↳ ${x.user.name}: ${x.body}`));

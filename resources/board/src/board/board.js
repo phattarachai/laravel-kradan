@@ -354,7 +354,7 @@ export function mountBoard(boot, root) {
     renderCanvas();
   }
   function renderBar() {
-    $('#ttl').innerHTML = `<span class="k-t">${esc(B.title)}</span><span class="k-round">${esc(t('round_n', { n: R.number }))}</span><span class="k-caret">▾</span>`;
+    $('#ttl').innerHTML = `<span class="k-t">${esc(B.label || B.title)}</span><span class="k-round">${esc(t('round_n', { n: R.number }))}</span><span class="k-caret">▾</span>`;
     $('#ttl').dataset.tip = R.title;
     $('#oldr').hidden = $('#latestb').hidden = !OLD();
     $('#pos').textContent = `${ui.step}/${STEPS.length}`;
