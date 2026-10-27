@@ -20,7 +20,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '../../..');
@@ -86,18 +85,11 @@ function parse(html) {
 
 let roundSeq = 0;
 const ROUNDS = {};   // id → { dir }
-/* a markdown flow: index.md becomes index.html through the package's own renderer (needs composer install) */
-function pageOf(dir) {
-  const md = path.join(dir, 'index.md');
-  if (exists(path.join(dir, 'index.html')) || !exists(md)) { return null; }
-  return JSON.parse(execFileSync('php', [path.join(HERE, 'markdown.php'), md], { encoding: 'utf8' })).html;
-}
 function round(dir, number, pushedMinsAgo, retitle) {
-  const rendered = pageOf(dir);
-  const html = rendered ?? fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
   const p = parse(html);
   const id = ++roundSeq;
-  ROUNDS[id] = { dir, html: rendered };
+  ROUNDS[id] = { dir };
   return { id, number, title: retitle || p.title, pushed_at: minsAgo(pushedMinsAgo), steps: p.steps, prints: p.prints };
 }
 function baseUrl(r) {
@@ -108,32 +100,30 @@ const sign = (id, expires) => crypto.createHmac('sha256', SECRET).update(`${id}|
 
 const LOCAL = path.join(FIX, 'local');
 const BOARDS = [];
-function board(slug, panel, kind, title, taskRef, rounds, extra = {}) {
+/* every board is a decision board (owner, 2026-10-28: flows moved to laravel-ai-docs) */
+function board(slug, title, taskRef, rounds, extra = {}) {
   if (!rounds.length) { return; }
-  BOARDS.push({ id: BOARDS.length + 1, slug, panel, kind, title, task_ref: taskRef, status: 'open', decided_at: null, decided_by: null,
+  BOARDS.push({ id: BOARDS.length + 1, slug, title, task_ref: taskRef, status: 'open', decided_at: null, decided_by: null,
     rounds, picks: {}, comments: [], items: [], viewers: {}, changedAt: new Date().toISOString(), ...extra });
 }
 const demo = path.join(FIX, 'demo-frames');
-board('demo-cart', 'decisions', 'decision', 'Demo ตะกร้า', 'T000', [round(demo, 1, 60 * 30)]);
+board('demo-cart', 'Demo ตะกร้า', 'T000', [round(demo, 1, 60 * 30)]);
 if (exists(path.join(LOCAL, 'launchpad-search/2'))) {
-  board('t190-launchpad-search', 'decisions', 'decision', 'V2 Launchpad search', 'T190', [
+  board('t190-launchpad-search', 'V2 Launchpad search', 'T190', [
     round(path.join(LOCAL, 'launchpad-search/1'), 1, 60 * 26),
     round(path.join(LOCAL, 'launchpad-search/2'), 2, 40, 'V2 Launchpad search รอบ 2'),
   ]);
 }
 if (exists(path.join(LOCAL, 'ws1-roundup/1'))) {
-  board('t179-roundup', 'decisions', 'decision', 'T179 ข้อ 17 การปัดเศษ', 'T179', [round(path.join(LOCAL, 'ws1-roundup/1'), 1, 60 * 30)]);
+  board('t179-roundup', 'T179 ข้อ 17 การปัดเศษ', 'T179', [round(path.join(LOCAL, 'ws1-roundup/1'), 1, 60 * 30)]);
 }
 if (exists(path.join(LOCAL, 'leave-cover/1'))) {
-  board('t185-leave-cover', 'flows', 'flow', 'การรับแทนทำงานอย่างไร', 'T185', [round(path.join(LOCAL, 'leave-cover/1'), 1, 60 * 50)]);
+  /* a page without data-dp-step: one screen step, shown whole */
+  board('t185-leave-cover', 'การรับแทนทำงานอย่างไร', 'T185', [round(path.join(LOCAL, 'leave-cover/1'), 1, 60 * 50)]);
 }
-board('demo-decided', 'decisions', 'decision', 'Demo ปุ่มยืนยัน', 'T001', [round(demo, 1, 60 * 24 * 9)],
+board('demo-decided', 'Demo ปุ่มยืนยัน', 'T001', [round(demo, 1, 60 * 24 * 9)],
   { status: 'decided', decided_at: minsAgo(60 * 24 * 7), decided_by: userOf(1) });
-board('demo-flow', 'flows', 'flow', 'Demo flow ตะกร้า', 'T002', [round(demo, 1, 60 * 24 * 3)]);
-board('isolation-probe', 'flows', 'flow', 'Isolation probe', 'T192', [round(path.join(FIX, 'security'), 1, 5)]);
-if (exists(path.join(ROOT, 'vendor/autoload.php'))) {
-  board('demo-markdown', 'flows', 'flow', 'ตะกร้ายืนยันอย่างไร', 'T188', [round(path.join(FIX, 'markdown'), 1, 15)]);
-}
+board('isolation-probe', 'Isolation probe', 'T192', [round(path.join(FIX, 'security'), 1, 5)]);
 
 /* seed answers from other people on the newest round of the first boards */
 let commentSeq = 0;
@@ -141,7 +131,7 @@ function seed(b) {
   const r = b.rounds.at(-1), st = r.steps;
   if (!st.length) { return; }
   const q = st.find(s => s.kind === 'question');
-  if (q && b.kind === 'decision') {
+  if (q) {
     pick(b, r, q.key, 2, [q.options[0].key], false, 50);
     pick(b, r, q.key, 3, [q.options[0].key, q.options.at(-1).key], false, 30);
     pick(b, r, q.key, 5, [], true, 20);
@@ -224,8 +214,7 @@ BOARDS.filter(b => b.status === 'open').slice(0, 3).forEach(seed);
 const viewersOf = b => Object.entries(b.viewers)
   .map(([uid, v]) => ({ user: userOf(uid), last_seen_at: v.last_seen_at, active: Date.now() - Date.parse(v.last_seen_at) < 120000, recent: Date.now() - Date.parse(v.last_seen_at) < 900000 }))
   .sort((a, c) => c.last_seen_at.localeCompare(a.last_seen_at));
-const boardUrl = b => `/kradan/${b.panel}/${b.slug}`;
-const PANELS = [{ key: 'flows', kind: 'flow', title: 'Flow การทำงาน', url: '/kradan/flows' }, { key: 'decisions', kind: 'decision', title: 'เรื่องที่ต้องตัดสินใจ', url: '/kradan/decisions' }];
+const boardUrl = b => `/kradan/${b.slug}`;
 const answeredIn = (b, r) => new Set([...Object.values(b.picks[r.number] || {}).map(p => p.user.id), ...b.comments.filter(c => c.round === r.number && !c.deleted).map(c => c.user.id)]);
 function commentOut(c, me) {
   const { round, deleted, ...rest } = c;
@@ -242,7 +231,7 @@ function boardPayload(b, me, number) {
   const items = b.items.filter(it => !it.deleted).map(it => itemOut(it, b, me));
   const people = new Map([...picks.map(p => [p.user.id, p.user]), ...live.map(c => [c.user.id, c.user])]);
   return {
-    slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
+    slug: b.slug, title: b.title, label: labelOf(b), status: b.status, task_ref: b.task_ref,
     decided_at: b.decided_at, decided_by: b.decided_by, updated_at: b.rounds.at(-1).pushed_at, url: boardUrl(b),
     rounds: b.rounds.map(r => ({ number: r.number, title: r.title, pushed_at: r.pushed_at, steps: r.steps, prints: r.prints, base_url: baseUrl(r), readonly: r.number !== latest })),
     current: cur.number, latest, picks_locked: b.status !== 'open' || cur.number !== latest,
@@ -257,7 +246,7 @@ function indexRows(me) {
   return BOARDS.map(b => {
     const r = b.rounds.at(-1), seen = b.viewers[me]?.seen_prints;
     return {
-      slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
+      slug: b.slug, title: b.title, label: labelOf(b), status: b.status, task_ref: b.task_ref,
       decided_at: b.decided_at, decided_by: b.decided_by, updated_at: r.pushed_at, url: boardUrl(b),
       round: { number: r.number, title: r.title, pushed_at: r.pushed_at }, steps: r.steps.map(s => s.title),
       answered: answeredIn(b, r).size, viewers: viewersOf(b).filter(v => v.recent),
@@ -308,16 +297,15 @@ function serveContent(req, res, url) {
   const [, id, expires, sig, rel] = m;
   const r = ROUNDS[id];
   const ok = r && sig === sign(+id, +expires) && +expires > Date.now() / 1000;
-  const ours = { '__kradan/agent.js': path.join(ROOT, 'dist/agent.js'), '__kradan/mermaid.js': path.join(ROOT, 'resources/content/mermaid.min.js') };
+  const ours = { '__kradan/agent.js': path.join(ROOT, 'dist/agent.js') };
   const agent = !!ours[rel];
   const file = ours[rel] || path.resolve(r?.dir || '/', decodeURIComponent(rel || 'index.html'));
-  const page = r?.html && (rel === '' || rel === 'index.html') ? r.html : null;
-  if (!ok || (!agent && !page && !file.startsWith(r.dir + path.sep)) || (!page && (!exists(file) || fs.statSync(file).isDirectory()))) { send(res, ok ? 404 : 403, ok ? 'not found' : 'bad signature'); return true; }
+  if (!ok || (!agent && !file.startsWith(r.dir + path.sep)) || !exists(file) || fs.statSync(file).isDirectory()) { send(res, ok ? 404 : 403, ok ? 'not found' : 'bad signature'); return true; }
   const ext = path.extname(file);
   const headers = { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Content-Security-Policy': 'sandbox allow-scripts', 'X-Content-Type-Options': 'nosniff' };
   if (ext === '.html') {
     const tag = `<script src="${CONTENT}/kradan/f/${id}/${expires}/${sig}/__kradan/agent.js" data-parent="${APP}"></script>`;
-    let html = stripHarness(page ?? fs.readFileSync(file, 'utf8'));
+    let html = stripHarness(fs.readFileSync(file, 'utf8'));
     html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
     send(res, 200, html, headers);
   } else {
@@ -334,8 +322,7 @@ async function api(req, res, url, me) {
   let m;
   const find = slug => BOARDS.find(b => b.slug === slug);
   if (p === 'boards' && req.method === 'GET') {
-    const panel = url.searchParams.get('panel');
-    return sendJson(res, 200, { boards: indexRows(me).filter(b => !panel || b.panel === panel) });
+    return sendJson(res, 200, { boards: indexRows(me) });
   }
   if ((m = p.match(/^boards\/([^/]+)$/)) && req.method === 'GET') {
     const b = find(m[1]);
@@ -344,7 +331,7 @@ async function api(req, res, url, me) {
   if ((m = p.match(/^boards\/([^/]+)\/rounds\/(\d+)\/picks\/(.+)$/)) && req.method === 'PUT') {
     const b = find(m[1]), r = b?.rounds.find(x => x.number === +m[2]), step = decodeURIComponent(m[3]);
     if (!r) { return sendJson(res, 404, {}); }
-    if (r !== b.rounds.at(-1) || b.status !== 'open' || b.kind !== 'decision') { return sendJson(res, 409, { message: 'read only' }); }
+    if (r !== b.rounds.at(-1) || b.status !== 'open') { return sendJson(res, 409, { message: 'read only' }); }
     const body = await readBody(req);
     pick(b, r, step, me, Array.isArray(body?.options) ? body.options.map(String) : [], !!body?.seen);
     touch(b);
@@ -384,7 +371,7 @@ async function api(req, res, url, me) {
   if ((m = p.match(/^boards\/([^/]+)\/decide$/)) && req.method === 'POST') {
     const b = find(m[1]);
     if (!USERS[me].manage) { return sendJson(res, 403, {}); }
-    Object.assign(b, { status: b.kind === 'flow' ? 'archived' : 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
+    Object.assign(b, { status: 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
     return sendJson(res, 200, boardPayload(b, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/items$/)) && req.method === 'POST') {
@@ -507,14 +494,12 @@ async function app(req, res) {
   if (url.pathname.startsWith('/kradan/api/')) { return api(req, res, url, USERS[me] ? me : 0); }
   if (url.pathname === '/' ) { return send(res, 302, '', { Location: '/kradan' }); }
   const assets = `${APP}/kradan/assets`;
-  const panel = url.pathname.match(/^\/kradan(?:\/(\w+))?\/?$/);
-  if (panel && (!panel[1] || PANELS.some(p => p.key === panel[1]))) {
-    const title = PANELS.find(p => p.key === panel[1])?.title || null;
-    const data = { boot: boot(me, 'index', { index: { title, panel: panel[1] || null, q: url.searchParams.get('q') || '', panels: PANELS, boards: indexRows(me) } }), assets };
+  if (url.pathname === '/kradan' || url.pathname === '/kradan/') {
+    const data = { boot: boot(me, 'index', { index: { q: url.searchParams.get('q') || '', boards: indexRows(me) } }), assets };
     return send(res, 200, blade('index', data), { 'Content-Type': TYPES['.html'], 'Set-Cookie': setCookie });
   }
-  const m = url.pathname.match(/^\/kradan\/(\w+)\/([^/]+)$/);
-  const b = m && BOARDS.find(x => x.panel === m[1] && x.slug === m[2]);
+  const m = url.pathname.match(/^\/kradan\/([^/]+)$/);
+  const b = m && BOARDS.find(x => x.slug === decodeURIComponent(m[1]));
   if (b) {
     const data = { boot: boot(me, 'board', { board: boardPayload(b, me, url.searchParams.get('round')) }), assets };
     return send(res, 200, blade('board', data), { 'Content-Type': TYPES['.html'], 'Set-Cookie': setCookie });
