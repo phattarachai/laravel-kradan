@@ -54,7 +54,8 @@ export function mountIndex(boot, root) {
   function row(b) {
     const date = b.status !== 'open' && b.decided_at ? t(b.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(b.decided_at) }) : shortDate(b.round?.pushed_at || b.updated_at);
     const answered = typeof b.answered === 'number' ? (b.answered ? t('people_n', { n: b.answered }) : t('nobody')) : '';
-    return `<tr><td><a class="t" href="${esc(b.url)}">${esc(b.title)}</a><div class="r">${esc([b.task_ref, b.round ? t('round_n', { n: b.round.number }) : ''].filter(Boolean).join(' · '))}</div></td>
+    /* label is the title with the task in front unless the title already starts with it; the task isn't repeated below */
+    return `<tr><td><a class="t" href="${esc(b.url)}">${esc(b.label || b.title)}</a><div class="r">${esc([b.label ? '' : b.task_ref, b.round ? t('round_n', { n: b.round.number }) : ''].filter(Boolean).join(' · '))}</div></td>
       <td class="g tnum">${esc(date)}</td><td class="g tnum">${esc(answered)}</td>
       <td><span class="k-avs">${avatarRow(b.viewers || [], { me: ME.id, max: 4 })}</span></td>
       <td class="u">${b.updated ? `<span class="k-upd">${t('updated')}</span>` : ''}</td></tr>`;
