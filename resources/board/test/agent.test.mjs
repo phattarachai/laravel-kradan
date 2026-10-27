@@ -129,3 +129,19 @@ test('boot listens and announces ready inside a frame', () => {
   assert.ok(w.listeners.message?.length === 1);
   assert.equal(w.posted.at(-1).msg.type, 'ready');
 });
+
+test('a page that grows after load reports its new height once', () => {
+  const w = fakeWin();
+  const observers = [];
+  w.win.ResizeObserver = class { constructor(fn) { this.fn = fn; observers.push(this); } observe() {} disconnect() {} };
+  w.win.getComputedStyle = () => ({});
+  const a = createAgent({ win: w.win, doc: w.doc, parentOrigin: APP });
+  a.listen();
+  w.scroller.scrollHeight = 3000;
+  observers[0].fn();
+  assert.equal(w.posted.length, 0, 'same height: nothing sent');
+  w.scroller.scrollHeight = 4200;
+  w.doc.body.scrollHeight = 4200;
+  observers[0].fn();
+  assert.deepEqual(w.posted.map(p => [p.origin, p.msg.type, p.msg.height]), [[APP, 'resized', 4200]]);
+});

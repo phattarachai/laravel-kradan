@@ -229,6 +229,7 @@ export function mountBoard(boot, root) {
     if (!frames.includes(f)) { return; }
     if (type === 'ready') { hookFrame(f); return; }
     if (type === 'cropped' && f.crop && d.rect) { recrop(f, d.rect); return; }
+    if (type === 'resized') { if (f.cell.shot.whole && f.crop) { growWhole(f, +d.height); } return; }
     const r = () => f.ifr.getBoundingClientRect();
     if (type === 'wheel') {
       const b = r();
@@ -258,7 +259,9 @@ export function mountBoard(boot, root) {
     if (f.crop) {
       const st = step();
       const r = f.cell.shot.whole ? null : await bridge.ask(f.ifr.contentWindow, 'crop', { step: f.cell.shot.si, key: st?.key, option: f.cell.shot.key });
-      if (r?.rect) { recrop(f, r.rect); } else if (f.cell.shot.whole) { wholePage(f); }
+      /* no such step in the page: a page without data-dp-step (a markdown flow), which the backend sends as one
+         "|title" step. It shows whole */
+      if (r?.rect) { recrop(f, r.rect); } else if (r || f.cell.shot.whole) { f.cell.shot.whole = true; wholePage(f); }
     }
     applyEdits(f);
   }
@@ -270,6 +273,16 @@ export function mountBoard(boot, root) {
     f.ifr.style.height = f.crop.h + 'px';
     sizeFrames();
     if (ui.zoom === 'fit' && !userMoved) { fit(); } else { applyView(); }
+  }
+  /* the whole page grew after load (a mermaid diagram, an image): the frame follows its height */
+  function growWhole(f, height) {
+    const h = Math.min(16000, Math.max(1, Math.ceil(height || 0)));
+    if (!h || Math.abs(h - f.crop.h) < 2) { return; }
+    f.crop.h = h;
+    f.ifr.style.height = h + 'px';
+    sizeFrames();
+    applyView();
+    renderPins();
   }
   function recrop(f, rect) {
     f.crop = { x: rect.x, y: rect.y, w: rect.w, h: rect.h };

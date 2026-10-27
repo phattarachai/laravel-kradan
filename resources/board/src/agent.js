@@ -29,6 +29,7 @@
  *     pointerdown {}               a press inside the page closes the board's menus
  *     key {code, key, up}          Space and the tool keys, outside the page's own inputs
  *     hash {hash}                  the page's hash changed
+ *     resized {width, height}      the page grew or shrank after load (mermaid, images, fonts)
  *
  * The agent only takes messages from window.parent whose origin is data-parent, and posts only to that
  * origin. It never evaluates anything it receives; text from the board lands through textContent.
@@ -304,6 +305,18 @@ export function createAgent({ win, doc, parentOrigin }) {
       });
     }, { passive: true });
     win.addEventListener('hashchange', () => emit('hash', { hash: win.location.hash }));
+    /* a page drawn after load (mermaid, late images) changes height: the board resizes the frame to follow */
+    if (win.ResizeObserver && doc.documentElement) {
+      let last = docHeight();
+      const ro = new win.ResizeObserver(() => {
+        const h = docHeight();
+        if (Math.abs(h - last) < 2) { return; }
+        last = h;
+        emit('resized', { width: scroller().scrollWidth, height: h });
+      });
+      ro.observe(doc.documentElement);
+      if (doc.body) { ro.observe(doc.body); }
+    }
   }
 
   function ready() {
