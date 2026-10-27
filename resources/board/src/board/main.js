@@ -1,6 +1,6 @@
 /* board.js entry: the boot payload is window.Kradan, printed by the Blade shell. */
 import { setLocale, t } from './i18n.js';
-import { esc, tint } from './util.js';
+import { esc, tint, getLocal, setLocal } from './util.js';
 import { mountBoard } from './board.js';
 import { mountIndex } from './index.js';
 import { setFavicon } from './icon.js';
@@ -17,6 +17,11 @@ if (accent && /^#[0-9a-f]{6}$/i.test(accent)) {
 }
 
 setFavicon();
+
+/* design round (2026-10-28): how an option looks in the panel, ?cards=a|b|c, remembered here, until the owner picks */
+const cards = new URLSearchParams(location.search).get('cards');
+if (/^[abc]$/.test(cards || '')) { setLocal('kradan:cards', cards); }
+document.documentElement.dataset.cards = (/^[abc]$/.test(cards || '') ? cards : getLocal('kradan:cards')) || 'a';
 
 const root = document.getElementById('kradan');
 try {
