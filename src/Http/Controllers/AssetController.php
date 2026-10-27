@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Phattarachai\Kradan\Http\Controllers;
 
+use Phattarachai\Kradan\Kradan;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
@@ -13,6 +14,8 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 final class AssetController
 {
+    private static ?string $version = null;
+
     private const array FILES = [
         'board.js' => 'application/javascript; charset=utf-8',
         'board.css' => 'text/css; charset=utf-8',
@@ -37,6 +40,25 @@ final class AssetController
     public static function base(): string
     {
         return url(trim((string) config('kradan.path', 'kradan'), '/').'/assets');
+    }
+
+    /**
+     * The package version plus a hash of the built board, so a rebuilt dist/
+     * gets new URLs even when the version was not bumped. Hashed once per process.
+     */
+    public static function version(): string
+    {
+        return self::$version ??= self::hashVersion();
+    }
+
+    private static function hashVersion(): string
+    {
+        $hashes = array_map(
+            fn (string $file): string => is_file(self::path($file)) ? (string) md5_file(self::path($file)) : '',
+            array_keys(self::FILES),
+        );
+
+        return implode('', $hashes) === '' ? Kradan::VERSION : Kradan::VERSION.'-'.substr(md5(implode('', $hashes)), 0, 10);
     }
 
     public static function path(string $file): string

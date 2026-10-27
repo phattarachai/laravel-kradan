@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Date;
 use Phattarachai\Kradan\Enums\Ability;
 use Phattarachai\Kradan\Enums\BoardStatus;
+use Phattarachai\Kradan\Http\Controllers\AssetController;
 use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Comment;
@@ -273,7 +274,7 @@ final readonly class BoardPresenter
     private function boot(Authenticatable $user, string $page, ?string $panel): array
     {
         return [
-            'version' => Kradan::VERSION,
+            'version' => AssetController::version(),
             'page' => $page,
             'brand' => (array) config('kradan.brand'),
             'locale' => (string) config('kradan.locale', 'th'),
