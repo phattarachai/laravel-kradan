@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 beforeEach(function (): void {
     $this->dir = sys_get_temp_dir().'/kradan-cli-'.Str::random(8);
     File::ensureDirectoryExists($this->dir);
-    config()->set('kradan.remote', ['url' => 'https://qas.example.com', 'token' => 'test-token']);
+    config()->set('kradan.remote', ['url' => 'https://staging.example.com', 'token' => 'test-token']);
 });
 
 afterEach(function (): void {
@@ -40,10 +40,10 @@ it('pushes a design folder as a zip without the workbench files', function (): v
         File::put("{$this->dir}/t188/{$path}", $contents);
     }
 
-    Http::fake(['qas.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://qas.example.com/kradan/decisions/t188', 'round' => 1, 'title' => 'x', 'steps' => 2, 'created' => true], 201)]);
+    Http::fake(['staging.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://staging.example.com/kradan/decisions/t188', 'round' => 1, 'title' => 'x', 'steps' => 2, 'created' => true], 201)]);
 
     $this->artisan('kradan:push', ['dir' => "{$this->dir}/t188", '--kind' => 'decision', '--task' => 'T188'])
-        ->expectsOutputToContain('New round 1: https://qas.example.com/kradan/decisions/t188')
+        ->expectsOutputToContain('New round 1: https://staging.example.com/kradan/decisions/t188')
         ->assertSuccessful();
 
     Http::assertSent(function (Request $request): bool {
@@ -76,7 +76,7 @@ it('pulls every round into rounds/NN by data-dp title, and the latest as review.
     File::ensureDirectoryExists("{$this->dir}/rounds/03");
     File::put("{$this->dir}/rounds/rounds.json", json_encode([['dir' => '03', 'title' => 'Manual SO รอบ 2', 'created' => '2026-10-20T10:00:00']]));
 
-    Http::fake(['qas.example.com/kradan/api/v1/boards/t188-manual-so/review' => Http::response([
+    Http::fake(['staging.example.com/kradan/api/v1/boards/t188-manual-so/review' => Http::response([
         'board' => ['slug' => 't188-manual-so'],
         'rounds' => [
             ['number' => 1, 'title' => 'Manual SO รอบ 2', 'json' => ['round' => 1], 'markdown' => "round one\n"],
@@ -84,7 +84,7 @@ it('pulls every round into rounds/NN by data-dp title, and the latest as review.
         ],
     ])]);
 
-    $this->artisan('kradan:pull', ['board' => 'https://qas.example.com/kradan/decisions/t188-manual-so?round=2', '--to' => $this->dir])
+    $this->artisan('kradan:pull', ['board' => 'https://staging.example.com/kradan/decisions/t188-manual-so?round=2', '--to' => $this->dir])
         ->assertSuccessful();
 
     $rounds = json_decode(File::get("{$this->dir}/rounds/rounds.json"), true);
@@ -98,8 +98,8 @@ it('pulls every round into rounds/NN by data-dp title, and the latest as review.
 
 it('lists boards and marks one decided', function (): void {
     Http::fake([
-        'qas.example.com/kradan/api/v1/boards' => Http::response(['boards' => [['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://qas.example.com/kradan/decisions/t188']]]),
-        'qas.example.com/kradan/api/v1/boards/t188/decide' => Http::response(['board' => ['slug' => 't188', 'status' => 'decided', 'url' => 'https://qas.example.com/kradan/decisions/t188']]),
+        'staging.example.com/kradan/api/v1/boards' => Http::response(['boards' => [['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/decisions/t188']]]),
+        'staging.example.com/kradan/api/v1/boards/t188/decide' => Http::response(['board' => ['slug' => 't188', 'status' => 'decided', 'url' => 'https://staging.example.com/kradan/decisions/t188']]),
     ]);
 
     $this->artisan('kradan:list')->expectsOutputToContain('T188 Manual SO')->assertSuccessful();
