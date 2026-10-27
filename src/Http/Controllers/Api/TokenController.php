@@ -34,6 +34,7 @@ final readonly class TokenController
             Bundle::fromZip((string) $file->getRealPath()),
             $kind === null ? null : BoardKind::from((string) $kind),
             $request->validated('task_ref'),
+            $request->validated('title'),
         );
 
         return response()->json([

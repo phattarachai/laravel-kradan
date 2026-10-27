@@ -34,11 +34,31 @@ final readonly class Bundle
         $files = self::read($zip);
         $zip->close();
 
-        if (! isset($files['index.html'])) {
+        if (! isset($files['index.html']) && ! isset($files['index.md'])) {
             throw ValidationException::withMessages(['bundle' => trans('kradan::ui.bundle_no_index')]);
         }
 
         return new self($files);
+    }
+
+    public function isMarkdown(): bool
+    {
+        return ! isset($this->files['index.html']) && isset($this->files['index.md']);
+    }
+
+    /**
+     * The bundle with an index.html: a markdown folder gets one rendered from
+     * index.md, titled by its first `# heading` or else `$fallbackTitle`.
+     */
+    public function withPage(string $fallbackTitle): self
+    {
+        if (! $this->isMarkdown()) {
+            return $this;
+        }
+
+        $page = new MarkdownPage()->render($this->files['index.md'], $fallbackTitle);
+
+        return new self([...$this->files, 'index.html' => $page['html']]);
     }
 
     public function get(string $path): ?string

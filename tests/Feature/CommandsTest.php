@@ -72,6 +72,20 @@ it('shows what a dry run would push without sending anything', function (): void
     Http::assertNothingSent();
 });
 
+it('pushes a markdown folder, sending --title for a page without a heading', function (): void {
+    File::put("{$this->dir}/index.md", "สรุปผลการตรวจ\n\n| a | b |\n|---|---|\n| 1 | 2 |\n");
+
+    $this->artisan('kradan:push', ['dir' => $this->dir, '--title' => 'ผลการตรวจ รอบ 1', '--dry-run' => true])
+        ->expectsOutputToContain('ผลการตรวจ รอบ 1')
+        ->assertSuccessful();
+
+    Http::fake(['staging.example.com/kradan/api/v1/push' => Http::response(['board_url' => 'https://staging.example.com/kradan/flows/x', 'round' => 1, 'title' => 'x', 'steps' => 1, 'created' => true], 201)]);
+
+    $this->artisan('kradan:push', ['dir' => $this->dir, '--slug' => 'x', '--title' => 'ผลการตรวจ รอบ 1'])->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => collect($request->data())->pluck('contents', 'name')['title'] === 'ผลการตรวจ รอบ 1');
+});
+
 it('pulls every round into rounds/NN by data-dp title, and the latest as review.md', function (): void {
     File::ensureDirectoryExists("{$this->dir}/rounds/03");
     File::put("{$this->dir}/rounds/rounds.json", json_encode([['dir' => '03', 'title' => 'Manual SO รอบ 2', 'created' => '2026-10-20T10:00:00']]));

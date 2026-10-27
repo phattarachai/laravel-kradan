@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Support\ContentSigner;
+use Phattarachai\Kradan\Support\MarkdownPage;
 use Phattarachai\Kradan\Support\RoundPublisher;
 use Phattarachai\Kradan\Support\SafePath;
 use Phattarachai\Kradan\Support\StepParser;
@@ -58,7 +59,11 @@ final readonly class ContentController
         }
 
         if ($path === ContentSigner::AGENT) {
-            return $this->agent();
+            return $this->script(AssetController::path('agent.js'));
+        }
+
+        if ($path === MarkdownPage::MERMAID) {
+            return $this->script(MarkdownPage::mermaidPath());
         }
 
         $file = $this->file($round, $path);
@@ -105,10 +110,8 @@ final readonly class ContentController
         return $at === false ? $html.$tag : substr_replace($html, $tag, $at, 0);
     }
 
-    private function agent(): Response
+    private function script(string $path): Response
     {
-        $path = AssetController::path('agent.js');
-
         return is_file($path)
             ? $this->respond((string) file_get_contents($path), 200, 'js')
             : $this->respond('Not found', 404, 'txt');
