@@ -11,6 +11,7 @@ enum ActivityAction: string
     case Comment = 'comment';
     case Pin = 'pin';
     case Edit = 'edit';
+    case Item = 'item';
     case Decide = 'decide';
     case Push = 'push';
 }

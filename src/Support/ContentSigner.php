@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Phattarachai\Kradan\Support;
 
 use Illuminate\Support\Facades\Date;
+use Phattarachai\Kradan\Models\Item;
 use Phattarachai\Kradan\Models\Round;
 
 /**
@@ -27,6 +28,25 @@ final class ContentSigner
         return $this->prefix($round, $expires, $signature).self::AGENT;
     }
 
+    /**
+     * An uploaded image or file, on the content host like round files.
+     */
+    public function fileUrl(Item $item): string
+    {
+        $expires = $this->expires();
+        $root = rtrim((string) (config('kradan.content_url') ?: url('/')), '/');
+        $path = trim((string) config('kradan.path', 'kradan'), '/');
+        $name = rawurlencode((string) $item->file_name);
+
+        return "{$root}/{$path}/files/{$item->id}/{$expires}/{$this->signFile($item->id, $expires)}/{$name}";
+    }
+
+    public function validFile(int $item, int $expires, string $signature): bool
+    {
+        return $expires >= Date::now()->getTimestamp()
+            && hash_equals($this->signFile($item, $expires), $signature);
+    }
+
     public function valid(int $round, int $expires, string $signature): bool
     {
         return $expires >= Date::now()->getTimestamp()
@@ -36,6 +56,11 @@ final class ContentSigner
     public function sign(int $round, int $expires): string
     {
         return substr(hash_hmac('sha256', "kradan-content|{$round}|{$expires}", $this->key()), 0, 40);
+    }
+
+    private function signFile(int $item, int $expires): string
+    {
+        return substr(hash_hmac('sha256', "kradan-file|{$item}|{$expires}", $this->key()), 0, 40);
     }
 
     private function prefix(int $round, int $expires, string $signature): string

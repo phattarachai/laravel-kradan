@@ -137,6 +137,21 @@ return [
 
     'max_bundle_kb' => (int) env('KRADAN_MAX_BUNDLE_KB', 20480),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Uploads (images and files users add to a board)
+    |--------------------------------------------------------------------------
+    |
+    | `types` are file extensions. Images show on the board through the
+    | sandboxed content prefix; every other type downloads as an attachment.
+    |
+    */
+
+    'uploads' => [
+        'max_kb' => (int) env('KRADAN_UPLOAD_MAX_KB', 20480),
+        'types' => ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt', 'zip'],
+    ],
+
     'remote' => [
         'url' => env('KRADAN_REMOTE_URL'),
         'token' => env('KRADAN_REMOTE_TOKEN'),

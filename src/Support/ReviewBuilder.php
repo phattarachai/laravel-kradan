@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Phattarachai\Kradan\Support;
 
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Phattarachai\Kradan\Enums\ItemKind;
 use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Comment;
+use Phattarachai\Kradan\Models\Item;
 use Phattarachai\Kradan\Models\Pick;
 use Phattarachai\Kradan\Models\Round;
 
@@ -28,13 +31,17 @@ final class ReviewBuilder
     /** @var Collection<int, Comment> */
     private Collection $comments;
 
+    /** @var Collection<int, Item> */
+    private Collection $items;
+
     /** @var array<int, int> comment id => pin number */
     private array $pinNumbers = [];
 
     public function __construct(private readonly Board $board, private readonly Round $round)
     {
         $this->picks = $round->picks()->oldest('id')->get();
-        $this->comments = $round->comments()->whereNull('parent_id')->with('replies')->oldest('id')->get();
+        $this->comments = $round->comments()->whereNull('parent_id')->whereNull('item_id')->with('replies')->oldest('id')->get();
+        $this->items = $this->itemsUpToThisRound();
         $this->pinNumbers = $this->numberPins();
     }
 
@@ -86,6 +93,7 @@ final class ReviewBuilder
             'text' => $this->markdown(),
             'steps' => array_map($this->jsonStep(...), $this->round->steps, array_keys($this->round->steps)),
             'missing' => $this->missing(),
+            'attachments' => $this->attachments(),
             'progress' => $this->progress(),
         ];
     }
@@ -147,12 +155,73 @@ final class ReviewBuilder
      */
     private function details(string $stepKey): array
     {
-        return $this->comments
-            ->where('step_key', $stepKey)
-            ->flatMap(fn (Comment $comment): array => [
-                ...$this->block(self::INDENT, $this->commentLine($comment)),
-                ...$comment->replies->flatMap(fn (Comment $reply): array => $this->block(self::INDENT.self::INDENT, '↳ '.$this->name($reply->user_id).": {$reply->body}")),
+        $comments = $this->comments->where('step_key', $stepKey)
+            ->map(fn (Comment $comment): array => [self::order($comment->created_at, 0, $comment->id), $this->commentLine($comment), $comment->replies]);
+        $items = $this->items->where('step_key', $stepKey)
+            ->map(fn (Item $item): array => [self::order($item->created_at, 1, $item->id), $this->itemLine($item), $item->replies]);
+
+        return $comments->concat($items)
+            ->sortBy(fn (array $entry): string => $entry[0])
+            ->flatMap(fn (array $entry): array => [
+                ...$this->block(self::INDENT, $entry[1]),
+                ...$entry[2]->flatMap(fn (Comment $reply): array => $this->block(self::INDENT.self::INDENT, '↳ '.$this->name($reply->user_id).": {$reply->body}")),
             ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The thread's order: by time, comments before items at the same moment.
+     */
+    private static function order(?CarbonInterface $at, int $type, int $id): string
+    {
+        return sprintf('%s|%d|%012d', $at?->format('Y-m-d H:i:s.u') ?? '', $type, $id);
+    }
+
+    private function itemLine(Item $item): string
+    {
+        $name = $this->name($item->user_id);
+        $where = $this->where($item->anchor['option'] ?? null, $item->anchor['device'] ?? null);
+        $texts = $item->texts ?? [];
+
+        return match ($item->kind) {
+            ItemKind::Note, ItemKind::Text => "🗒 {$name}: ".trim((string) $item->text),
+            ItemKind::Image => "🖼 {$name}: {$item->file_name} ({$item->localPath()})",
+            ItemKind::File => "📎 {$name}: {$item->file_name} ({$item->localPath()})",
+            ItemKind::Arrow => "➚ {$name}{$where}".($texts === [] ? '' : ' '.Kradan::trans('item_arrow').$this->quoted($texts[0])),
+            ItemKind::Rect => "▭ {$name}{$where} ".Kradan::trans('item_rect').$this->quoted($texts),
+            ItemKind::Ellipse => "▭ {$name}{$where} ".Kradan::trans('item_ellipse').$this->quoted($texts),
+            ItemKind::Stroke => "〰 {$name}{$where} ".Kradan::trans('item_stroke').($texts === [] ? '' : ' '.Kradan::trans('item_near').$this->quoted($texts[0])),
+        };
+    }
+
+    /**
+     * Items carry over between rounds, so round N shows those added up to N.
+     *
+     * @return Collection<int, Item>
+     */
+    private function itemsUpToThisRound(): Collection
+    {
+        return Item::query()
+            ->where('board_id', $this->board->id)
+            ->whereIn('round_id', Round::query()->select('id')->where('board_id', $this->board->id)->where('number', '<=', $this->round->number))
+            ->with(['replies', 'round'])
+            ->oldest('id')
+            ->get();
+    }
+
+    /**
+     * Every upload this round shows, for `kradan:pull` to download.
+     *
+     * @return list<array{item: int, name: string, path: string, url: string}>
+     */
+    public function attachments(): array
+    {
+        $signer = app(ContentSigner::class);
+
+        return $this->items
+            ->filter(fn (Item $item): bool => $item->file_path !== null)
+            ->map(fn (Item $item): array => ['item' => $item->id, 'name' => (string) $item->file_name, 'path' => (string) $item->localPath(), 'url' => $signer->fileUrl($item)])
             ->values()
             ->all();
     }
@@ -254,6 +323,7 @@ final class ReviewBuilder
             'comments' => $comments->whereNull('pin')->whereNull('edit')->values()->map($this->jsonComment(...))->all(),
             'pins' => $comments->filter(fn (Comment $c): bool => $c->pin !== null && $c->edit === null)->values()->map(fn (Comment $c): array => [...$this->jsonComment($c), 'no' => $this->pinNumbers[$c->id]])->all(),
             'edits' => $comments->filter(fn (Comment $c): bool => $c->edit !== null)->values()->map($this->jsonComment(...))->all(),
+            'items' => $this->items->where('step_key', $step['key'])->values()->map($this->jsonItem(...))->all(),
         ];
     }
 
@@ -270,6 +340,31 @@ final class ReviewBuilder
             'edit' => $comment->edit,
             'at' => $comment->created_at?->toIso8601String(),
             'replies' => $comment->replies->map(fn (Comment $reply): array => [
+                'id' => $reply->id,
+                'user' => $this->name($reply->user_id),
+                'body' => $reply->body,
+                'at' => $reply->created_at?->toIso8601String(),
+            ])->all(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function jsonItem(Item $item): array
+    {
+        return [
+            'id' => $item->id,
+            'kind' => $item->kind->value,
+            'round' => $item->round?->number,
+            'user' => $this->name($item->user_id),
+            'line' => $this->itemLine($item),
+            'text' => $item->text,
+            'texts' => $item->texts,
+            'anchor' => $item->anchor,
+            'file' => $item->file_path === null ? null : ['name' => $item->file_name, 'type' => $item->file_type, 'size' => $item->file_size, 'path' => $item->localPath()],
+            'at' => $item->created_at?->toIso8601String(),
+            'replies' => $item->replies->map(fn (Comment $reply): array => [
                 'id' => $reply->id,
                 'user' => $this->name($reply->user_id),
                 'body' => $reply->body,

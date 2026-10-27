@@ -68,6 +68,10 @@ Without a callback only the `local` environment lets signed-in users in. A guest
   The board shows how far each person got.
 - **Rounds.** A push with the same `data-dp` title replaces the latest round; a new title opens the next round.
   Earlier rounds stay readable and read-only.
+- **Notes, files and drawings.** Users add sticky notes, text, images, files, arrows, boxes and freehand lines
+  beside or over a screen, and reply to them. Anyone may move an item; only its author edits or deletes it.
+  Uploads are limited by `kradan.uploads` (size and file extensions). Images show through the sandboxed
+  content prefix; every other file only downloads, so nothing uploaded runs on your app's origin.
 - **History and presence.** Who viewed (at most one entry per person per 30 minutes), picked, commented and pinned.
   Avatars show who is on the board now, over a Reverb presence channel when your app broadcasts with Reverb, or
   from a 30-second heartbeat otherwise.
@@ -115,7 +119,7 @@ KRADAN_REMOTE_TOKEN=…written by kradan:token --write
 | Command | What it does |
 |---|---|
 | `kradan:push <dir> [--slug=] [--kind=decision\|flow] [--task=] [--title=] [--dry-run]` | Zips a design or markdown folder and pushes it as a round; prints the board URL |
-| `kradan:pull <slug\|board url> [--to=]` | Writes `rounds/NN/review.json` and `review.md` per round, and the latest as `review.md` |
+| `kradan:pull <slug\|board url> [--to=]` | Writes `rounds/NN/review.json` and `review.md` per round, the latest as `review.md`, and every uploaded image and file into `attachments/` |
 | `kradan:list` | Every board, its kind, status and latest round |
 | `kradan:decide <slug>` | Marks a decision board decided (a flow archived) |
 | `kradan:doctor` | Checks the install |
@@ -159,6 +163,8 @@ php artisan vendor:publish --tag=kradan-config
 | `panels` | | flows, decisions | Key, kind and title of each panel |
 | `brand` | `KRADAN_BRAND`, `KRADAN_LOGO`, `KRADAN_ACCENT` | app name | |
 | `presence` | `KRADAN_PRESENCE` | `auto` | `auto`, `reverb`, `polling` or `off` |
+| `uploads.max_kb` | `KRADAN_UPLOAD_MAX_KB` | `20480` | Largest image or file a user may add |
+| `uploads.types` | | images, pdf, office, csv, txt, zip | Allowed file extensions |
 | `tokens` | `KRADAN_TOKEN_HASHES` | none | sha256 hashes, comma separated |
 | `locale` | `KRADAN_LOCALE` | `th` | `th` or `en` |
 

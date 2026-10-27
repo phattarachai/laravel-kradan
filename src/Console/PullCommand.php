@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\File;
 use Phattarachai\Kradan\Support\KradanRemote;
+use Phattarachai\Kradan\Support\SafePath;
 
 /**
  * Files every round's answers into the design folder the way the design
@@ -41,6 +42,7 @@ final class PullCommand extends Command
 
         File::put("{$folder}/rounds/rounds.json", json_encode($rounds, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
         $this->writeLatest($folder, $review['rounds']);
+        $this->downloadAttachments($remote, $folder, $review['rounds']);
 
         return self::SUCCESS;
     }
@@ -81,6 +83,28 @@ final class PullCommand extends Command
         $rounds[] = ['dir' => $dir, 'title' => $title, 'created' => Date::now()->format('Y-m-d\TH:i:s'), 'textOnly' => true];
 
         return $dir;
+    }
+
+    /**
+     * Every image and file users added, at the path the review lines name.
+     *
+     * @param  list<array{number: int, title: string, json: array<string, mixed>, markdown: string}>  $rounds
+     */
+    private function downloadAttachments(KradanRemote $remote, string $folder, array $rounds): void
+    {
+        $attachments = collect($rounds)
+            ->flatMap(fn (array $round): array => (array) ($round['json']['attachments'] ?? []))
+            ->keyBy(fn (array $attachment): string => (string) SafePath::normalize((string) $attachment['path']))
+            ->filter(fn (array $attachment, string $path): bool => str_starts_with($path, 'attachments/'));
+
+        foreach ($attachments as $path => $attachment) {
+            File::ensureDirectoryExists(dirname("{$folder}/{$path}"));
+            File::put("{$folder}/{$path}", $remote->download((string) $attachment['url']));
+        }
+
+        if ($attachments->isNotEmpty()) {
+            $this->components->info($attachments->count()." attachment(s) → {$folder}/attachments");
+        }
     }
 
     /**

@@ -11,7 +11,9 @@ use Phattarachai\Kradan\Enums\ActivityAction;
 use Phattarachai\Kradan\Http\Controllers\Concerns\ResolvesBoards;
 use Phattarachai\Kradan\Http\Requests\CommentRequest;
 use Phattarachai\Kradan\Http\Requests\CommentUpdateRequest;
+use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Comment;
+use Phattarachai\Kradan\Models\Item;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Support\ActivityLog;
 use Phattarachai\Kradan\Support\BoardPresenter;
@@ -29,17 +31,21 @@ final readonly class CommentController
         $step = (string) $request->validated('step');
 
         abort_unless($round->isLatest(), 409, trans('kradan::ui.round_readonly'));
-        throw_if($round->step($step) === null, ValidationException::withMessages(['step' => trans('kradan::ui.unknown_step')]));
+
+        $itemId = $this->itemId($board, $step, $request->validated('item_id'));
+        throw_if($itemId === null && $round->step($step) === null, ValidationException::withMessages(['step' => trans('kradan::ui.unknown_step')]));
 
         $parentId = $this->parentId($round, $step, $request->validated('parent_id'));
+        $threadStart = $parentId === null && $itemId === null;
         $comment = Comment::query()->create([
             'round_id' => $round->id,
             'step_key' => $step,
             'parent_id' => $parentId,
+            'item_id' => $itemId,
             'user_id' => $this->userId(),
             'body' => (string) ($request->validated('body') ?? ''),
-            'pin' => $parentId === null ? $request->validated('pin') : null,
-            'edit' => $parentId === null ? $request->validated('edit') : null,
+            'pin' => $threadStart ? $request->validated('pin') : null,
+            'edit' => $threadStart ? $request->validated('edit') : null,
         ]);
 
         $this->activity->record($board, $this->action($comment), $this->userId(), $round, ['step' => $step, 'comment' => $comment->id]);
@@ -70,6 +76,22 @@ final readonly class CommentController
         abort_unless($comment->user_id === $this->userId(), 403, trans('kradan::ui.not_yours'));
 
         return $comment;
+    }
+
+    /**
+     * A reply to an item on this board, on the item's own step.
+     */
+    private function itemId(Board $board, string $step, mixed $itemId): ?int
+    {
+        if ($itemId === null) {
+            return null;
+        }
+
+        $item = Item::query()->where('board_id', $board->id)->find((int) $itemId);
+
+        throw_if($item === null || $item->step_key !== $step, ValidationException::withMessages(['item_id' => trans('kradan::ui.item_reply_step')]));
+
+        return $item->id;
     }
 
     private function parentId(Round $round, string $step, mixed $parentId): ?int

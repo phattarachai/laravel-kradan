@@ -15,6 +15,7 @@ use Override;
  * @property int $round_id
  * @property string $step_key
  * @property int|null $parent_id
+ * @property int|null $item_id
  * @property string $user_id
  * @property string $body
  * @property array{option?: ?string, device?: ?string, src?: ?string, x?: float, y?: float, text?: ?string, box?: array{w?: float, h?: float, texts?: list<string>}|null}|null $pin
@@ -30,7 +31,7 @@ final class Comment extends KradanModel
     protected $table = 'kradan_comments';
 
     /** @var list<string> */
-    protected $fillable = ['round_id', 'step_key', 'parent_id', 'user_id', 'body', 'pin', 'edit'];
+    protected $fillable = ['round_id', 'step_key', 'parent_id', 'item_id', 'user_id', 'body', 'pin', 'edit'];
 
     /** @return BelongsTo<Round, $this> */
     public function round(): BelongsTo

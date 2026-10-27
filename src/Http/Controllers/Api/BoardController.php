@@ -15,6 +15,7 @@ use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Models\Viewer;
 use Phattarachai\Kradan\Support\ActivityLog;
+use Phattarachai\Kradan\Support\BoardChanges;
 use Phattarachai\Kradan\Support\BoardIndex;
 use Phattarachai\Kradan\Support\BoardPresenter;
 use Phattarachai\Kradan\Support\DecideBoard;
@@ -56,7 +57,7 @@ final readonly class BoardController
         $round = $board->rounds()->where('number', $request->integer('round'))->first();
         $this->activity->view($board, $this->userId(), $round);
 
-        return response()->json(['viewers' => $this->presenter->viewers($board)]);
+        return response()->json(['viewers' => $this->presenter->viewers($board), 'changed_at' => BoardChanges::at($board)]);
     }
 
     public function decide(string $slug, DecideBoard $decide): JsonResponse
