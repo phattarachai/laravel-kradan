@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Date;
+use Phattarachai\Kradan\Http\Controllers\AssetController;
 use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Activity;
 use Phattarachai\Kradan\Models\Comment;
@@ -44,7 +45,14 @@ it('renders the board shell with the boot payload', function (): void {
         ->and($boot['board']['rounds'][0])->toHaveKeys(['number', 'title', 'pushed_at', 'steps', 'prints', 'base_url'])
         ->and(array_keys($boot['board']['rounds'][0]['prints']))->toBe([QUESTION, SCREEN])
         ->and($boot['board']['rounds'][0]['base_url'])->toStartWith('http://localhost/kradan/f/')
-        ->and($html)->toContain('http://localhost/kradan/assets/board.js?v=');
+        ->and($html)->toContain('http://localhost/kradan/assets/board.js?v='.$boot['version']);
+});
+
+it('versions the board assets by the content of dist/, not only the package version', function (): void {
+    $dist = dirname(__DIR__, 2).'/dist';
+    $hash = substr(md5(md5_file("{$dist}/board.js").md5_file("{$dist}/board.css")), 0, 10);
+
+    expect(AssetController::version())->toBe(Kradan::VERSION."-{$hash}");
 });
 
 it('renders the index shell with the panels the user may view and a row per board', function (): void {
