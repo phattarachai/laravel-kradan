@@ -10,7 +10,7 @@ import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText } from './ut
 import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
-import { MARK } from './icon.js';
+import { corner } from './icon.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -167,11 +167,10 @@ export function mountBoard(boot, root) {
   }
 
   /* ---------- shell ---------- */
-  const brand = boot.brand || {};
   root.innerHTML = `<div class="k-app" id="app">
     <header class="k-bar">
       ${ib('data-act="side"', 'side', t('side'))}
-      <a class="k-brand" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc([brand.name, t('product')].filter(Boolean).join(' '))}"><span class="k-mark">${MARK}</span></a>
+      ${corner(boot)}
       <span class="k-crumb">/</span>
       <button class="k-ttl" id="ttl" data-act="rounds"></button>
       <span class="k-old" id="oldr" hidden>${t('old_round')}</span>
@@ -1065,7 +1064,8 @@ export function mountBoard(boot, root) {
     if (e.target.name === 'seen') { setPicks([], e.target.checked); }
   });
   document.addEventListener('input', e => {
-    if (e.target.matches('.k-compose textarea')) { e.target.style.height = 'auto'; e.target.style.height = Math.min(200, e.target.scrollHeight) + 'px'; }
+    /* every note box grows with what is typed (owner, round 2) */
+    if (e.target.matches('.k-compose textarea, .k-pop textarea')) { e.target.style.height = 'auto'; e.target.style.height = Math.min(innerHeight * 0.5, e.target.scrollHeight + 2) + 'px'; }
   });
   document.addEventListener('contextmenu', e => {
     if (e.shiftKey || !e.target.closest('#canvas')) { return; }

@@ -29,8 +29,10 @@ a { color: inherit; }
 /* ---------- top bar ---------- */
 .k-bar { grid-area: bar; display: flex; align-items: center; gap: 6px; height: 52px; padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); min-width: 0; position: relative; z-index: 30; }
 .k-brand { display: flex; align-items: center; gap: 8px; font-weight: 600; text-decoration: none; white-space: nowrap; flex: none; padding: 3px; border-radius: 8px; }
-.k-mark, .k-mark svg { width: 26px; height: 26px; display: block; }
-.k-index .k-brand { padding-right: 8px; }
+.k-mark, .k-mark svg { width: 26px; height: 26px; display: block; flex: none; }
+.k-ws { display: flex; align-items: center; gap: 6px; min-width: 0; padding-right: 4px; }
+.k-ws .k-logo { width: 20px; height: 20px; border-radius: 5px; font-size: 9px; }
+.k-ws .k-bname { overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
 .k-brand:hover { background: var(--hover); }
 .k-logo { width: 26px; height: 26px; border-radius: 7px; background: var(--k-accent); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; object-fit: contain; }
 img.k-logo { background: none; }
@@ -185,14 +187,14 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-pnum.edit { background: #6b7280; }
 .k-compose { display: flex; gap: 6px; align-items: flex-end; border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 10px; }
 .k-compose:focus-within { border-color: #b8bdc5; }
-.k-compose textarea { flex: 1; border: 0; outline: 0; resize: none; font: inherit; font-size: 14px; line-height: 1.5; padding: 2px 0; min-height: 24px; background: transparent; }
+.k-compose textarea { flex: 1; max-height: 50vh; overflow: auto; border: 0; outline: 0; resize: none; font: inherit; font-size: 14px; line-height: 1.5; padding: 2px 0; min-height: 24px; background: transparent; }
 .k-compose .k-btn { padding: 2px 10px; }
 
 /* ---------- popover, menus, dialogs ---------- */
 .k-pop { position: fixed; z-index: 60; width: 280px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.15); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .k-pop .at { font-size: 12px; color: var(--mute); }
 .k-tpop { width: 320px; max-height: 60vh; overflow: auto; gap: 12px; }
-.k-pop textarea { width: 100%; min-height: 64px; border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: inherit; font-size: 14px; resize: vertical; }
+.k-pop textarea { width: 100%; min-height: 64px; max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 8px; padding: 6px; font: inherit; font-size: 14px; resize: vertical; }
 .k-pop .row { display: flex; gap: 6px; justify-content: flex-end; }
 .k-ctx { position: fixed; z-index: 90; min-width: 220px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 32px rgba(0,0,0,.16); padding: 5px; font-size: 13px; }
 .k-ctx button { display: flex; width: 100%; align-items: center; gap: 8px; border: 0; background: none; padding: 6px 10px 6px 8px; border-radius: 6px; text-align: left; }
@@ -242,8 +244,6 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-inav a:hover { background: var(--soft); }
 .k-inav a[aria-current="true"] { background: var(--k-accent-bg); color: var(--k-accent); font-weight: 500; }
 .k-inav .n { color: var(--faint); font-weight: 400; }
-.k-ihead { display: flex; align-items: center; gap: 8px; margin: 4px 10px 12px; font-weight: 600; }
-.k-ihead .k-logo { width: 22px; height: 22px; border-radius: 6px; font-size: 10px; }
 .k-imain { padding: 24px 32px; min-width: 0; }
 .k-imain h1 { font-size: 20px; margin: 0 0 16px; }
 .k-tool { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -270,3 +270,71 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
   .k-imain { padding: 16px; }
   .k-table th:nth-child(4), .k-table td:nth-child(4) { display: none; }
 }
+
+/* ---------- themes (design round 3, 2026-10-27): ?theme=a|b|c until the owner picks one ----------
+   --brand is the app's accent (config kradan.brand.accent). Theme A picks with it; B and C give Kradan its own
+   colour and keep the app's only in the workspace badge. */
+:root { --brand: #2563eb; --brand-bg: #e8efff; --k-accent: var(--brand); --k-accent-bg: var(--brand-bg);
+  --font-head: 'Anuphan', 'IBM Plex Sans Thai', system-ui, sans-serif; }
+.k-logo { background: var(--brand); }
+.k-panel h2, .k-imain h1, .k-ttl, .k-ws .k-bname, .k-modal h2 { font-family: var(--font-head); }
+.k-panel h2 { font-size: 19px; font-weight: 600; }
+.k-imain h1 { font-size: 24px; font-weight: 600; }
+
+/* B · กระดานเขียว: the chrome is the board's dark green frame, the canvas a whiteboard */
+:root[data-theme="b"] {
+  --k-accent: #2f6f62; --k-accent-bg: #e4efea; --canvas: #eef1ec; --dot: #dce3dc;
+  --chrome: #1f3a33; --chrome-2: #24443b; --chrome-ink: #eef4f0; --chrome-mute: #a7bfb4; --chrome-faint: #7d978c;
+  --chrome-line: rgba(255,255,255,.1); --chrome-hover: rgba(255,255,255,.08); --chrome-on: rgba(255,255,255,.15);
+}
+[data-theme="b"] .k-bar { background: var(--chrome); color: var(--chrome-ink); border-bottom-color: var(--chrome); }
+[data-theme="b"] .k-side, [data-theme="b"] .k-inav { background: var(--chrome-2); color: var(--chrome-ink); border-right-color: var(--chrome-2); }
+[data-theme="b"] .k-ib, [data-theme="b"] .k-pager, [data-theme="b"] .k-pct, [data-theme="b"] .k-ttl .k-round, [data-theme="b"] .k-ttl .k-caret,
+[data-theme="b"] .k-crumb, [data-theme="b"] .k-old, [data-theme="b"] .k-status, [data-theme="b"] .k-more { color: var(--chrome-mute); }
+[data-theme="b"] .k-pct, [data-theme="b"] .k-ttl { color: var(--chrome-ink); }
+[data-theme="b"] .k-ib:hover, [data-theme="b"] .k-ttl:hover, [data-theme="b"] .k-brand:hover, [data-theme="b"] .k-pct:hover { background: var(--chrome-hover); color: var(--chrome-ink); }
+[data-theme="b"] .k-bar .k-ib[aria-pressed="true"] { background: var(--chrome-on); color: #fff; }
+[data-theme="b"] .k-sep { background: var(--chrome-line); }
+[data-theme="b"] .k-bar .k-av { border-color: var(--chrome); background: #3b5c52; color: #e3ece7; }
+[data-theme="b"] .k-ib.k-fresh { background: rgba(255,178,122,.16); color: #ffb27a; }
+[data-theme="b"] .k-side a:hover, [data-theme="b"] .k-inav a:hover { background: var(--chrome-hover); }
+[data-theme="b"] .k-side a[aria-current="true"], [data-theme="b"] .k-inav a[aria-current="true"] { background: var(--chrome-on); color: #fff; }
+[data-theme="b"] .k-side .n, [data-theme="b"] .k-inav .n { color: var(--chrome-faint); }
+[data-theme="b"] .k-side .k, [data-theme="b"] .k-prog, [data-theme="b"] .k-side .k-sec { color: var(--chrome-mute); }
+[data-theme="b"] .k-side .k b { color: var(--chrome-ink); }
+[data-theme="b"] .k-side .k-upd { color: #ffb27a; }
+[data-theme="b"] .k-canvas { background-image: linear-gradient(var(--dot) 1px, transparent 1px), linear-gradient(90deg, var(--dot) 1px, transparent 1px); background-size: 28px 28px; }
+[data-theme="b"] .k-tools { background: var(--chrome); border-color: var(--chrome); box-shadow: 0 6px 20px rgba(31,58,51,.3); }
+[data-theme="b"] .k-tools .k-ib { color: var(--chrome-mute); }
+[data-theme="b"] .k-tools .k-ib[aria-pressed="true"] { background: var(--chrome-on); color: #fff; }
+[data-theme="b"] .vp:not(.phone):not(.tablet) { border-color: #cfd8d1; border-radius: 8px; box-shadow: 0 1px 2px rgba(31,58,51,.08), 0 12px 32px rgba(31,58,51,.08); }
+[data-theme="b"] .k-primary, [data-theme="b"] .k-primary:hover { background: var(--k-accent); border-color: var(--k-accent); }
+[data-theme="b"] .k-index .k-bar .k-av { border-color: var(--chrome); }
+
+/* C · กระดาษโน้ต: ink outlines and hard shadows, picks on sticky-note yellow, squared paper */
+:root[data-theme="c"] {
+  --k-accent: #1d2127; --k-accent-bg: #fff1bf; --sticky: #ffd84d; --canvas: #f5f4ef; --dot: #e4e1d6; --line: #dcd8cc; --soft: #f3f1ea; --hover: #efede5;
+}
+[data-theme="c"] body, [data-theme="c"] .k-panel, [data-theme="c"] .k-bar { background: #fffefb; }
+[data-theme="c"] .k-bar { border-bottom: 2px solid var(--ink); }
+[data-theme="c"] .k-side, [data-theme="c"] .k-inav { background: #faf9f4; border-right: 2px solid var(--ink); }
+[data-theme="c"] .k-panel { border-left: 2px solid var(--ink); }
+[data-theme="c"] .k-canvas { background-image: linear-gradient(var(--dot) 1px, transparent 1px), linear-gradient(90deg, var(--dot) 1px, transparent 1px); background-size: 20px 20px; }
+[data-theme="c"] .vp:not(.phone):not(.tablet) { border: 2px solid var(--ink); border-radius: 10px; box-shadow: 5px 5px 0 var(--ink); }
+[data-theme="c"] .grp-h .key { border: 1.5px solid var(--ink); }
+[data-theme="c"] .grp.picked .grp-h .key { background: var(--sticky); border-color: var(--ink); color: var(--ink); }
+[data-theme="c"] .grp-h .pick { border: 1.5px solid var(--ink); color: var(--ink); }
+[data-theme="c"] .grp.picked .grp-h .pick { background: var(--sticky); border-color: var(--ink); color: var(--ink); }
+[data-theme="c"] .k-ol label, [data-theme="c"] .k-seen, [data-theme="c"] .k-compose { border: 1.5px solid var(--ink); border-radius: 10px; background: #fff; }
+[data-theme="c"] .k-ol label:has(input:checked), [data-theme="c"] .k-seen:has(input:checked) { background: var(--k-accent-bg); box-shadow: 3px 3px 0 var(--ink); border-color: var(--ink); }
+[data-theme="c"] .k-side a[aria-current="true"], [data-theme="c"] .k-inav a[aria-current="true"] { background: var(--k-accent-bg); color: var(--ink); box-shadow: inset 3px 0 0 var(--ink); border-radius: 4px 8px 8px 4px; }
+[data-theme="c"] .k-tools { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+[data-theme="c"] .k-mini { border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+[data-theme="c"] .k-ib[aria-pressed="true"] { background: var(--k-accent-bg); color: var(--ink); }
+[data-theme="c"] .k-btn { border: 1.5px solid var(--ink); }
+[data-theme="c"] .k-pop, [data-theme="c"] .k-ctx, [data-theme="c"] .k-modal .box { border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+[data-theme="c"] .k-table th { border-bottom: 2px solid var(--ink); color: var(--ink); }
+[data-theme="c"] .k-tabs button[aria-pressed="true"] { background: var(--k-accent-bg); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+[data-theme="c"] .k-search { border: 1.5px solid var(--ink); }
+[data-theme="c"] .pinmark { border: 1.5px solid var(--ink); }
+[data-theme="c"] .k-panel h2, [data-theme="c"] .k-imain h1 { font-weight: 700; }
