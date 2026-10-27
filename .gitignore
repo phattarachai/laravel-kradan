@@ -1,5 +1,8 @@
 /vendor/
 /node_modules/
+composer.lock
+.phpunit.cache/
 .phpunit.result.cache
+phpunit.xml
 .env
 /resources/board/dev/fixtures/local/

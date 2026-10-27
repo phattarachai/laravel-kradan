@@ -1,0 +1,67 @@
+{
+    "name": "phattarachai/laravel-kradan",
+    "description": "A review board inside your Laravel app: Claude pushes design, decision and flow pages; your signed-in users pick options, comment and pin; Claude pulls the answers back.",
+    "keywords": [
+        "laravel",
+        "design-review",
+        "feedback",
+        "claude",
+        "review-board",
+        "kradan"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Phattarachai Chaimongkol",
+            "email": "phatchai28@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "ext-dom": "*",
+        "ext-zip": "*",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.10",
+        "laravel/pint": "^1.24",
+        "orchestra/testbench": "^10.8|^11.0",
+        "pestphp/pest": "^4.0",
+        "pestphp/pest-plugin-laravel": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Phattarachai\\Kradan\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Phattarachai\\Kradan\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Phattarachai\\Kradan\\KradanServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": [
+            "@php vendor/bin/pest"
+        ],
+        "analyse": "vendor/bin/phpstan analyse",
+        "format": "vendor/bin/pint"
+    }
+}
