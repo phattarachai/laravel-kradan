@@ -110,6 +110,37 @@ it('pulls every round into rounds/NN by data-dp title, and the latest as review.
         ->and($rounds[1])->toMatchArray(['dir' => '04', 'title' => 'Manual SO รอบ 3', 'textOnly' => true]);
 });
 
+it('downloads every image and file into attachments/, at the paths the review names', function (): void {
+    Http::fake([
+        'staging.example.com/kradan/api/v1/boards/t188/review' => Http::response([
+            'board' => ['slug' => 't188'],
+            'rounds' => [
+                ['number' => 1, 'title' => 'T188 รอบ 1', 'markdown' => "one\n", 'json' => ['attachments' => [
+                    ['item' => 2, 'name' => 'shot.png', 'path' => 'attachments/2-shot.png', 'url' => 'https://staging.example.com/kradan/files/2/1/sig/shot.png'],
+                    ['item' => 9, 'name' => 'x', 'path' => 'attachments/../../escape.txt', 'url' => 'https://staging.example.com/kradan/files/9/1/sig/x'],
+                ]]],
+                ['number' => 2, 'title' => 'T188 รอบ 2', 'markdown' => "two\n", 'json' => ['attachments' => [
+                    ['item' => 2, 'name' => 'shot.png', 'path' => 'attachments/2-shot.png', 'url' => 'https://staging.example.com/kradan/files/2/1/sig/shot.png'],
+                    ['item' => 3, 'name' => 'ราคา.xlsx', 'path' => 'attachments/3-ราคา.xlsx', 'url' => 'https://staging.example.com/kradan/files/3/1/sig/x.xlsx'],
+                ]]],
+            ],
+        ]),
+        'staging.example.com/kradan/files/2/*' => Http::response('PNGDATA'),
+        'staging.example.com/kradan/files/3/*' => Http::response('XLSXDATA'),
+        'staging.example.com/kradan/files/9/*' => Http::response('NOPE'),
+    ]);
+
+    $this->artisan('kradan:pull', ['board' => 't188', '--to' => "{$this->dir}/t188"])
+        ->expectsOutputToContain('2 attachment(s)')
+        ->assertSuccessful();
+
+    expect(File::get("{$this->dir}/t188/attachments/2-shot.png"))->toBe('PNGDATA')
+        ->and(File::get("{$this->dir}/t188/attachments/3-ราคา.xlsx"))->toBe('XLSXDATA')
+        ->and(File::exists("{$this->dir}/escape.txt"))->toBeFalse();
+
+    Http::assertSentCount(3);
+});
+
 it('lists boards and marks one decided', function (): void {
     Http::fake([
         'staging.example.com/kradan/api/v1/boards' => Http::response(['boards' => [['slug' => 't188', 'kind' => 'decision', 'status' => 'open', 'round' => 2, 'task_ref' => 'T188', 'title' => 'Manual SO', 'url' => 'https://staging.example.com/kradan/decisions/t188']]]),

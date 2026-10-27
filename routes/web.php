@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Route;
 use Phattarachai\Kradan\Http\Controllers\Api\BoardController;
 use Phattarachai\Kradan\Http\Controllers\Api\CommentController;
+use Phattarachai\Kradan\Http\Controllers\Api\ItemController;
 use Phattarachai\Kradan\Http\Controllers\Api\PickController;
 use Phattarachai\Kradan\Http\Controllers\PageController;
 use Phattarachai\Kradan\Kradan;
@@ -23,6 +24,9 @@ Route::prefix('api')->name('api.')->group(function (): void {
         ->whereNumber('number')->where('step', '.*')->name('picks.update');
     Route::post('boards/{slug}/rounds/{number}/comments', [CommentController::class, 'store'])
         ->whereNumber('number')->name('comments.store');
+    Route::post('boards/{slug}/items', [ItemController::class, 'store'])->name('items.store');
+    Route::patch('items/{item}', [ItemController::class, 'update'])->whereNumber('item')->name('items.update');
+    Route::delete('items/{item}', [ItemController::class, 'destroy'])->whereNumber('item')->name('items.destroy');
     Route::patch('comments/{comment}', [CommentController::class, 'update'])->whereNumber('comment')->name('comments.update');
     Route::delete('comments/{comment}', [CommentController::class, 'destroy'])->whereNumber('comment')->name('comments.destroy');
 });

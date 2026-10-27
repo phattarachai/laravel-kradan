@@ -14,7 +14,8 @@ final class CommentRequest extends FormRequest
         return [
             'step' => ['required', 'string', 'max:512'],
             'body' => ['required_without:edit', 'nullable', 'string', 'max:5000'],
-            'parent_id' => ['nullable', 'integer'],
+            'parent_id' => ['nullable', 'integer', 'prohibits:item_id'],
+            'item_id' => ['nullable', 'integer'],
             'pin' => ['nullable', 'array'],
             'pin.option' => ['nullable', 'string', 'max:64'],
             'pin.device' => ['nullable', 'string', 'max:32'],

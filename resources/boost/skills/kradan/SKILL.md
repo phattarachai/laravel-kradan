@@ -1,7 +1,7 @@
 ---
 name: kradan
 description: "Share a finished public/design/<slug> page, or a markdown write-up, with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
-version: 2026.10.27.2
+version: 2026.10.28.1
 ---
 
 # Kradan: design review with the app's own users
@@ -62,6 +62,9 @@ T188 Manual SO ก่อนยืนยัน · รอบ 2 · https://…/krad
 - `📍` is a pin on a spot (option, device, the text under it). `▭` is a boxed area. `✎` is an exact
   string to find and replace in the source.
 - `ยังไม่มีคนตอบ` means nobody answered that step yet.
+- Users also add things to the board: `🗒` a note, `🖼` an image and `📎` a file (pull saves both under
+  `attachments/`, at the path in brackets: open images to look at them), `➚` an arrow at a text, `▭` a box
+  or circle around texts, `〰` a freehand line near a text. `↳` lines are replies to the item above.
 
 ## Other commands
 

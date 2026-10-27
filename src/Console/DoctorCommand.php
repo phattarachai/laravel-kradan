@@ -19,7 +19,7 @@ use Throwable;
  */
 final class DoctorCommand extends Command
 {
-    private const array TABLES = ['kradan_boards', 'kradan_rounds', 'kradan_picks', 'kradan_comments', 'kradan_viewers', 'kradan_activity'];
+    private const array TABLES = ['kradan_boards', 'kradan_rounds', 'kradan_picks', 'kradan_comments', 'kradan_viewers', 'kradan_activity', 'kradan_items'];
 
     protected $signature = 'kradan:doctor';
 

@@ -56,6 +56,14 @@ final class KradanRemote
         return $this->request()->post('boards/'.rawurlencode($slug).'/decide')->throw()->json('board');
     }
 
+    /**
+     * An upload from a signed URL in a review; the signature is the credential.
+     */
+    public function download(string $url): string
+    {
+        return Http::timeout(self::TIMEOUT_SECONDS)->get($url)->throw()->body();
+    }
+
     private function request(): PendingRequest
     {
         $token = (string) config('kradan.remote.token');

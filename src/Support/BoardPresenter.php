@@ -11,6 +11,7 @@ use Phattarachai\Kradan\Enums\BoardStatus;
 use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Comment;
+use Phattarachai\Kradan\Models\Item;
 use Phattarachai\Kradan\Models\Pick;
 use Phattarachai\Kradan\Models\Round;
 use Phattarachai\Kradan\Models\Viewer;
@@ -84,8 +85,14 @@ final readonly class BoardPresenter
             'latest' => $rounds->last()?->number,
             'picks_locked' => $board->status !== BoardStatus::Open,
             ...($current instanceof Round ? $this->answers($current, $user) : ['picks' => [], 'comments' => [], 'progress' => []]),
+            'items' => $this->items($board, $user),
+            'uploads' => [
+                'max_kb' => (int) config('kradan.uploads.max_kb', 20480),
+                'types' => array_values((array) config('kradan.uploads.types', [])),
+            ],
             'viewers' => $this->viewers($board),
             'seen_prints' => $this->seenPrints($board, $user),
+            'changed_at' => BoardChanges::at($board),
         ];
     }
 
@@ -155,6 +162,7 @@ final readonly class BoardPresenter
             'id' => $comment->id,
             'step' => $comment->step_key,
             'parent_id' => $comment->parent_id,
+            'item_id' => $comment->item_id,
             'user' => Kradan::userById($comment->user_id),
             'mine' => $comment->user_id === (string) $user->getAuthIdentifier(),
             'body' => $comment->body,
@@ -164,6 +172,72 @@ final readonly class BoardPresenter
             'updated_at' => $comment->updated_at?->toIso8601String(),
             ...($comment->parent_id === null ? ['replies' => $comment->replies->map(fn (Comment $reply): array => $this->comment($reply, $user))->values()->all()] : []),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function item(Item $item, Authenticatable $user): array
+    {
+        return [
+            'id' => $item->id,
+            'round' => $item->round?->number,
+            'step' => $item->step_key,
+            'kind' => $item->kind->value,
+            'user' => Kradan::userById($item->user_id),
+            'mine' => $item->user_id === (string) $user->getAuthIdentifier(),
+            'created_at' => $item->created_at?->toIso8601String(),
+            'updated_at' => $item->updated_at?->toIso8601String(),
+            'reply_count' => (int) ($item->replies_count ?? $item->replies()->count()),
+            'anchor' => $item->anchor,
+            'x' => $item->x,
+            'y' => $item->y,
+            'w' => $item->w,
+            'h' => $item->h,
+            'color' => $item->color,
+            'text' => $item->text,
+            'points' => $item->points,
+            'texts' => $item->texts,
+            'file' => $this->file($item),
+        ];
+    }
+
+    /**
+     * @return array{name: string, type: ?string, size: ?int, url: string, thumb: ?string}|null
+     */
+    public function file(Item $item): ?array
+    {
+        if ($item->file_path === null) {
+            return null;
+        }
+
+        $url = $this->signer->fileUrl($item);
+
+        return [
+            'name' => (string) $item->file_name,
+            'type' => $item->file_type,
+            'size' => $item->file_size,
+            'url' => $url,
+            'thumb' => $item->isImage() ? $url : null,
+        ];
+    }
+
+    /**
+     * Every item on the board, from every round, oldest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function items(Board $board, Authenticatable $user): array
+    {
+        return Item::query()
+            ->where('board_id', $board->id)
+            ->with('round')
+            ->withCount('replies')
+            ->oldest('id')
+            ->get()
+            ->map(fn (Item $item): array => $this->item($item, $user))
+            ->values()
+            ->all();
     }
 
     /**
@@ -187,8 +261,7 @@ final readonly class BoardPresenter
     {
         return [
             'picks' => $round->picks()->oldest('id')->get()->map($this->pick(...))->values()->all(),
-            'comments' => $round->comments()->whereNull('parent_id')->with('replies')->oldest('id')->get()
-                ->map(fn (Comment $comment): array => $this->comment($comment, $user))->values()->all(),
+            'comments' => $this->comments($round, $user),
             'progress' => ReviewBuilder::for($round)->progress(),
         ];
     }
@@ -207,6 +280,27 @@ final readonly class BoardPresenter
             'csrf' => csrf_token(),
             'routes' => ['api' => url(trim((string) config('kradan.path'), '/').'/api'), 'index' => route('kradan.index')],
         ];
+    }
+
+    /**
+     * The round's threads plus every reply to an item on the board, since
+     * items show in every round.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function comments(Round $round, Authenticatable $user): array
+    {
+        return Comment::query()
+            ->whereNull('parent_id')
+            ->where(fn ($query) => $query
+                ->where(fn ($own) => $own->where('round_id', $round->id)->whereNull('item_id'))
+                ->orWhereIn('item_id', Item::query()->select('id')->where('board_id', $round->board_id)))
+            ->with('replies')
+            ->oldest('id')
+            ->get()
+            ->map(fn (Comment $comment): array => $this->comment($comment, $user))
+            ->values()
+            ->all();
     }
 
     /**
