@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Isolation probe</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; }
+  table { border-collapse: collapse; font-size: 14px; }
+  td { padding: 6px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .ok { color: #0f7b52; font-weight: 600; } .bad { color: #b32626; font-weight: 600; }
+</style>
+</head>
+<body data-dp="Isolation probe">
+<section data-dp-step data-title="What this page can reach" data-sub="Every row should read blocked">
+  <table id="out"><tr><td>running…</td></tr></table>
+</section>
+<script>
+/* A hostile page tries what the board's sandbox must stop. Each row: what was tried, blocked or not. */
+(async () => {
+  const APP = (document.querySelector('script[data-parent]') || {}).dataset?.parent || location.origin;
+  const rows = [];
+  const tryIt = async (what, fn) => {
+    try { const r = await fn(); rows.push([what, false, String(r).slice(0, 120)]); }
+    catch (e) { rows.push([what, true, `${e.name}: ${e.message}`.slice(0, 160)]); }
+  };
+  await tryIt('read parent.document', () => parent.document.title);
+  await tryIt('read top.location.href', () => top.location.href);
+  await tryIt('read document.cookie', () => { const c = document.cookie; return c; });
+  await tryIt('localStorage', () => { localStorage.setItem('x', '1'); return 'writable'; });
+  await tryIt('fetch app /dev/secret with cookies', async () => { const r = await fetch(APP + '/dev/secret', { credentials: 'include' }); return `${r.status} ${await r.text()}`; });
+  await tryIt('fetch app board API with cookies', async () => { const r = await fetch(APP + '/kradan/api/boards/demo-cart', { credentials: 'include' }); return `${r.status} ${(await r.text()).slice(0, 60)}`; });
+  await tryIt('POST a comment to the app', async () => { const r = await fetch(APP + '/kradan/api/boards/demo-cart/rounds/1/comments', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'x', body: 'from the frame' }) }); return `${r.status}`; });
+  await tryIt('open a popup', () => { const w = window.open(APP); if (!w) { throw new Error('blocked'); } return 'opened'; });
+  /* document.cookie in an opaque origin throws; an empty read would also mean nothing leaked */
+  rows.forEach(r => { if (r[0] === 'read document.cookie' && !r[1] && r[2] === '') { r[1] = true; r[2] = '(empty)'; } });
+  document.getElementById('out').innerHTML = rows.map(([w, blocked, d]) => `<tr><td>${w}</td><td class="${blocked ? 'ok' : 'bad'}">${blocked ? 'blocked' : 'REACHED'}</td><td>${d.replace(/</g, '&lt;')}</td></tr>`).join('')
+    + `<tr><td>this page's origin</td><td colspan="2">${self.origin}</td></tr>`;
+  console.log('[kradan-probe]', JSON.stringify(rows));
+})();
+</script>
+</body>
+</html>

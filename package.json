@@ -1,0 +1,17 @@
+{
+  "name": "laravel-kradan-board",
+  "private": true,
+  "type": "module",
+  "description": "Browser side of phattarachai/laravel-kradan: the board, the index page and the frame agent. Built into dist/ and committed.",
+  "scripts": {
+    "build": "node resources/board/build.mjs",
+    "watch": "node resources/board/build.mjs --watch",
+    "dev": "node --watch-path=resources/board/dev --watch-path=resources/views resources/board/dev/server.mjs",
+    "test": "node --test \"resources/board/test/*.test.mjs\""
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "laravel-echo": "^2.1.0",
+    "pusher-js": "^8.4.0"
+  }
+}
