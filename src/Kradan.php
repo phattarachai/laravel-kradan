@@ -9,19 +9,18 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Auth;
 use Phattarachai\Kradan\Enums\Ability;
-use Phattarachai\Kradan\Enums\BoardKind;
 
 /**
- * The host registers who may open which panel, and how a user is shown:
+ * The host registers who may open Kradan, and how a user is shown:
  *
- *   Kradan::auth(fn ($user, string $panel, string $ability) => $user->isAdmin());
+ *   Kradan::auth(fn ($user, string $ability) => $user->isAdmin());
  *   Kradan::userUsing(fn ($user) => ['id' => $user->id, 'name' => $user->name, 'avatar' => $user->avatar_url]);
  */
 final class Kradan
 {
     public const string VERSION = '0.1.0';
 
-    /** @var (Closure(Authenticatable, string, string): bool)|null */
+    /** @var (Closure(Authenticatable, string): bool)|null */
     private static ?Closure $authUsing = null;
 
     /** @var (Closure(Authenticatable): array{id: mixed, name: string, avatar?: ?string})|null */
@@ -31,7 +30,7 @@ final class Kradan
     private static array $users = [];
 
     /**
-     * @param  Closure(Authenticatable, string, string): bool  $callback
+     * @param  Closure(Authenticatable, string): bool  $callback  receives the user and `view` or `manage`
      */
     public static function auth(Closure $callback): void
     {
@@ -47,50 +46,17 @@ final class Kradan
         self::$users = [];
     }
 
-    public static function allows(?Authenticatable $user, string $panel, Ability $ability): bool
+    public static function allows(?Authenticatable $user, Ability $ability): bool
     {
-        if (! $user instanceof Authenticatable || self::panel($panel) === null) {
+        if (! $user instanceof Authenticatable) {
             return false;
         }
 
         if (self::$authUsing instanceof Closure) {
-            return (bool) call_user_func(self::$authUsing, $user, $panel, $ability->value);
+            return (bool) call_user_func(self::$authUsing, $user, $ability->value);
         }
 
         return app()->environment('local');
-    }
-
-    public static function allowsAny(?Authenticatable $user, Ability $ability = Ability::View): bool
-    {
-        return collect(array_keys(self::panels()))
-            ->contains(fn (string $panel): bool => self::allows($user, $panel, $ability));
-    }
-
-    /** @return list<string> */
-    public static function viewablePanels(?Authenticatable $user): array
-    {
-        return array_values(array_filter(
-            array_keys(self::panels()),
-            fn (string $panel): bool => self::allows($user, $panel, Ability::View),
-        ));
-    }
-
-    /** @return array<string, array{kind: string, title: string}> */
-    public static function panels(): array
-    {
-        return (array) config('kradan.panels', []);
-    }
-
-    /** @return array{kind: string, title: string}|null */
-    public static function panel(string $panel): ?array
-    {
-        return self::panels()[$panel] ?? null;
-    }
-
-    public static function panelFor(BoardKind $kind): string
-    {
-        return (string) collect(self::panels())
-            ->search(fn (array $panel): bool => $panel['kind'] === $kind->value);
     }
 
     public static function user(): ?Authenticatable

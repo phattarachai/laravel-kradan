@@ -23,11 +23,11 @@ final class KradanRemote
     /**
      * @return array{board_url: string, round: int, title: string, steps: int, created: bool}
      */
-    public function push(string $zip, string $slug, ?string $kind, ?string $taskRef, ?string $title = null): array
+    public function push(string $zip, string $slug, ?string $taskRef): array
     {
         return $this->request()
             ->attach('bundle', (string) file_get_contents($zip), "{$slug}.zip")
-            ->post('push', array_filter(['slug' => $slug, 'kind' => $kind, 'task_ref' => $taskRef, 'title' => $title], fn (?string $value): bool => $value !== null && $value !== ''))
+            ->post('push', array_filter(['slug' => $slug, 'task_ref' => $taskRef], fn (?string $value): bool => $value !== null && $value !== ''))
             ->throw()
             ->json();
     }

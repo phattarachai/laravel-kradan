@@ -7,7 +7,7 @@
 ![Laravel Version](https://img.shields.io/badge/laravel-12%20%7C%2013-FF2D20?style=flat-square&logo=laravel&logoColor=white)
 [![Total Downloads](https://img.shields.io/packagist/dt/phattarachai/laravel-kradan.svg?style=flat-square)](https://packagist.org/packages/phattarachai/laravel-kradan)
 
-A review board inside your Laravel app. Claude pushes design, decision and flow pages; your signed-in users
+A review board inside your Laravel app. Claude pushes designed pages that ask for a decision; your signed-in users
 pick options, comment, reply and drop pins; Claude pulls the answers back as `review.md`.
 
 Kradan (กระดาน, "board") is for the moment a design or a business rule needs answers from the people who use
@@ -44,13 +44,13 @@ check `git status` afterwards and restore them.
 
 ## Access
 
-Register who may open each panel in a service provider. `$ability` is `view` or `manage`; `manage` may mark a
+Register who may open Kradan in a service provider. `$ability` is `view` or `manage`; `manage` may mark a
 decision board decided.
 
 ```php
 use Phattarachai\Kradan\Kradan;
 
-Kradan::auth(fn ($user, string $panel, string $ability): bool => $user->isAdmin());
+Kradan::auth(fn ($user, string $ability): bool => $user->isAdmin());
 
 // Optional: how a person is shown. The default is the `name` attribute and initials.
 Kradan::userUsing(fn ($user): array => [
@@ -71,10 +71,9 @@ KRADAN_LOGIN_ROUTE=filament.admin.auth.login
 
 ## What it does
 
-- **Two panels.** *Decisions* hold options to pick from; once marked decided they move to history, picks lock and
-  comments stay open. *Flows* are living explanations of how the system works, updated as it changes. Each panel
-  has its own path and its own auth check. `/kradan` lists every board with search over titles, task references
-  and step titles.
+- **Decision boards.** Each board, at `/kradan/<slug>`, holds options to pick from. Once marked decided it moves
+  to history: picks lock and comments stay open. `/kradan` lists every board with search over titles, task
+  references and step titles. A page that only explains something belongs in your docs, not on a board.
 - **Open answering.** Anyone allowed in may pick, comment or pin on any step, and everyone sees who picked what.
   The board shows how far each person got.
 - **Rounds.** A push with the same `data-dp` title replaces the latest round; a new title opens the next round.
@@ -129,31 +128,16 @@ KRADAN_REMOTE_TOKEN=…written by kradan:token --write
 
 | Command | What it does |
 |---|---|
-| `kradan:push <dir> [--slug=] [--kind=decision\|flow] [--task=] [--title=] [--dry-run]` | Zips a design or markdown folder and pushes it as a round; prints the board URL |
+| `kradan:push <dir> [--slug=] [--task=] [--dry-run]` | Zips a design folder (`index.html`) and pushes it as a round; prints the board URL |
 | `kradan:pull <slug\|board url> [--to=]` | Writes `rounds/NN/review.json` and `review.md` per round, the latest as `review.md`, and every uploaded image and file into `attachments/` |
-| `kradan:list` | Every board, its kind, status and latest round |
-| `kradan:decide <slug>` | Marks a decision board decided (a flow archived) |
+| `kradan:list` | Every board, its status and latest round |
+| `kradan:decide <slug>` | Marks a board decided |
 | `kradan:doctor` | Checks the install |
 
 The package ships a [Laravel Boost](https://github.com/laravel/boost) skill, so `php artisan boost:install`
 teaches Claude this workflow in your project.
 
-### Flow boards from markdown
-
-A flow board is often the result of an investigation, so a folder whose entry is `index.md` (and no
-`index.html`) works too. Kradan renders it at push with GitHub-flavoured markdown: tables, task lists,
-autolinks, raw HTML and figures, and relative images from the same folder. A fenced ` ```mermaid ` block
-draws as a diagram; mermaid is bundled with the package and only loaded by pages that use it.
-
-The first `# heading` names the round, as `data-dp` does for a designed page; without one, pass `--title`.
-A new board pushed from markdown is a flow unless you pass `--kind`. The whole page is one step, so comments
-and pins attach to it.
-
-```bash
-php artisan kradan:push docs/investigations/t156-price --task=T156
-```
-
-Pages use the markup of the design workbench: `data-dp` on `<body>` for the round title, `data-dp-step` with
+A pushed folder needs an `index.html`. Pages use the markup of the design workbench: `data-dp` on `<body>` for the round title, `data-dp-step` with
 `data-title` for each step, `data-dp-option` with `data-key` and `data-label` for options, `data-dp-group` for
 sections and `data-dp-frames` with `data-src` for live screens.
 
@@ -171,7 +155,6 @@ php artisan vendor:publish --tag=kradan-config
 | `disk` | `KRADAN_DISK` | `local` | Round files go under `kradan/<slug>/<round>/` |
 | `content_url` | `KRADAN_CONTENT_URL` | `null` | A separate content host |
 | `signed_ttl` | `KRADAN_SIGNED_TTL` | `240` | Minutes a content URL stays valid |
-| `panels` | | flows, decisions | Key, kind and title of each panel |
 | `brand` | `KRADAN_BRAND`, `KRADAN_LOGO`, `KRADAN_ACCENT` | app name | |
 | `redirect_guests_to` | `KRADAN_LOGIN_ROUTE` | `login` | Route name or URL a guest is sent to; null 403s |
 | `presence` | `KRADAN_PRESENCE` | `auto` | `auto`, `reverb`, `polling` or `off` |

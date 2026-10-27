@@ -33,7 +33,7 @@ function bootOf(string $html): array
 it('renders the board shell with the boot payload', function (): void {
     publishRound();
 
-    $html = actingAs(kradanUser())->get('/kradan/decisions/t188-manual-so')->assertOk()->getContent();
+    $html = actingAs(kradanUser())->get('/kradan/t188-manual-so')->assertOk()->getContent();
     $boot = bootOf($html);
 
     expect($boot)->toHaveKeys(['version', 'page', 'brand', 'locale', 'user', 'csrf', 'routes', 'presence', 'board'])
@@ -41,7 +41,8 @@ it('renders the board shell with the boot payload', function (): void {
         ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true]])
         ->and($boot['routes'])->toBe(['api' => 'http://localhost/kradan/api', 'index' => 'http://localhost/kradan'])
         ->and($boot['presence']['mode'])->toBe('polling')
-        ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'kind' => 'decision', 'status' => 'open', 'task_ref' => 'T188', 'panel' => 'decisions', 'current' => 1, 'seen_prints' => null])
+        ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'status' => 'open', 'task_ref' => 'T188', 'url' => 'http://localhost/kradan/t188-manual-so', 'current' => 1, 'seen_prints' => null])
+        ->and($boot['board'])->not->toHaveKeys(['kind', 'panel'])
         ->and($boot['board']['rounds'][0])->toHaveKeys(['number', 'title', 'pushed_at', 'steps', 'prints', 'base_url'])
         ->and(array_keys($boot['board']['rounds'][0]['prints']))->toBe([QUESTION, SCREEN])
         ->and($boot['board']['rounds'][0]['base_url'])->toStartWith('http://localhost/kradan/f/')
@@ -55,21 +56,20 @@ it('versions the board assets by the content of dist/, not only the package vers
     expect(AssetController::version())->toBe(Kradan::VERSION."-{$hash}");
 });
 
-it('renders the index shell with the panels the user may view and a row per board', function (): void {
+it('renders the index shell with a row per board', function (): void {
     publishRound();
-    $user = kradanUser();
-    Kradan::auth(fn ($user, string $panel): bool => $panel === 'decisions');
 
-    $boot = bootOf(actingAs($user)->get('/kradan')->assertOk()->getContent());
+    $boot = bootOf(actingAs(kradanUser())->get('/kradan')->assertOk()->getContent());
 
     expect($boot['page'])->toBe('index')
         ->and($boot)->not->toHaveKey('board')
-        ->and($boot['index']['panels'])->toBe([['key' => 'decisions', 'kind' => 'decision', 'title' => 'เรื่องที่ต้องตัดสินใจ', 'url' => 'http://localhost/kradan/decisions']])
+        ->and(array_keys($boot['index']))->toBe(['boards'])
         ->and($boot['index']['boards'][0])->toMatchArray([
-            'slug' => 't188-manual-so', 'panel' => 'decisions', 'kind' => 'decision', 'status' => 'open', 'task_ref' => 'T188',
-            'url' => 'http://localhost/kradan/decisions/t188-manual-so', 'steps' => ['Block หรือเก็บไว้', 'หน้ายืนยัน'],
+            'slug' => 't188-manual-so', 'status' => 'open', 'task_ref' => 'T188',
+            'url' => 'http://localhost/kradan/t188-manual-so', 'steps' => ['Block หรือเก็บไว้', 'หน้ายืนยัน'],
             'answered' => 0, 'viewers' => [], 'updated' => false, 'decided_at' => null,
         ])
+        ->and($boot['index']['boards'][0])->not->toHaveKeys(['kind', 'panel'])
         ->and($boot['index']['boards'][0]['round'])->toMatchArray(['number' => 1, 'title' => 'Manual SO ก่อนยืนยัน รอบ 1']);
 });
 
@@ -261,14 +261,14 @@ it('logs a view at most once per user, per board, per 30 minutes', function (): 
 
 it('searches the index over title, task ref and step titles', function (): void {
     publishRound();
-    publishRound('cover-flow', 'Cover flow', taskRef: 'T185');
+    publishRound('t185-cover', 'Cover ใบลา', taskRef: 'T185');
     $user = kradanUser();
 
     $search = fn (string $q): array => array_column(actingAs($user)->getJson('/kradan/api/boards?q='.urlencode($q))->json('boards'), 'slug');
 
     expect($search('manual'))->toBe(['t188-manual-so'])
-        ->and($search('T185'))->toBe(['cover-flow'])
-        ->and($search('หน้ายืนยัน'))->toEqualCanonicalizing(['t188-manual-so', 'cover-flow'])
+        ->and($search('T185'))->toBe(['t185-cover'])
+        ->and($search('หน้ายืนยัน'))->toEqualCanonicalizing(['t188-manual-so', 't185-cover'])
         ->and($search(''))->toHaveCount(2);
 
     actingAs($user)->get('/kradan')->assertOk()->assertSee('t188-manual-so');

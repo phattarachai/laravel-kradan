@@ -8,9 +8,6 @@ use Phattarachai\Kradan\Http\Controllers\Api\CommentController;
 use Phattarachai\Kradan\Http\Controllers\Api\ItemController;
 use Phattarachai\Kradan\Http\Controllers\Api\PickController;
 use Phattarachai\Kradan\Http\Controllers\PageController;
-use Phattarachai\Kradan\Kradan;
-
-$panels = array_keys(Kradan::panels());
 
 Route::get('/', [PageController::class, 'index'])->name('index');
 
@@ -31,5 +28,4 @@ Route::prefix('api')->name('api.')->group(function (): void {
     Route::delete('comments/{comment}', [CommentController::class, 'destroy'])->whereNumber('comment')->name('comments.destroy');
 });
 
-Route::get('{panel}', [PageController::class, 'panel'])->whereIn('panel', $panels)->name('panel');
-Route::get('{panel}/{slug}', [PageController::class, 'board'])->whereIn('panel', $panels)->name('board');
+Route::get('{slug}', [PageController::class, 'board'])->where('slug', '[a-z0-9][a-z0-9._-]*')->name('board');

@@ -22,7 +22,7 @@ return [
     'item_stroke' => 'drew',
     'item_near' => 'near',
     'bundle_unreadable' => 'The zip could not be opened.',
-    'bundle_no_index' => 'The zip needs an index.html or index.md at its top level.',
+    'bundle_no_index' => 'The zip needs an index.html at its top level: Kradan takes designed pages only.',
     'bundle_bad_path' => 'The file :path is outside the page folder.',
     'bundle_too_large' => 'The zip is too large.',
 ];

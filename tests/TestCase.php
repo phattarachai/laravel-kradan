@@ -99,6 +99,6 @@ abstract class TestCase extends Orchestra
         View::prependNamespace('kradan', __DIR__.'/Fixtures/views');
 
         Kradan::flush();
-        Kradan::auth(fn ($user, string $panel, string $ability): bool => true);
+        Kradan::auth(fn ($user, string $ability): bool => true);
     }
 }

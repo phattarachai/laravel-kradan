@@ -17,10 +17,9 @@ final class ListCommand extends Command
     public function handle(KradanRemote $remote): int
     {
         $this->table(
-            ['slug', 'kind', 'status', 'round', 'title', 'url'],
+            ['slug', 'status', 'round', 'title', 'url'],
             array_map(fn (array $board): array => [
                 $board['slug'],
-                $board['kind'],
                 $board['status'],
                 $board['round'] ?? '-',
                 $board['label'] ?? Board::labelFor($board['task_ref'] ?? null, (string) $board['title']),

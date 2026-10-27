@@ -1,7 +1,7 @@
 ---
 name: kradan
-description: "Share a finished public/design/<slug> page, or a markdown write-up, with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
-version: 2026.10.28.1
+description: "Share a finished public/design/<slug> page that needs a decision with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
+version: 2026.10.28.2
 ---
 
 # Kradan: design review with the app's own users
@@ -18,20 +18,15 @@ The commands run in this checkout and talk to the server in `KRADAN_REMOTE_URL` 
    `data-dp-frames`). Its `<body data-dp="…">` title names the round.
 2. Push it:
    ```bash
-   php artisan kradan:push public/design/<slug> --kind=decision --task=T188
+   php artisan kradan:push public/design/<slug> --task=T188
    ```
-   - `--kind=decision` is options to pick from; once decided it moves to history. `--kind=flow` is a living
-     explanation (how the system works) that you keep updating.
+   - The folder needs an `index.html`. A board asks for a decision; an explanation with nothing to decide
+     belongs in the project's docs, not on Kradan.
    - `--dry-run` prints the round title, file count and step count without sending.
    - `rounds/`, `review*` and `workbench.json` stay local.
 3. Give the user the printed board URL. Users answer whenever they get to it. Don't wait or poll.
 
-**Markdown.** A flow that explains something (an investigation, a process) can be a folder with an `index.md`
-instead of a designed page: tables, images beside it, raw HTML figures and ` ```mermaid ` diagrams all work.
-Its first `# heading` is the round title (`--title` when there is none), and a new board from markdown is a
-flow. Prefer it to building a page when prose and a table explain it best.
-
-**Rounds.** Same `data-dp` title (or `# heading`) as the latest round → that round is replaced (users see มีอัปเดต). A new
+**Rounds.** Same `data-dp` title as the latest round → that round is replaced (users see มีอัปเดต). A new
 title (`… รอบ 2`) → a new round; earlier rounds stay readable and read-only. Change the title when the
 question changes, not for a typo fix.
 
@@ -68,8 +63,8 @@ T188 Manual SO ก่อนยืนยัน · รอบ 2 · https://…/krad
 
 ## Other commands
 
-- `php artisan kradan:list`: every board, its kind, status and latest round.
-- `php artisan kradan:decide <slug>`: file a decision board as decided (a flow as archived). Picks lock and
+- `php artisan kradan:list`: every board, its status and latest round.
+- `php artisan kradan:decide <slug>`: file a board as decided. Picks lock and
   comments stay open. Do it once the decision is made and recorded, and only when the user agrees.
 - `php artisan kradan:doctor`: checks the install on the server side (enabled, tables, disk, assets).
 
@@ -81,4 +76,4 @@ T188 Manual SO ก่อนยืนยัน · รอบ 2 · https://…/krad
 | `KRADAN_REMOTE_URL is not set` | Ask the user which environment hosts Kradan and set its app URL. |
 | HTTP 401 | The server doesn't list this token's hash yet. Same as above. |
 | HTTP 404 on every URL | Kradan is off on that server (`KRADAN_ENABLED=false`) or the URL is wrong. |
-| HTTP 422 `bundle` | The folder has no top-level `index.html`, or a file path climbs out of it. |
+| HTTP 422 `bundle` | The folder has no top-level `index.html` (markdown is not accepted), or a file path climbs out of it. |

@@ -85,7 +85,7 @@ final class KradanServiceProvider extends ServiceProvider
         Broadcast::channel('kradan.board.{id}', function (Authenticatable $user, string $id): array|false {
             $board = Board::query()->find((int) $id);
 
-            return $board instanceof Board && Kradan::allows($user, $board->panel(), Ability::View)
+            return $board instanceof Board && Kradan::allows($user, Ability::View)
                 ? Kradan::present($user)
                 : false;
         }, array_filter(['guards' => config('kradan.guard') === null ? null : [config('kradan.guard')]]));
