@@ -46,3 +46,25 @@ test('anchor.on sent as a form field ("0"/"1") reads the same as JSON', () => {
   assert.equal(besideGroup({ anchor: { option: null, on: '0' } }, ''), true);
   assert.equal(onFrame({ anchor: { option: null, device: 'desktop', src: 'crop', on: '1' } }, { option: null, device: 'desktop', src: 'crop' }), true);
 });
+
+test('a move keeps the anchor when the item stays in the same place', async () => {
+  const { movePatch } = await import('../src/board/items.js');
+  const it = { x: 40, y: 60, anchor: { option: 'A', device: 'desktop', src: 'crop', on: false } };
+  /* beside the same group: the device of its first frame doesn't matter */
+  assert.deepEqual(movePatch(it, { anchor: { option: 'A', device: 'phone', src: 'crop', on: false }, x: 40.4, y: 59.6 }), { x: 40, y: 60 });
+  const onA = { x: 10, y: 20, anchor: { option: 'A', device: 'desktop', src: 'crop', on: '1' } };
+  assert.deepEqual(movePatch(onA, { anchor: { option: 'A', device: 'desktop', src: 'crop', on: true }, x: 11, y: 21 }), { x: 10, y: 20 });
+});
+
+test('dropping onto a frame, off it, or onto another option re-anchors with x/y in the new space', async () => {
+  const { movePatch } = await import('../src/board/items.js');
+  const beside = { x: 900, y: 40, anchor: { option: 'A', device: 'desktop', src: 'crop', on: false } };
+  const frameA = { option: 'A', device: 'desktop', src: 'crop', on: true };
+  assert.deepEqual(movePatch(beside, { anchor: frameA, x: 120.6, y: 88.2 }), { anchor: frameA, x: 121, y: 88 }, 'onto the frame');
+  const onFrame = { x: 120, y: 88, anchor: { ...frameA, on: '1' } };
+  const besideB = { option: 'B', device: 'desktop', src: 'crop', on: false };
+  assert.deepEqual(movePatch(onFrame, { anchor: besideB, x: -30, y: 400 }), { anchor: besideB, x: -30, y: 400 }, 'off the frame, beside B');
+  const phone = { option: 'A', device: 'phone', src: 'crop', on: true };
+  assert.deepEqual(movePatch(onFrame, { anchor: phone, x: 5, y: 6 }).anchor, phone, 'onto the same option at another device');
+  assert.deepEqual(movePatch(beside, null), { x: 900, y: 40 }, 'nowhere to land: plain move');
+});
