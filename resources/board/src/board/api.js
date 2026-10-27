@@ -30,6 +30,25 @@ export function createApi(boot) {
     deleteComment: id => call('DELETE', `comments/${id}`),
     heartbeat: (slug, round, printsSeen) => call('POST', `boards/${seg(slug)}/heartbeat`, { round, ...(printsSeen ? { prints_seen: printsSeen } : {}) }),
     decide: slug => call('POST', `boards/${seg(slug)}/decide`, {}),
+    createItem: (slug, body) => call('POST', `boards/${seg(slug)}/items`, body),
+    patchItem: (id, body) => call('PATCH', `items/${id}`, body),
+    deleteItem: id => call('DELETE', `items/${id}`),
+    /* an image or a file: multipart, with upload progress (fetch can't report it) */
+    uploadItem: (slug, fields, file, onProgress) => new Promise((resolve, reject) => {
+      const form = new FormData();
+      Object.entries(fields).forEach(([k, v]) => form.append(k, v ?? ''));
+      form.append('file', file, file.name);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${base}/boards/${seg(slug)}/items`);
+      xhr.withCredentials = true;
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      xhr.setRequestHeader('X-CSRF-TOKEN', boot.csrf || '');
+      xhr.upload.onprogress = e => { if (e.lengthComputable) { onProgress?.(e.loaded / e.total * 100); } };
+      xhr.onload = () => { if (xhr.status >= 200 && xhr.status < 300) { try { resolve(JSON.parse(xhr.responseText)); } catch (err) { reject(err); } } else { reject(Object.assign(new Error(String(xhr.status)), { status: xhr.status })); } };
+      xhr.onerror = () => reject(new Error('network'));
+      xhr.send(form);
+    }),
     exportMd: slug => call('GET', `boards/${seg(slug)}/export.md`, undefined, { text: true }),
   };
 }

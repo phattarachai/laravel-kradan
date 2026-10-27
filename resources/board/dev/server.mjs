@@ -111,7 +111,7 @@ const BOARDS = [];
 function board(slug, panel, kind, title, taskRef, rounds, extra = {}) {
   if (!rounds.length) { return; }
   BOARDS.push({ id: BOARDS.length + 1, slug, panel, kind, title, task_ref: taskRef, status: 'open', decided_at: null, decided_by: null,
-    rounds, picks: {}, comments: [], viewers: {}, ...extra });
+    rounds, picks: {}, comments: [], items: [], viewers: {}, changedAt: new Date().toISOString(), ...extra });
 }
 const demo = path.join(FIX, 'demo-frames');
 board('demo-cart', 'decisions', 'decision', 'Demo ตะกร้า', 'T000', [round(demo, 1, 60 * 30)]);
@@ -148,6 +148,8 @@ function seed(b) {
   }
   const c = comment(b, r, { step: st[0].key, body: 'ถ้าเลือกแบบนี้ ต้องมีทางให้ sales แก้เอง', user: 4, mins: 45 });
   comment(b, r, { step: st[0].key, body: 'เห็นด้วย', parent_id: c.id, user: 2, mins: 20 });
+  const note = item(b, r, { step: st[0].key, kind: 'note', anchor: { option: q?.options[0]?.key ?? null, device: 'desktop', src: 'crop', on: false }, x: -220, y: 40, w: 180, h: 120, color: 'yellow', text: 'sales ต้องแก้เลข SO เองได้ ไม่ต้องโทรหาไอที' }, 3, 25);
+  comment(b, r, { step: st[0].key, body: 'เห็นด้วย ให้ RM แก้แทนได้', item_id: note.id, user: 2, mins: 15 });
   b.viewers[2] = { last_seen_at: minsAgo(1), seen_prints: { ...r.prints } };
   b.viewers[3] = { last_seen_at: minsAgo(9), seen_prints: { ...r.prints } };
   b.viewers[4] = { last_seen_at: minsAgo(60 * 26), seen_prints: {} };
@@ -160,11 +162,62 @@ function pick(b, r, step, uid, options, seen, mins = 0) {
   if (!options.length && !seen) { delete b.picks[r.number][k]; return; }
   b.picks[r.number][k] = { step, user: userOf(uid), options, seen, updated_at: minsAgo(mins) };
 }
-function comment(b, r, { step, body, parent_id = null, pin = null, edit = null, user, mins = 0 }) {
-  const c = { id: ++commentSeq, round: r.number, step, parent_id, user: userOf(user), body: body || '', pin, edit, created_at: minsAgo(mins), updated_at: minsAgo(mins), deleted: false };
+function comment(b, r, { step, body, parent_id = null, item_id = null, pin = null, edit = null, user, mins = 0 }) {
+  const c = { id: ++commentSeq, round: r.number, step, parent_id, item_id, user: userOf(user), body: body || '', pin, edit, created_at: minsAgo(mins), updated_at: minsAgo(mins), deleted: false };
   b.comments.push(c);
+  touch(b);
   return c;
 }
+/* the heartbeat's changed_at: the latest write to picks, comments or items */
+function touch(b) { b.changedAt = new Date().toISOString(); }
+
+/* ---------- items (item 11, 2-board-payload.md "Items") ---------- */
+let itemSeq = 0;
+const FILES = {};   // id → { name, type, buf }
+const UPLOADS = { max_kb: 20480, types: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt', 'zip'] };
+const KINDS = ['note', 'text', 'image', 'file', 'stroke', 'arrow', 'rect', 'ellipse'];
+function item(b, r, fields, user, mins = 0) {
+  const it = { id: ++itemSeq, round: r.number, step: fields.step, kind: fields.kind, user: userOf(user),
+    anchor: fields.anchor || { option: null, device: 'desktop', src: 'crop', on: false },
+    x: +fields.x || 0, y: +fields.y || 0, w: +fields.w || 0, h: +fields.h || 0, color: fields.color || null,
+    text: fields.text ?? null, points: fields.points || null, texts: fields.texts || null, file: fields.file || null,
+    created_at: minsAgo(mins), updated_at: minsAgo(mins), deleted: false };
+  b.items.push(it);
+  touch(b);
+  return it;
+}
+const fileUrl = (id, disposition) => { const exp = Math.floor(Date.now() / 1000) + TTL; return `${APP}/kradan/files/${id}/${exp}/${sign(`file${id}`, exp)}${disposition ? '?download=1' : ''}`; };
+function itemOut(it, b, me) {
+  const { deleted, file, ...rest } = it;
+  const out = { ...rest, mine: it.user.id === me, reply_count: b.comments.filter(c => c.item_id === it.id && !c.deleted).length };
+  if (file) { out.file = { name: file.name, type: file.type, size: file.size, url: fileUrl(file.id, !file.type.startsWith('image/')), thumb: file.type.startsWith('image/') ? fileUrl(file.id) : null }; }
+  return out;
+}
+/* just enough multipart: text fields (with a[b] brackets) and one file */
+function multipart(buf, type) {
+  const boundary = '--' + (type.match(/boundary=(?:"([^"]+)"|([^;]+))/) || [])[1 + (type.includes('boundary="') ? 0 : 1)];
+  const out = { fields: {}, file: null };
+  let at = buf.indexOf(boundary);
+  while (at !== -1) {
+    const next = buf.indexOf(boundary, at + boundary.length);
+    if (next === -1) { break; }
+    const part = buf.subarray(at + boundary.length + 2, next - 2);
+    const split = part.indexOf('\r\n\r\n');
+    const head = part.subarray(0, split).toString('utf8'), body = part.subarray(split + 4);
+    const name = head.match(/name="([^"]*)"/)?.[1], filename = head.match(/filename="([^"]*)"/)?.[1];
+    if (filename !== undefined) {
+      out.file = { name: filename, type: head.match(/Content-Type:\s*([^\r\n]+)/i)?.[1] || 'application/octet-stream', buf: Buffer.from(body) };
+    } else if (name) {
+      const keys = name.replace(/\]/g, '').split('[');
+      let o = out.fields;
+      keys.slice(0, -1).forEach(k => { o = (o[k] ||= {}); });
+      o[keys.at(-1)] = body.toString('utf8');
+    }
+    at = next;
+  }
+  return out;
+}
+const readRaw = req => new Promise(done => { const parts = []; req.on('data', c => parts.push(c)); req.on('end', () => done(Buffer.concat(parts))); });
 BOARDS.filter(b => b.status === 'open').slice(0, 3).forEach(seed);
 
 /* ---------- payloads (the shapes in board-payload.md) ---------- */
@@ -184,13 +237,14 @@ function boardPayload(b, me, number) {
   const live = b.comments.filter(c => c.round === cur.number && !c.deleted);
   const picks = Object.values(b.picks[cur.number] || {});
   const comments = live.filter(c => !c.parent_id).map(c => ({ ...commentOut(c, me), replies: live.filter(x => x.parent_id === c.id).map(x => commentOut(x, me)) }));
+  const items = b.items.filter(it => !it.deleted).map(it => itemOut(it, b, me));
   const people = new Map([...picks.map(p => [p.user.id, p.user]), ...live.map(c => [c.user.id, c.user])]);
   return {
     slug: b.slug, title: b.title, kind: b.kind, panel: b.panel, status: b.status, task_ref: b.task_ref,
     decided_at: b.decided_at, decided_by: b.decided_by, updated_at: b.rounds.at(-1).pushed_at, url: boardUrl(b),
     rounds: b.rounds.map(r => ({ number: r.number, title: r.title, pushed_at: r.pushed_at, steps: r.steps, prints: r.prints, base_url: baseUrl(r), readonly: r.number !== latest })),
     current: cur.number, latest, picks_locked: b.status !== 'open' || cur.number !== latest,
-    picks, comments,
+    picks, comments, items, uploads: UPLOADS, changed_at: b.changedAt,
     progress: [...people.values()].map(u => ({ user: u, answered: cur.steps.filter(s => picks.some(p => p.user.id === u.id && p.step === s.key) || live.some(c => c.user.id === u.id && c.step === s.key)).length, total: cur.steps.length })),
     viewers: viewersOf(b),
     seen_prints: b.viewers[me]?.seen_prints || null,
@@ -287,6 +341,7 @@ async function api(req, res, url, me) {
     if (r !== b.rounds.at(-1) || b.status !== 'open' || b.kind !== 'decision') { return sendJson(res, 409, { message: 'read only' }); }
     const body = await readBody(req);
     pick(b, r, step, me, Array.isArray(body?.options) ? body.options.map(String) : [], !!body?.seen);
+    touch(b);
     return sendJson(res, 200, { picks: Object.values(b.picks[r.number] || {}).filter(x => x.step === step) });
   }
   if ((m = p.match(/^boards\/([^/]+)\/rounds\/(\d+)\/comments$/)) && req.method === 'POST') {
@@ -296,17 +351,19 @@ async function api(req, res, url, me) {
     const body = await readBody(req);
     if (!body?.step || (!String(body.body || '').trim() && !body.edit)) { return sendJson(res, 422, { message: 'body required' }); }
     const parent = body.parent_id ? b.comments.find(c => c.id === +body.parent_id) : null;
-    const c = comment(b, r, { step: body.step, body: String(body.body || ''), parent_id: parent ? (parent.parent_id || parent.id) : null, pin: body.pin || null, edit: body.edit || null, user: me });
+    const c = comment(b, r, { step: body.step, body: String(body.body || ''), parent_id: parent ? (parent.parent_id || parent.id) : null, item_id: body.item_id ? +body.item_id : null, pin: body.pin || null, edit: body.edit || null, user: me });
     return sendJson(res, 201, { ...commentOut(c, me), replies: [] });
   }
   if ((m = p.match(/^comments\/(\d+)$/)) && (req.method === 'PATCH' || req.method === 'DELETE')) {
     const c = BOARDS.flatMap(b => b.comments).find(x => x.id === +m[1] && !x.deleted);
     if (!c) { return sendJson(res, 404, {}); }
     if (c.user.id !== me) { return sendJson(res, 403, { message: 'own comments only' }); }
-    if (req.method === 'DELETE') { c.deleted = true; return send(res, 204, ''); }
+    const owner = BOARDS.find(b => b.comments.includes(c));
+    if (req.method === 'DELETE') { c.deleted = true; touch(owner); return send(res, 204, ''); }
     const body = await readBody(req);
     c.body = String(body?.body || c.body);
     c.updated_at = new Date().toISOString();
+    touch(owner);
     return sendJson(res, 200, commentOut(c, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/heartbeat$/)) && req.method === 'POST') {
@@ -316,13 +373,55 @@ async function api(req, res, url, me) {
     const v = (b.viewers[me] ||= { seen_prints: {} });
     v.last_seen_at = new Date().toISOString();
     v.seen_prints = { ...(v.seen_prints || {}), ...(body?.prints_seen || {}) };
-    return sendJson(res, 200, { viewers: viewersOf(b) });
+    return sendJson(res, 200, { viewers: viewersOf(b), changed_at: b.changedAt });
   }
   if ((m = p.match(/^boards\/([^/]+)\/decide$/)) && req.method === 'POST') {
     const b = find(m[1]);
     if (!USERS[me].manage) { return sendJson(res, 403, {}); }
     Object.assign(b, { status: b.kind === 'flow' ? 'archived' : 'decided', decided_at: new Date().toISOString(), decided_by: userOf(me) });
     return sendJson(res, 200, boardPayload(b, me));
+  }
+  if ((m = p.match(/^boards\/([^/]+)\/items$/)) && req.method === 'POST') {
+    const b = find(m[1]);
+    if (!b) { return sendJson(res, 404, {}); }
+    const type = req.headers['content-type'] || '';
+    let fields, file = null;
+    if (type.startsWith('multipart/form-data')) {
+      const mp = multipart(await readRaw(req), type);
+      fields = mp.fields;
+      if (mp.file) {
+        if (mp.file.buf.length > UPLOADS.max_kb * 1024) { return sendJson(res, 422, { message: 'too big' }); }
+        if (!UPLOADS.types.includes(mp.file.name.split('.').pop().toLowerCase())) { return sendJson(res, 422, { message: 'type not allowed' }); }
+        const id = Object.keys(FILES).length + 1;
+        FILES[id] = mp.file;
+        file = { id, name: mp.file.name, type: mp.file.type, size: mp.file.buf.length };
+      }
+      if (fields.anchor) { fields.anchor.on = fields.anchor.on === '1' || fields.anchor.on === 'true'; if (fields.anchor.option === '') { fields.anchor.option = null; } }
+    } else {
+      fields = await readBody(req);
+    }
+    const r = b.rounds.find(x => x.number === +fields?.round) || b.rounds.at(-1);
+    if (!fields?.step || !KINDS.includes(fields.kind)) { return sendJson(res, 422, { message: 'step and kind required' }); }
+    if (['image', 'file'].includes(fields.kind) && !file) { return sendJson(res, 422, { message: 'file required' }); }
+    return sendJson(res, 201, itemOut(item(b, r, { ...fields, file }, me), b, me));
+  }
+  if ((m = p.match(/^items\/(\d+)$/)) && (req.method === 'PATCH' || req.method === 'DELETE')) {
+    const b = BOARDS.find(x => x.items.some(it => it.id === +m[1] && !it.deleted));
+    const it = b?.items.find(x => x.id === +m[1]);
+    if (!it) { return sendJson(res, 404, {}); }
+    if (req.method === 'DELETE') {
+      if (it.user.id !== me) { return sendJson(res, 403, { message: 'own items only' }); }
+      it.deleted = true; touch(b); return send(res, 204, '');
+    }
+    const body = await readBody(req) || {};
+    const own = it.user.id === me;
+    const authorOnly = ['text', 'color', 'points', 'texts'].filter(k => k in body);
+    if (authorOnly.length && !own) { return sendJson(res, 403, { message: 'only the author edits' }); }
+    ['x', 'y', 'w', 'h'].forEach(k => { if (k in body) { it[k] = +body[k]; } });
+    authorOnly.forEach(k => { it[k] = body[k]; });
+    it.updated_at = new Date().toISOString();
+    touch(b);
+    return sendJson(res, 200, itemOut(it, b, me));
   }
   if ((m = p.match(/^boards\/([^/]+)\/export\.md$/)) && req.method === 'GET') {
     const b = find(m[1]);
@@ -352,6 +451,19 @@ function exportMd(b, me) {
       else { lines.push(`   💬 ${c.user.name}: ${c.body}`); }
       c.replies.forEach(x => lines.push(`      ↳ ${x.user.name}: ${x.body}`));
     });
+    pl.items.filter(it => it.step === s.key).forEach(it => {
+      const where = it.anchor?.on ? ` (${[it.anchor.option, it.anchor.device].filter(Boolean).join(', ')})` : '';
+      const said = it.texts?.length ? `“${it.texts.join('”, “')}”` : '';
+      const line = {
+        note: `🗒 ${it.user.name}: ${it.text}`, text: `🗒 ${it.user.name}: ${it.text}`,
+        image: `🖼 ${it.user.name}: ${it.file?.name} (attachments/${b.slug}/${it.file?.name})`,
+        file: `📎 ${it.user.name}: ${it.file?.name} (attachments/${b.slug}/${it.file?.name})`,
+        arrow: `➚ ${it.user.name}${where} ชี้ที่ ${said}`, rect: `▭ ${it.user.name}${where} ตีกรอบ ${said}`,
+        ellipse: `◯ ${it.user.name}${where} วงไว้ ${said}`, stroke: `〰 ${it.user.name}${where} วาดเส้น`,
+      }[it.kind];
+      lines.push(`   ${line.trimEnd()}`);
+      pl.comments.filter(c => c.item_id === it.id).forEach(x => lines.push(`      ↳ ${x.user.name}: ${x.body}`));
+    });
   });
   return lines.join('\n') + '\n';
 }
@@ -372,6 +484,14 @@ async function app(req, res) {
     return jar.kradan_dev_session ? sendJson(res, 200, { user: userOf(jar.kradan_dev_session), secret: 'only with the session cookie' }) : sendJson(res, 401, { message: 'no session' });
   }
   if (url.pathname === '/dev/log') { return sendJson(res, 200, SECRET_LOG); }
+  const fm = url.pathname.match(/^\/kradan\/files\/(\d+)\/(\d+)\/([a-f0-9]+)$/);
+  if (fm) {
+    const f = FILES[fm[1]];
+    if (!f || fm[3] !== sign(`file${fm[1]}`, +fm[2]) || +fm[2] < Date.now() / 1000) { return send(res, 403, 'bad signature'); }
+    const inline = f.type.startsWith('image/') && !url.searchParams.has('download');
+    return send(res, 200, f.buf, { 'Content-Type': f.type, 'Content-Security-Policy': 'sandbox', 'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(f.name)}` });
+  }
   if (url.pathname.startsWith('/kradan/assets/')) {
     const file = path.join(ROOT, 'dist', path.basename(url.pathname));
     return exists(file) ? send(res, 200, fs.readFileSync(file), { 'Content-Type': TYPES[path.extname(file)] || 'text/plain' }) : send(res, 404, 'run npm run build');

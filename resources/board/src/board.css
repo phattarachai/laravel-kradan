@@ -271,6 +271,76 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
   .k-table th:nth-child(4), .k-table td:nth-child(4) { display: none; }
 }
 
+/* ---------- what people add (item 11): notes, text, images, files, drawings ---------- */
+.shots { position: relative; }
+.k-ilayer { position: absolute; left: 0; top: 0; width: 0; height: 0; overflow: visible; z-index: 3; }
+.k-flayer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+.k-flin { position: absolute; left: 0; top: 0; width: 100%; }
+.k-flin > *, .k-ilayer > * { pointer-events: auto; }
+.k-canvas.tool-note .k-item, .k-canvas.tool-pen .k-item, .k-canvas.tool-arrow .k-item, .k-canvas.tool-rect .k-item, .k-canvas.tool-ellipse .k-item, .k-canvas.tool-text .k-item, .k-canvas.tool-pin .k-item { pointer-events: none; }
+.k-canvas.tool-note iframe, .k-canvas.tool-text iframe, .k-canvas.tool-pen iframe, .k-canvas.tool-arrow iframe, .k-canvas.tool-rect iframe, .k-canvas.tool-ellipse iframe { pointer-events: none; }
+.k-canvas.tool-note, .k-canvas.tool-text { cursor: copy; }
+.k-canvas.tool-pen, .k-canvas.tool-arrow, .k-canvas.tool-rect, .k-canvas.tool-ellipse, .k-canvas.tool-pen .vp, .k-canvas.tool-arrow .vp, .k-canvas.tool-rect .vp, .k-canvas.tool-ellipse .vp { cursor: crosshair; }
+.k-item { position: absolute; cursor: default; }
+.k-canvas.tool-hand .k-item, .k-canvas.tool-use .k-item { cursor: move; }
+.k-item.pending { opacity: .85; }
+.k-item.sel:not(svg) { outline: 2px solid #1c7ed6; outline-offset: 2px; }
+svg.k-item { overflow: visible; }
+svg.k-item.sel { outline: 1.5px dashed #1c7ed6; outline-offset: -2px; }
+.k-preview { position: absolute; overflow: visible; pointer-events: none; }
+.k-i-note { padding: 12px 12px 28px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 14px rgba(0,0,0,.08); font-size: 14px; line-height: 1.5; color: #1d2127; }
+.k-i-note .tx, .k-i-text .tx { white-space: pre-wrap; overflow-wrap: anywhere; outline: 0; min-height: 1.5em; }
+.k-i-note .by { position: absolute; left: 12px; bottom: 8px; font-size: 11px; color: rgba(0,0,0,.45); }
+.k-i-note .rz { position: absolute; right: -5px; bottom: -5px; width: 10px; height: 10px; background: #fff; border: 1.5px solid #1c7ed6; border-radius: 2px; cursor: nwse-resize; }
+.k-i-text { font-size: 18px; font-weight: 500; white-space: nowrap; padding: 2px 4px; min-width: 40px; }
+.k-i-image { background: #fff; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1), 0 6px 16px rgba(0,0,0,.08); }
+.k-i-image img { display: block; width: 100%; height: auto; pointer-events: none; }
+.k-i-image .ph { height: 140px; background: #eef2f7; }
+.k-i-image .cap { display: flex; justify-content: space-between; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--mute); }
+.k-i-image .cap span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-i-file { width: 250px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.06); padding: 10px 12px; display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 2px 10px; align-items: center; }
+.k-i-file .ic { grid-row: span 2; width: 38px; height: 44px; border-radius: 6px; background: #495057; color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
+.k-i-file .ic[data-ext="PDF"] { background: #e03131; }
+.k-i-file .ic[data-ext="XLSX"], .k-i-file .ic[data-ext="CSV"] { background: #2f9e44; }
+.k-i-file .ic[data-ext="DOCX"] { background: #1c7ed6; }
+.k-i-file .nm { font-weight: 500; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-i-file .mt { font-size: 12px; color: var(--mute); }
+.k-i-file .mt a, .k-ibar a, .k-irow a, .k-icm a { color: var(--ink); text-decoration: underline; }
+.k-item .prog { grid-column: 1 / 3; height: 4px; background: #eef0f2; border-radius: 2px; overflow: hidden; margin: 6px 0 0; }
+.k-i-image .prog { margin: 0; border-radius: 0; }
+.k-item .prog i { display: block; height: 100%; background: var(--ink); transition: width .2s; }
+.k-canvas.dropping::after { content: attr(data-drop); position: absolute; inset: 12px; border: 2px dashed #1c7ed6; border-radius: 14px; background: rgba(28,126,214,.06); pointer-events: none; z-index: 30; }
+.k-ibar { position: fixed; z-index: 60; display: flex; align-items: center; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.12); padding: 4px 6px; font-size: 12px; }
+.k-ibar button, .k-ibar a { border: 0; background: none; padding: 3px 8px; border-radius: 6px; font-size: 12px; }
+.k-ibar button:hover { background: var(--soft); }
+.k-ibar .note { color: var(--mute); padding: 0 6px; }
+.k-ibar .vr { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+.sw { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); padding: 0; flex: none; }
+.sw.on { box-shadow: 0 0 0 2px var(--ink); }
+.k-itip { position: fixed; z-index: 95; background: var(--ink); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.k-tsep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; align-self: center; }
+.k-colorb .k-dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,.15); }
+.k-colors { min-width: 0; padding: 6px; }
+.k-colors .row { display: flex; gap: 6px; padding: 4px; }
+.k-colors .sw { width: 22px; height: 22px; border-radius: 50%; display: block; }
+.k-colors button:hover { background: none; }
+.k-ptabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: -16px -16px 0; padding: 0 12px; position: sticky; top: -16px; background: var(--panel); z-index: 1; }
+.k-ptabs button { border: 0; background: none; padding: 10px 10px 8px; color: var(--mute); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.k-ptabs button[aria-pressed="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 500; }
+.k-ilist { display: flex; flex-direction: column; gap: 4px; }
+.k-irow { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 2px 10px; padding: 6px; margin: 0 -6px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+.k-irow:hover { background: var(--soft); }
+.k-irow .ic, .k-i-ic { width: 28px; height: 28px; border-radius: 6px; background: var(--soft); display: grid; place-items: center; grid-row: span 2; }
+.k-i-ic { display: inline; background: none; }
+.k-irow .ic.k-i-ic-note, .k-irow .ic.k-i-ic-text { background: #fff3bf; }
+.k-irow .h { font-size: 12px; color: var(--mute); }
+.k-irow .h b { color: var(--ink); font-weight: 500; }
+.k-irow .b { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
+.k-irow .th, .k-icm .th { grid-column: 2; max-width: 180px; max-height: 110px; border-radius: 6px; object-fit: cover; display: block; }
+.k-icm { cursor: pointer; }
+.k-icm:hover > .b { text-decoration: underline; text-decoration-color: var(--line); }
+.k-tools { gap: 2px; align-items: center; }
+
 /* ---------- Kradan's look: กระดานเขียว (owner's pick B, design round 3, 2026-10-27) ----------
    --brand is the app's accent (config kradan.brand.accent), kept for the workspace badge; Kradan picks with its
    own green. */
@@ -310,3 +380,5 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .vp:not(.phone):not(.tablet) { border-color: #cfd8d1; border-radius: 8px; box-shadow: 0 1px 2px rgba(31,58,51,.08), 0 12px 32px rgba(31,58,51,.08); }
 .k-primary, .k-primary:hover { background: var(--k-accent); border-color: var(--k-accent); }
 .k-index .k-bar .k-av { border-color: var(--chrome); }
+.k-tools .k-tsep { background: var(--chrome-line); }
+.k-canvas.dropping::after { display: grid; place-items: center; color: #1c7ed6; font-weight: 500; font-size: 15px; }

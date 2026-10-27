@@ -50,7 +50,7 @@ export function avatarRow(viewers, opts = {}) {
  * Keeps the viewers list fresh. `onChange(viewers, online)` runs after every heartbeat and channel event.
  * `seen()` returns the prints to report with the next beat (and clears them).
  */
-export function startPresence({ boot, api, slug, round, onChange, seen }) {
+export function startPresence({ boot, api, slug, round, onChange, onBeat, seen }) {
   const state = { viewers: [], online: new Set(), echo: null, timer: null };
   const changed = () => onChange?.(state.viewers, state.online);
 
@@ -60,6 +60,7 @@ export function startPresence({ boot, api, slug, round, onChange, seen }) {
     try {
       const r = await api.heartbeat(slug, round, prints && Object.keys(prints).length ? prints : null);
       if (Array.isArray(r?.viewers)) { state.viewers = r.viewers; changed(); }
+      onBeat?.(r || {});
     } catch { /* next beat */ }
   }
 

@@ -271,7 +271,7 @@ export function createAgent({ win, doc, parentOrigin }) {
     return false;
   }
   const inField = t => !!t?.closest?.('input, textarea, select, [contenteditable="true"]');
-  const TOOL_KEYS = ['Space', 'KeyH', 'KeyV', 'KeyR', 'KeyE', 'KeyC', 'KeyM', 'Escape'];
+  const TOOL_KEYS = ['Space', 'KeyH', 'KeyV', 'KeyE', 'KeyC', 'KeyN', 'KeyT', 'KeyP', 'KeyA', 'KeyR', 'KeyO', 'KeyM', 'Escape'];
 
   function listen() {
     win.addEventListener('message', onMessage);

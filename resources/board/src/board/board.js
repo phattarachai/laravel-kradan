@@ -11,6 +11,7 @@ import { createApi } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
 import { corner } from './icon.js';
+import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -19,7 +20,10 @@ const DEV = {
   phone: { w: 390, h: 844, icon: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>' },
 };
 const DEV_ORDER = ['desktop', 'laptop', 'tablet', 'phone'];
-const TOOLS = ['hand', 'use', 'box', 'edit', 'pin'];
+/* toolbar A (owner's pick, item 11): look, then mark the screens, then add to the board */
+const TOOLS = ['hand', 'use', 'pin', 'edit', ...DRAW_TOOLS];
+const TOOL_KEYS = { hand: 'H', use: 'V', pin: 'C', edit: 'E', note: 'N', text: 'T', pen: 'P', arrow: 'A', rect: 'R', ellipse: 'O' };
+const VIEW_TOOLS = ['hand', 'use'];
 const devName = d => (d === 'custom' ? t('width') : t(`dev_${d}`));
 
 const IC = {
@@ -37,7 +41,12 @@ const IC = {
   copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/>',
   hand: '<path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12"/><path d="M11 11.5V4a1.5 1.5 0 0 1 3 0v7.5"/><path d="M14 11.5V5.5a1.5 1.5 0 0 1 3 0V14"/><path d="M8 12.5 6.6 11a1.6 1.6 0 0 0-2.4 2.1L8 18.5A5 5 0 0 0 12 21h1a5 5 0 0 0 5-5v-4.5a1.5 1.5 0 0 0-3 0"/>',
   use: '<path d="M5 3l14 7-6 2-2 6z"/>',
-  box: '<rect x="4" y="5" width="16" height="14" rx="1.5" stroke-dasharray="3 2.4"/>',
+  note: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
+  text: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+  pen: '<path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 7l3 3"/>',
+  arrow: '<path d="M5 19L19 5M10 5h9v9"/>',
+  rect: '<rect x="4" y="6" width="16" height="12" rx="1.5"/>',
+  ellipse: '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>',
   edit: '<path d="M4 7V5h11v2M9.5 5v14M7 19h5"/><path d="M15 15l4-4 2 2-4 4h-2z"/>',
   pin: '<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
 };
@@ -68,6 +77,7 @@ export function mountBoard(boot, root) {
     side: Q.get('side') !== 'off',
     panel: Q.get('panel') !== 'off',
     tool: TOOLS.includes(Q.get('tool')) ? Q.get('tool') : 'hand',
+    ptab: Q.get('tab') === 'items' ? 'items' : 'step',
     mini: Q.get('mini') !== 'off',
   };
   const view = { x: 32, y: 32, z: 1 };
@@ -114,7 +124,8 @@ export function mountBoard(boot, root) {
   const myPick = key => picksFor(key).find(p => isMe(p.user));
   const myKeys = key => myPick(key)?.options || [];
   const mySeen = key => !!myPick(key)?.seen;
-  const threads = key => COMMENTS.filter(c => c.step === key);
+  /* comment threads of a step; replies to an item (item_id) belong to that item */
+  const threads = key => COMMENTS.filter(c => c.step === key && !c.item_id);
   const pinned = key => threads(key).filter(c => c.pin && !c.edit);
   const edits = key => threads(key).filter(c => c.edit);
   const pinNo = c => pinned(c.step).indexOf(c) + 1;
@@ -162,6 +173,7 @@ export function mountBoard(boot, root) {
       if (!ui.mini) { p.set('mini', 'off'); }
       if (!ui.side) { p.set('side', 'off'); }
       if (!ui.panel) { p.set('panel', 'off'); }
+      if (ui.ptab === 'items') { p.set('tab', 'items'); }
       history.replaceState(null, '', '?' + p.toString());
     }, 150);
   }
@@ -192,7 +204,7 @@ export function mountBoard(boot, root) {
       ${ib('data-act="copy"', 'copy', t('copy'), true)}
     </header>
     <nav class="k-side" id="side"></nav>
-    <main class="k-canvas" id="canvas"></main>
+    <main class="k-canvas" id="canvas" data-drop="${esc(t('drop_here'))}"></main>
     <aside class="k-panel" id="panel"></aside>
   </div>`;
 
@@ -246,6 +258,8 @@ export function mountBoard(boot, root) {
     if (type === 'scrolled') {
       f.scrollY = +d.y || 0;
       renderPins();
+      const fl = $('.k-flin', f.fig);
+      if (fl) { fl.style.transform = `translateY(${-f.scrollY}px)`; }
       if (ui.sync && !d.mirrored && !f.crop) { peers(f).forEach(p => bridge.tell(p.ifr.contentWindow, 'scroll', { ratio: d.ratio })); }
       return;
     }
@@ -364,7 +378,7 @@ export function mountBoard(boot, root) {
       const read = ps.filter(p => p.seen).length;
       ans = read ? `${t('read')} ${read}` : '';
     }
-    const cm = threads(s.key).length;
+    const cm = threads(s.key).length + (items?.forStep(s.key).length || 0);
     ans = [ans, cm ? t('comments_n', { n: cm }) : ''].filter(Boolean).join(' · ') || (DECISION() ? (s.pickable ? t('not_picked') : t('not_read')) : '');
     return looked.upd.has(n) ? `<span class="k-upd">${isNew(s) ? t('new_step') : t('updated')}</span>${ans ? ' · ' + ans : ''}` : ans;
   }
@@ -399,7 +413,19 @@ export function mountBoard(boot, root) {
     const keys = myKeys(key);
     const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
-    $('#panel').innerHTML = `
+    const added = items.forStep(key);
+    const tabs = `<div class="k-ptabs"><button data-ptab="step" aria-pressed="${ui.ptab !== 'items'}">${t('tab_step')}</button><button data-ptab="items" aria-pressed="${ui.ptab === 'items'}">${t('tab_items')}${added.length ? ` <span class="tnum">${added.length}</span>` : ''}</button></div>`;
+    if (ui.ptab === 'items') {
+      $('#panel').innerHTML = `${tabs}${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}<h2>${esc(st.title)}</h2>${items.tabHtml(key)}`;
+      $('#panel').scrollTop = scroll;
+      renderThread();
+      return;
+    }
+    /* comments and what people added, one thread by time (owner's pick C) */
+    const entries = [...threads(key).map(c => ({ at: c.created_at, html: commentHtml(c, true) })),
+      ...added.filter(it => !it.draft).map(it => ({ at: it.created_at, html: items.threadEntry(it, COMMENTS, commentHtml, composer) }))]
+      .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+    $('#panel').innerHTML = `${tabs}
       ${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}
       <h2>${esc(st.title)}</h2>
       ${looked.upd.has(n) ? `<div class="k-sub k-upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
@@ -410,8 +436,8 @@ export function mountBoard(boot, root) {
           <span class="lb">${esc(o.key)} ${esc(o.label)}</span>${pickers(key, o.key)}${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}</label>`).join('')}</div>` : ''}
       ${DECISION() ? `<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>` : ''}
       ${DECISION() ? '<div class="k-hr"></div>' : ''}
-      <div class="k-lab">${threads(key).length ? esc(t('comments_n', { n: threads(key).length })) : esc(t('no_comments'))}</div>
-      <div class="k-thread">${threads(key).map(c => commentHtml(c, true)).join('')}</div>
+      <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
+      <div class="k-thread">${entries.map(x => x.html).join('')}</div>
       ${CAN_WRITE() ? composer('') : ''}`;
     $('#panel').scrollTop = scroll;
     renderThread();
@@ -444,7 +470,7 @@ export function mountBoard(boot, root) {
     const groups = plan();
     cv.innerHTML = `<div class="k-board" id="board">${groups.map((g, gi) => groupHtml(st, g, gi)).join('')}</div>
       <div class="k-hint">${t('hint')}</div>
-      <div class="k-tools" id="tools">${TOOLS.filter(k => CAN_WRITE() || k === 'hand' || k === 'use').map(k => `<button class="k-ib" data-tool="${k}" data-tip="${esc(t(`tool_${k}`))} (${({ hand: 'H', use: 'V', box: 'R', edit: 'E', pin: 'C' })[k]})">${svg(k)}</button>`).join('')}</div>
+      <div class="k-tools" id="tools">${toolbar()}</div>
       <div class="k-mini ${ui.mini ? '' : 'off'}" id="mini"><div class="k-mini-in"></div></div>`;
     setTool(CAN_WRITE() || ['hand', 'use'].includes(ui.tool) ? ui.tool : 'hand');
     frames = [];
@@ -464,7 +490,43 @@ export function mountBoard(boot, root) {
     sizeFrames();
     userMoved = false;
     if (ui.zoom === 'fit') { fit(); } else { view.z = clamp(+ui.zoom / 100 || 1, 0.05, 4); view.x = 32; view.y = 32; applyView(); }
+    items.render();
+    paintColor();
   }
+  /* มือจับ กดในจอ | ปักโน้ต แก้คำ | โน้ต ข้อความ ปากกา ลูกศร สี่เหลี่ยม วงรี | สี */
+  function toolbar() {
+    const btn = k => `<button class="k-ib" data-tool="${k}" data-tip="${esc(t(`tool_${k}`))} (${TOOL_KEYS[k]})">${svg(k)}</button>`;
+    const sep = '<span class="k-tsep"></span>';
+    if (!CAN_WRITE()) { return VIEW_TOOLS.map(btn).join(''); }
+    return [VIEW_TOOLS, ['pin', 'edit'], DRAW_TOOLS].map(g => g.map(btn).join('')).join(sep)
+      + `${sep}<button class="k-ib k-colorb" data-act="colors" data-tip="${esc(t('colour'))}"><span class="k-dot" id="colordot"></span></button>`;
+  }
+  function paintColor() {
+    const dot = $('#colordot');
+    if (!dot || !items) { return; }
+    dot.style.background = ui.tool === 'note' ? STICKIES[items.state.noteColor] : STROKES[items.state.color];
+  }
+  function openColors(anchor) {
+    closeCtx();
+    const el = document.createElement('div');
+    el.className = 'k-ctx k-colors';
+    const row = (pal, cur, attr) => `<div class="row">${Object.entries(pal).map(([k, c]) => `<button class="sw ${k === cur ? 'on' : ''}" ${attr}="${k}" style="background:${c}" aria-label="${k}"></button>`).join('')}</div>`;
+    el.innerHTML = row(STROKES, items.state.color, 'data-stroke') + row(STICKIES, items.state.noteColor, 'data-sticky');
+    document.body.appendChild(el);
+    const b = anchor.getBoundingClientRect();
+    el.style.left = Math.min(b.left - 40, innerWidth - el.offsetWidth - 8) + 'px';
+    el.style.top = b.top - el.offsetHeight - 8 + 'px';
+    ctx = el;
+    el.addEventListener('click', e => {
+      const x = e.target.closest('button');
+      if (!x) { return; }
+      if (x.dataset.stroke) { items.state.color = x.dataset.stroke; if (ui.tool === 'note' || !DRAW_TOOLS.includes(ui.tool)) { setTool('pen'); } }
+      if (x.dataset.sticky) { items.state.noteColor = x.dataset.sticky; setTool('note'); }
+      closeCtx();
+      paintColor();
+    });
+  }
+
   function groupHtml(st, g, gi) {
     const picked = st.pickable && myKeys(st.key).includes(g.opt.key);
     const head = (ui.mode === 'options' && st.pickable)
@@ -474,9 +536,9 @@ export function mountBoard(boot, root) {
       : (g.shotCap ? `<div class="grp-h"><span class="lbl">${esc(g.shotCap)}</span></div>` : '');
     const cells = g.cells.map((c, ci) => `<figure class="k-fr" data-g="${gi}" data-c="${ci}">
         <figcaption><span class="cap">${esc(ui.mode === 'sizes' ? '' : c.shot.cap)}</span><span class="dim tnum"></span></figcaption>
-        <div class="vp ${c.shot.crop ? 'crop' : c.dev}"><div class="scr"><div class="pinlayer"></div></div>${ui.mode === 'real' ? `<div class="handle" data-tip="${esc(t('drag_width'))}"></div>` : ''}</div>
+        <div class="vp ${c.shot.crop ? 'crop' : c.dev}"><div class="scr"><div class="k-flayer"><div class="k-flin"></div></div><div class="pinlayer"></div></div>${ui.mode === 'real' ? `<div class="handle" data-tip="${esc(t('drag_width'))}"></div>` : ''}</div>
       </figure>`).join('');
-    return `<section class="grp ${picked ? 'picked' : ''}" data-key="${esc(g.opt.key)}">${head}<div class="shots">${cells}</div></section>`;
+    return `<section class="grp ${picked ? 'picked' : ''}" data-key="${esc(g.opt.key)}">${head}<div class="shots">${cells}<div class="k-ilayer" data-opt="${esc(g.opt.key)}"></div></div></section>`;
   }
   /* a pick only changes marks; the canvas, its frames and the view stay as they are */
   function refreshPicks() {
@@ -633,32 +695,6 @@ export function mountBoard(boot, root) {
     const hit = await bridge.ask(f.ifr.contentWindow, 'hit', docPoint(f, x, y));
     openPop({ option: f.opt.key || null, device: f.cell.dev, src: frameSrc(f), x: Math.round(x), y: Math.round(y + (f.crop ? 0 : f.scrollY)), text: hit?.text || '', box: null }, ev);
   }
-  function drawBox(f, ev) {
-    if (!CAN_WRITE()) { return; }
-    closePop(true);
-    const start = framePoint(f, ev), layer = $('.pinlayer', f.fig);
-    const mark = document.createElement('span');
-    mark.className = 'boxmark';
-    layer.appendChild(mark);
-    let b = { x: start.x, y: start.y, w: 0, h: 0 };
-    const move = e => {
-      const p = framePoint(f, e);
-      b = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
-      Object.assign(mark.style, { left: b.x + 'px', top: b.y + 'px', width: b.w + 'px', height: b.h + 'px' });
-    };
-    const up = async e => {
-      removeEventListener('pointermove', move);
-      removeEventListener('pointerup', up);
-      if (b.w < 6 || b.h < 6) { mark.remove(); return; }
-      const o = docPoint(f, b.x, b.y);
-      const r = await bridge.ask(f.ifr.contentWindow, 'box', { rect: { x: o.x, y: o.y, w: b.w, h: b.h } });
-      mark.remove();
-      const texts = r?.texts || [];
-      openPop({ option: f.opt.key || null, device: f.cell.dev, src: frameSrc(f), x: Math.round(b.x), y: Math.round(b.y + (f.crop ? 0 : f.scrollY)), text: texts.slice(0, 3).join('”, “'), box: { w: Math.round(b.w), h: Math.round(b.h), texts } }, e);
-    };
-    addEventListener('pointermove', move);
-    addEventListener('pointerup', up);
-  }
   function openPop(pin, ev) {
     const el = document.createElement('div');
     el.className = 'k-pop';
@@ -730,7 +766,7 @@ export function mountBoard(boot, root) {
     try {
       const res = await api.comment(B.slug, R.number, body);
       const c = res?.comment ?? res;
-      if (body.parent_id) {
+      if (body.parent_id && !body.item_id) {
         const top = COMMENTS.find(x => x.id === body.parent_id);
         if (top) { top.replies = [...(top.replies || []), c]; }
       } else {
@@ -763,9 +799,10 @@ export function mountBoard(boot, root) {
     const same = fresh.rounds.find(r => r.number === R.number);
     $('#freshb').hidden = !(latest.number !== LATEST() || JSON.stringify(same?.prints || {}) !== JSON.stringify(R.prints || {}));
     const typing = document.activeElement?.closest?.('.k-panel textarea, .k-pop');
-    const changed = JSON.stringify([fresh.picks, fresh.comments]) !== JSON.stringify([PICKS, COMMENTS]);
-    B = { ...B, status: fresh.status, decided_at: fresh.decided_at, decided_by: fresh.decided_by, picks_locked: fresh.picks_locked };
+    const changed = JSON.stringify([fresh.picks, fresh.comments, fresh.items]) !== JSON.stringify([PICKS, COMMENTS, items.all().filter(x => !x.pending && !x.draft)]);
+    B = { ...B, status: fresh.status, decided_at: fresh.decided_at, decided_by: fresh.decided_by, picks_locked: fresh.picks_locked, uploads: fresh.uploads ?? B.uploads };
     if (!changed) { return; }
+    items.merge(fresh.items || []);
     PICKS = fresh.picks || [];
     COMMENTS = fresh.comments || [];
     renderSide();
@@ -799,8 +836,8 @@ export function mountBoard(boot, root) {
       st.pickable && key && CAN_PICK() ? item('pick', picked ? t('unpick', { k: key }) : t('pick_k', { k: key })) : '',
       '<hr>',
     ].join('') : '';
-    const tools = [['hand', 'H'], ['use', 'V'], ['box', 'R'], ['edit', 'E'], ['pin', 'C']].filter(([k]) => CAN_WRITE() || k === 'hand' || k === 'use')
-      .map(([k, kb]) => item(`tool:${k}`, t(`tool_${k}`), kb, { check: ui.tool === k, ic: icon(k) })).join('');
+    const tools = TOOLS.filter(k => CAN_WRITE() || VIEW_TOOLS.includes(k))
+      .map(k => item(`tool:${k}`, t(`tool_${k}`), TOOL_KEYS[k], { check: ui.tool === k, ic: icon(k) })).join('');
     const el = document.createElement('div');
     el.className = 'k-ctx';
     el.innerHTML = here + tools + '<hr>'
@@ -909,20 +946,22 @@ export function mountBoard(boot, root) {
   /* ---------- tools, minimap, zoom-to ---------- */
   function go(n) { lookAt(ui.step); ui.step = clamp(n, 1, STEPS.length); ui.opt = ''; render(); lookAt(ui.step); }
   function toolKey(code) {
-    const tool = { KeyH: 'hand', KeyV: 'use', KeyC: 'pin', KeyR: 'box', KeyE: 'edit' }[code];
+    const tool = TOOLS.find(k => `Key${TOOL_KEYS[k]}` === code);
     if (tool) { setTool(tool); writeUrl(); return true; }
     if (code === 'KeyM') { toggleMini(); return true; }
     return false;
   }
   function spacePan(on) { $('#canvas').classList.toggle('spacepan', on); }
   function setTool(tool) {
-    if (!CAN_WRITE() && !['hand', 'use'].includes(tool)) { tool = 'hand'; }
+    if (!CAN_WRITE() && !VIEW_TOOLS.includes(tool)) { tool = 'hand'; }
     ui.tool = tool;
     const cv = $('#canvas');
     TOOLS.forEach(k => cv.classList.toggle(`tool-${k}`, k === tool));
     if (tool !== 'edit') { endEdit(true); }
     $$('#tools button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === tool));
-    if (tool !== 'pin' && tool !== 'box') { closePop(false); }
+    if (tool !== 'pin') { closePop(false); }
+    if (!VIEW_TOOLS.includes(tool)) { items?.deselect(); }
+    paintColor();
   }
   function toggleMini() {
     ui.mini = !ui.mini;
@@ -981,7 +1020,7 @@ export function mountBoard(boot, root) {
 
   /* ---------- events ---------- */
   document.addEventListener('click', e => {
-    const t0 = e.target.closest('button, a, .pinlayer, .pinmark, .boxmark');
+    const t0 = e.target.closest('button, a, .pinlayer, .pinmark, .boxmark, [data-goitem]');
     if (!t0) { return; }
     if (t0.matches('.pinmark, .boxmark') && t0.dataset.pin) { openThread(+t0.dataset.pin, t0); focusComment(t0.dataset.pin, false); return; }
     if (t0.classList.contains('pinlayer')) {
@@ -991,6 +1030,8 @@ export function mountBoard(boot, root) {
       return;
     }
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
+    if (items.click(e)) { return; }
+    if (t0.dataset.ptab) { ui.ptab = t0.dataset.ptab; writeUrl(); renderPanel(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -1031,6 +1072,7 @@ export function mountBoard(boot, root) {
     if (act === 'side') { ui.side = !ui.side; $('#app').classList.toggle('noside', !ui.side); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'panel') { ui.panel = !ui.panel; $('#app').classList.toggle('nopanel', !ui.panel); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'copy') { openCopy(); }
+    if (act === 'colors') { openColors(t0); }
     if (act === 'rounds') { openRounds(t0); }
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
@@ -1043,13 +1085,16 @@ export function mountBoard(boot, root) {
     if (!text) { return; }
     ta.disabled = true;
     if (form.dataset.editform) { await patchComment(+form.dataset.editform, text); return; }
-    const parent = form.dataset.compose ? +form.dataset.compose : null;
-    const c = await postComment({ step: step().key, body: text, ...(parent ? { parent_id: parent } : {}) });
+    /* "item:12" is a reply to an item (its comments carry item_id), a number a reply to a comment */
+    const to = form.dataset.compose || '';
+    const parent = /^\d+$/.test(to) ? +to : null, itemId = to.startsWith('item:') ? +to.slice(5) : null;
+    const c = await postComment({ step: step().key, body: text, ...(parent ? { parent_id: parent } : {}), ...(itemId ? { item_id: itemId } : {}) });
     if (!c) { ta.disabled = false; }
   });
   document.addEventListener('keydown', e => {
     if (e.target.closest?.('.k-compose textarea') && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.target.form?.requestSubmit(); return; }
-    if (e.target.closest?.('textarea, input')) { return; }
+    if (e.target.closest?.('textarea, input, [contenteditable="true"], [contenteditable="plaintext-only"]')) { return; }
+    if (items.keyDown(e)) { return; }
     if (e.code === 'Space') { e.preventDefault(); spacePan(true); return; }
     if (!e.metaKey && !e.ctrlKey && !e.altKey && toolKey(e.code)) { return; }
     if (e.key === 'ArrowRight') { go(ui.step + 1); }
@@ -1083,13 +1128,7 @@ export function mountBoard(boot, root) {
   document.addEventListener('pointerdown', e => {
     if (pop && !e.target.closest('.k-pop') && !e.target.closest('.pinlayer')) { closePop(true); }
     if (threadPop && !e.target.closest('.k-tpop, .pinmark, .boxmark')) { closeThread(); }
-    const layer = e.target.closest('.pinlayer');
-    if (layer && ui.tool === 'box' && e.button === 0 && !e.target.closest('.pinmark, .boxmark[data-pin]')) {
-      e.preventDefault();
-      const f = frames.find(x => x.fig.contains(layer));
-      if (f) { drawBox(f, e); }
-      return;
-    }
+    if (items.pointerDown(e)) { return; }
     const cv = $('#canvas');
     const h = e.target.closest('.handle');
     if (h) {
@@ -1111,7 +1150,7 @@ export function mountBoard(boot, root) {
       addEventListener('pointerup', up);
       return;
     }
-    if (!e.target.closest('#canvas') || e.target.closest('button, .pinlayer, .pinmark, .boxmark, .handle, .k-tools')) { return; }
+    if (!e.target.closest('#canvas') || e.target.closest('button, .pinlayer, .pinmark, .boxmark, .handle, .k-tools, [data-item]')) { return; }
     const onBackground = e.target === cv || e.target.id === 'board' || e.target.matches('.grp, .shots, .k-hint');
     const handy = cv.classList.contains('tool-hand') || cv.classList.contains('spacepan');
     if (!(handy || onBackground || e.button === 1)) { return; }
@@ -1125,6 +1164,7 @@ export function mountBoard(boot, root) {
   });
   addEventListener('resize', () => (ui.zoom === 'fit' ? fit() : applyView()));
   document.addEventListener('dblclick', e => {
+    if (items.dblclick(e)) { return; }
     const vp = e.target.closest('#canvas .vp');
     if (vp && !e.target.closest('.pinlayer, .handle')) { zoomTo(vp); }
   });
@@ -1138,10 +1178,26 @@ export function mountBoard(boot, root) {
 
   /* ---------- presence ---------- */
   let presence = null;
+  let lastChanged = B.changed_at || null;
   function renderAvatars(viewers, online) {
     $('#avs').innerHTML = avatarRow(viewers, { me: ME.id, online });
     if (!DECISION()) { renderSide(); }
   }
+
+  /* ---------- what people add to the board (item 11) ---------- */
+  function centerOn(el) {
+    const cv = $('#canvas').getBoundingClientRect(), r = el.getBoundingClientRect();
+    view.x += cv.left + cv.width / 2 - (r.left + r.width / 2);
+    view.y += cv.top + cv.height / 2 - (r.top + r.height / 2);
+    userMoved = true;
+    applyView();
+    items.renderSelection();
+  }
+  const items = createItems({
+    api, bridge, ME, view, frameSrc, docPoint,
+    board: () => B, round: () => R, step, frames: () => frames, tool: () => ui.tool, canWrite: CAN_WRITE, centerOn,
+    onChange: () => { renderSide(); if (!document.activeElement?.closest?.('.k-panel textarea')) { renderPanel(); } },
+  });
 
   /* ---------- start ---------- */
   STEPS = stepsFrom(R.steps || [], null);
@@ -1159,9 +1215,14 @@ export function mountBoard(boot, root) {
       boot, api, slug: B.slug, round: R.number,
       onChange: renderAvatars,
       seen: () => { const p = looked.pending; looked.pending = {}; return p; },
+      /* live refresh: the heartbeat's changed_at moving on means someone wrote; a server without it is polled */
+      onBeat: r => {
+        if (!r.changed_at) { refresh(); return; }
+        if (lastChanged && r.changed_at > lastChanged) { refresh(); }
+        lastChanged = r.changed_at;
+      },
     });
     presence.start(B.viewers || []);
-    setInterval(refresh, 30 * 1000);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); } });
   });
 }
