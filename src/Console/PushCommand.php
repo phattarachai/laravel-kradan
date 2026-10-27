@@ -15,10 +15,11 @@ use ZipArchive;
 final class PushCommand extends Command
 {
     protected $signature = 'kradan:push
-        {dir : the design folder, e.g. public/design/<slug>}
+        {dir : the folder to push: a design page (index.html) or markdown (index.md)}
         {--slug= : the board slug (default: the folder name)}
-        {--kind= : decision or flow (default: the board\'s current kind, or decision)}
+        {--kind= : decision or flow (default: the board\'s current kind; a new board is a flow when markdown, else a decision)}
         {--task= : a task reference shown with the title, e.g. T188}
+        {--title= : the round title of a markdown folder whose index.md has no # heading}
         {--dry-run : list what would be pushed without sending it}';
 
     protected $description = 'Push a design folder to the Kradan server as a board round';
@@ -27,15 +28,15 @@ final class PushCommand extends Command
     {
         $dir = rtrim((string) $this->argument('dir'), '/');
 
-        if (! File::isFile("{$dir}/index.html")) {
-            $this->components->error("{$dir}/index.html not found.");
+        if (! File::isFile("{$dir}/index.html") && ! File::isFile("{$dir}/index.md")) {
+            $this->components->error("{$dir} has no index.html or index.md.");
 
             return self::FAILURE;
         }
 
         $slug = (string) ($this->option('slug') ?: basename($dir));
         $zip = $this->zip($dir);
-        $bundle = Bundle::fromZip($zip);
+        $bundle = Bundle::fromZip($zip)->withPage((string) ($this->option('title') ?: $slug));
         $parsed = $parser->parse((string) $bundle->get('index.html'), $bundle->get(...));
 
         $this->components->twoColumnDetail('board', $slug);
@@ -48,7 +49,7 @@ final class PushCommand extends Command
             return self::SUCCESS;
         }
 
-        $result = $remote->push($zip, $slug, $this->option('kind'), $this->option('task'));
+        $result = $remote->push($zip, $slug, $this->option('kind'), $this->option('task'), $this->option('title'));
         File::delete($zip);
 
         $this->components->info(($result['created'] ? 'New round ' : 'Updated round ')."{$result['round']}: {$result['board_url']}");

@@ -1,7 +1,7 @@
 ---
 name: kradan
-description: "Share a finished public/design/<slug> page with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
-version: 2026.10.27.1
+description: "Share a finished public/design/<slug> page, or a markdown write-up, with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
+version: 2026.10.27.2
 ---
 
 # Kradan: design review with the app's own users
@@ -26,7 +26,12 @@ The commands run in this checkout and talk to the server in `KRADAN_REMOTE_URL` 
    - `rounds/`, `review*` and `workbench.json` stay local.
 3. Give the user the printed board URL. Users answer whenever they get to it. Don't wait or poll.
 
-**Rounds.** Same `data-dp` title as the latest round → that round is replaced (users see มีอัปเดต). A new
+**Markdown.** A flow that explains something (an investigation, a process) can be a folder with an `index.md`
+instead of a designed page: tables, images beside it, raw HTML figures and ` ```mermaid ` diagrams all work.
+Its first `# heading` is the round title (`--title` when there is none), and a new board from markdown is a
+flow. Prefer it to building a page when prose and a table explain it best.
+
+**Rounds.** Same `data-dp` title (or `# heading`) as the latest round → that round is replaced (users see มีอัปเดต). A new
 title (`… รอบ 2`) → a new round; earlier rounds stay readable and read-only. Change the title when the
 question changes, not for a typo fix.
 

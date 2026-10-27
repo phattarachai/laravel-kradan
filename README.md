@@ -114,7 +114,7 @@ KRADAN_REMOTE_TOKEN=…written by kradan:token --write
 
 | Command | What it does |
 |---|---|
-| `kradan:push <dir> [--slug=] [--kind=decision\|flow] [--task=] [--dry-run]` | Zips a design folder and pushes it as a round; prints the board URL |
+| `kradan:push <dir> [--slug=] [--kind=decision\|flow] [--task=] [--title=] [--dry-run]` | Zips a design or markdown folder and pushes it as a round; prints the board URL |
 | `kradan:pull <slug\|board url> [--to=]` | Writes `rounds/NN/review.json` and `review.md` per round, and the latest as `review.md` |
 | `kradan:list` | Every board, its kind, status and latest round |
 | `kradan:decide <slug>` | Marks a decision board decided (a flow archived) |
@@ -122,6 +122,21 @@ KRADAN_REMOTE_TOKEN=…written by kradan:token --write
 
 The package ships a [Laravel Boost](https://github.com/laravel/boost) skill, so `php artisan boost:install`
 teaches Claude this workflow in your project.
+
+### Flow boards from markdown
+
+A flow board is often the result of an investigation, so a folder whose entry is `index.md` (and no
+`index.html`) works too. Kradan renders it at push with GitHub-flavoured markdown: tables, task lists,
+autolinks, raw HTML and figures, and relative images from the same folder. A fenced ` ```mermaid ` block
+draws as a diagram; mermaid is bundled with the package and only loaded by pages that use it.
+
+The first `# heading` names the round, as `data-dp` does for a designed page; without one, pass `--title`.
+A new board pushed from markdown is a flow unless you pass `--kind`. The whole page is one step, so comments
+and pins attach to it.
+
+```bash
+php artisan kradan:push docs/investigations/t156-price --task=T156
+```
 
 Pages use the markup of the design workbench: `data-dp` on `<body>` for the round title, `data-dp-step` with
 `data-title` for each step, `data-dp-option` with `data-key` and `data-label` for options, `data-dp-group` for

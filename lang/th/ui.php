@@ -15,7 +15,7 @@ return [
     'reply_depth' => 'ตอบกลับได้ชั้นเดียว',
     'not_yours' => 'แก้หรือลบได้เฉพาะความเห็นของตัวเอง',
     'bundle_unreadable' => 'เปิดไฟล์ zip ไม่ได้',
-    'bundle_no_index' => 'ใน zip ต้องมี index.html อยู่ชั้นบนสุด',
+    'bundle_no_index' => 'ใน zip ต้องมี index.html หรือ index.md อยู่ชั้นบนสุด',
     'bundle_bad_path' => 'ไฟล์ :path อยู่นอกโฟลเดอร์ของหน้า',
     'bundle_too_large' => 'zip ใหญ่เกินไป',
 ];

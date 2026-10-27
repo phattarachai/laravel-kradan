@@ -18,6 +18,7 @@ final class PushRequest extends FormRequest
             'slug' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9][a-z0-9._-]*$/'],
             'kind' => ['nullable', Rule::enum(BoardKind::class)],
             'task_ref' => ['nullable', 'string', 'max:64'],
+            'title' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

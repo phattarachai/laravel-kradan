@@ -25,13 +25,15 @@ final readonly class RoundPublisher
     /**
      * @return array{board: Board, round: Round, created: bool}
      */
-    public function publish(string $slug, Bundle $bundle, ?BoardKind $kind = null, ?string $taskRef = null): array
+    public function publish(string $slug, Bundle $bundle, ?BoardKind $kind = null, ?string $taskRef = null, ?string $title = null): array
     {
+        $newKind = $bundle->isMarkdown() ? BoardKind::Flow : BoardKind::Decision;
+        $bundle = $bundle->withPage($title ?? $slug);
         $parsed = $this->parser->parse((string) $bundle->get('index.html'), $bundle->get(...));
         $title = $parsed['title'] !== '' ? $parsed['title'] : $slug;
 
-        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $kind, $taskRef, $title, $parsed): array {
-            $board = $this->board($slug, $title, $kind, $taskRef);
+        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $kind, $newKind, $taskRef, $title, $parsed): array {
+            $board = $this->board($slug, $title, $kind, $taskRef, $newKind);
             $latest = $board->latestRound()->first();
             $created = $latest === null || $latest->title !== $title;
 
@@ -49,11 +51,14 @@ final readonly class RoundPublisher
         return ['board' => $board, 'round' => $round, 'created' => $created];
     }
 
-    private function board(string $slug, string $title, ?BoardKind $kind, ?string $taskRef): Board
+    /**
+     * A new board without a kind is a flow when written in markdown, a decision otherwise.
+     */
+    private function board(string $slug, string $title, ?BoardKind $kind, ?string $taskRef, BoardKind $newKind): Board
     {
         $board = Board::query()->firstOrNew(['slug' => $slug]);
         $board->title = self::boardTitle($title);
-        $board->kind = $kind ?? $board->kind ?? BoardKind::Decision;
+        $board->kind = $kind ?? $board->kind ?? $newKind;
         $board->task_ref = $taskRef ?? $board->task_ref;
         $board->status ??= BoardStatus::Open;
         $board->save();
