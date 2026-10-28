@@ -210,7 +210,16 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     <nav class="k-side" id="side"></nav>
     <main class="k-canvas" id="canvas" data-drop="${esc(t('drop_here'))}"></main>
     <aside class="k-panel" id="panel"></aside>
+    <div class="k-rsz" data-rsz="side"></div>
+    <div class="k-rsz" data-rsz="panel"></div>
   </div>`;
+  /* both sidebars widen by dragging their inner edge, within a min that keeps titles and options readable and a max
+     that keeps the canvas usable (owner, 2026-10-28). Each viewer's widths stay in localStorage */
+  const SIDE_W = {
+    side: { min: 180, max: 480, prop: '--swo', key: ext.sizeKeys?.side || 'kradan:side-w' },
+    panel: { min: 260, max: 640, prop: '--pwo', key: ext.sizeKeys?.panel || 'kradan:panel-w' },
+  };
+  Object.values(SIDE_W).forEach(x => { const w = +getLocal(x.key); if (w) { $('#app').style.setProperty(x.prop, clamp(w, x.min, x.max) + 'px'); } });
 
   /* ---------- frames, through the agent ---------- */
   const bridge = createBridge({ win: window });
@@ -1217,6 +1226,30 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) { zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01)); } else { pan(-e.deltaX, -e.deltaY); }
   }, { passive: false });
+  document.addEventListener('pointerdown', e => {
+    const rsz = e.target.closest('.k-rsz');
+    if (!rsz || e.button !== 0) { return; }
+    e.preventDefault();
+    const x = SIDE_W[rsz.dataset.rsz], app = $('#app');
+    let w = 0, raf = 0;
+    app.classList.add('resizing');
+    rsz.classList.add('on');
+    const move = ev => {
+      w = clamp(Math.round(rsz.dataset.rsz === 'side' ? ev.clientX : innerWidth - ev.clientX), x.min, x.max);
+      app.style.setProperty(x.prop, w + 'px');
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView()));
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      app.classList.remove('resizing');
+      rsz.classList.remove('on');
+      if (w) { setLocal(x.key, w); }
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  });
   document.addEventListener('pointerdown', e => {
     if (pop && !e.target.closest('.k-pop') && !e.target.closest('.pinlayer')) { closePop(true); }
     if (threadPop && !e.target.closest('.k-tpop, .pinmark, .boxmark')) { closeThread(); }
