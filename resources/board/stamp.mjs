@@ -35,7 +35,8 @@ export function srcHash(root) {
 export function stamp(root) {
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   let sha = '';
-  try { sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
+  /* the last commit that changed the source, so a rebuild after committing gives the same stamp */
+  try { sha = execFileSync('git', ['log', '-1', '--format=%h', '--', 'resources/board/src'], { cwd: root, encoding: 'utf8' }).trim(); } catch { /* not a checkout */ }
   return { version: pkg.version || '0.0.0', sha, src_hash: srcHash(root) };
 }
 
