@@ -329,10 +329,12 @@ final readonly class BoardPresenter
      */
     private function reverb(): array
     {
-        $options = (array) config('broadcasting.connections.reverb.options', []);
+        $key = (string) config('broadcasting.connections.reverb.key');
+        $browserDoor = (array) (collect((array) config('reverb.apps.apps', []))->firstWhere('key', $key)['options'] ?? []);
+        $options = filled($browserDoor['host'] ?? null) ? $browserDoor : (array) config('broadcasting.connections.reverb.options', []);
 
         return [
-            'key' => (string) config('broadcasting.connections.reverb.key'),
+            'key' => $key,
             'host' => (string) ($options['host'] ?? request()->getHost()),
             'port' => (int) ($options['port'] ?? 443),
             'scheme' => (string) ($options['scheme'] ?? 'https'),
