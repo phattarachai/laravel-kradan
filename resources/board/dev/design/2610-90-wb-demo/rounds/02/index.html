@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Workbench demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 24px; background: #fafafa; }
+  section { margin: 0 0 40px; }
+  .opt { display: inline-block; width: 360px; margin: 0 16px 0 0; padding: 16px; border: 1px solid #ddd; border-radius: 10px; background: #fff; vertical-align: top; }
+  .btn { display: inline-block; padding: 8px 16px; border-radius: 8px; background: #2563eb; color: #fff; }
+  .btn.red { background: #c92a2a; }
+</style>
+</head>
+<body data-dp="Workbench demo รอบ 2">
+<div data-dp-group data-title="ตะกร้า">
+  <section data-dp-step data-title="ปุ่มยืนยัน" data-sub="ปุ่มสุดท้ายก่อนส่งคำสั่งซื้อ">
+    <div class="opt" data-dp-option data-key="A" data-label="ปุ่มเดียว" data-trade="ง่าย แต่กดพลาดได้"><h3>ยืนยันคำสั่งซื้อ</h3><span class="btn">ส่งคำสั่งซื้อ</span></div>
+    <div class="opt" data-dp-option data-key="B" data-label="สองขั้น" data-trade="ช้ากว่าหนึ่งคลิก"><h3>ตรวจก่อนส่ง</h3><span class="btn">ตรวจ</span> <span class="btn red">ส่ง</span></div>
+  </section>
+  <section data-dp-step data-title="ยอดรวม">
+    <div class="opt" data-dp-option data-key="A" data-label="ยอดเดียว"><p>รวม 11,651 / 10,000</p></div>
+    <div class="opt" data-dp-option data-key="B" data-label="แยกส่วนเกิน"><p>รวม 10,000</p><p>เกิน 1,651</p></div>
+  </section>
+</div>
+<section data-dp-step data-title="หน้ายืนยัน" data-group="หน้าจอ">
+  <p class="lbl">หน้าจอยืนยัน</p>
+  <div data-dp-frames data-src="screen.html#s=confirm" data-show="desktop phone"></div>
+</section>
+</body>
+</html>

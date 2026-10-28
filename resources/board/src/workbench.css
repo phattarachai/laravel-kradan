@@ -1,0 +1,44 @@
+/* workbench.css: the board's styles plus the design workbench's look and what only the workbench has (ext). */
+@import './board.css';
+
+/* ---------- theme workbench (<html class="workbench">): the workbench as it looked before the shared core ---------- */
+:root.workbench { --k-accent: #2563eb; --k-accent-bg: #e8efff; --brand: #2563eb; --brand-bg: #e8efff; }
+.workbench body { background: var(--canvas); overflow: hidden; }
+.workbench .k-app { grid-template-rows: 48px minmax(0, 1fr); --sw: var(--swo, 240px); --pw: var(--pwo, 320px); }
+.workbench .k-app.noside { --sw: 0px; }
+.workbench .k-app.nopanel { --pw: 0px; }
+.workbench .k-bar { height: 48px; padding: 0 10px; }
+/* a review page has no app around it, so no workspace corner */
+.workbench .k-brand, .workbench .k-crumb { display: none; }
+.workbench .k-primary, .workbench .k-primary:hover { background: var(--ink); border-color: var(--ink); }
+
+/* ---------- ส่ง, the answer-every-step check, the page manager, the core line ---------- */
+.k-extbar { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.k-extbar:empty { display: none; }
+.wb-send, .wb-send:hover { background: var(--k-accent); border-color: var(--k-accent); color: #fff; font-weight: 500; }
+.wb-send:disabled { background: #e5e7eb; border-color: #e5e7eb; color: var(--faint); opacity: 1; }
+.wb-miss { border: 1px solid #f3d9c8; background: #fff7f2; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.wb-miss h3 { margin: 0 0 4px; font-size: 15px; }
+.wb-miss .ln { border: 0; background: none; text-align: left; padding: 3px 0; display: flex; gap: 8px; }
+.wb-miss .ln:hover .t { text-decoration: underline; }
+.wb-miss .ln .k { color: var(--mute); margin-left: auto; flex: none; }
+.wb-miss .acts { display: flex; justify-content: flex-end; margin-top: 4px; }
+.wb-mghead { display: flex; align-items: center; gap: 12px; }
+.wb-mghead h2 { margin: 0; font-size: 17px; }
+.wb-mglist { overflow: auto; border: 1px solid var(--line); border-radius: 10px; min-height: 120px; }
+.wb-mglist table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.wb-mglist th { position: sticky; top: 0; z-index: 1; background: #f8f9fa; text-align: left; font-weight: 500; font-size: 12px; color: var(--mute); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.wb-mglist td { padding: 7px 10px; border-bottom: 1px solid #f0f1f3; vertical-align: top; }
+.wb-mglist tr:last-child td { border-bottom: 0; }
+.wb-mglist td:first-child, .wb-mglist th:first-child { width: 32px; }
+.wb-mglist a { text-decoration: none; }
+.wb-mglist a:hover { text-decoration: underline; }
+.wb-mglist .slug { font-size: 12px; color: var(--faint); }
+.wb-mglist .st, .wb-mglist .dt { color: var(--mute); font-size: 13px; white-space: nowrap; }
+.wb-mglist .wait { color: var(--k-accent); font-weight: 500; }
+.wb-mglist .upd { color: var(--upd); font-weight: 500; }
+.wb-mgfoot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.wb-mgfoot .grow { flex: 1; font-size: 13px; color: var(--mute); }
+.wb-danger, .wb-danger:hover { border-color: #c92a2a; background: #c92a2a; color: #fff; }
+.wb-danger:disabled { background: #fff; color: var(--faint); border-color: var(--line); }
+.wb-core { font-size: 11px; color: var(--faint); padding: 16px 12px 10px; }

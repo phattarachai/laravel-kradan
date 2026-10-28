@@ -63,6 +63,12 @@ const ib = (attrs, k, tip, end = false) => `<button class="k-ib" ${attrs} data-t
  */
 export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const api = store || KradanStore(boot);
+  /* what this store offers; a missing cap means the board's own behaviour */
+  const caps = { multiUser: true, presence: true, decide: true, ...(api.caps || {}) };
+  /* where frames load from: the store may serve them same-origin (the workbench), else the sandboxed signed prefix */
+  const hosting = api.frames || {};
+  /* the view a board opens at; the workbench keeps its own (fit, side by side when it fits) */
+  const DEF = { zoom: '100', arr: 'col', ...(ext.view || {}) };
   const ME = boot.user || {};
   const Q = new URLSearchParams(location.search);
   let B = boot.board;
@@ -77,8 +83,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     mode: ['options', 'sizes', 'real'].includes(Q.get('mode')) ? Q.get('mode') : 'options',
     dev: (Q.get('dev') || '').split(',').filter(d => DEV[d]),
     /* a board opens at 100% with the options stacked (owner, 2026-10-28) */
-    zoom: Q.get('zoom') || '100',
-    arr: ['row', 'col', 'auto'].includes(Q.get('arr')) ? Q.get('arr') : 'col',
+    zoom: Q.get('zoom') || DEF.zoom,
+    arr: ['row', 'col', 'auto'].includes(Q.get('arr')) ? Q.get('arr') : DEF.arr,
     opt: Q.get('opt') || '',
     w: +Q.get('w') || 0,
     sync: Q.get('sync') !== 'off',
@@ -116,11 +122,12 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   function safeSrc(src) {
     try {
       const base = new URL(R.base_url, location.href);
-      const u = new URL(src, new URL('index.html', base));
+      const u = new URL(src, pageUrl());
+      if (hosting.allow) { return hosting.allow(u) ? u.href : ''; }
       return /^https?:$/.test(u.protocol) && u.origin === base.origin && u.pathname.startsWith(base.pathname) ? u.href : '';
     } catch { return ''; }
   }
-  const pageUrl = () => new URL('index.html', new URL(R.base_url, location.href)).href;
+  const pageUrl = () => R.page_url || new URL('index.html', new URL(R.base_url, location.href)).href;
   const step = () => STEPS[ui.step - 1];
 
   /* ---------- answers ---------- */
@@ -162,17 +169,19 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const isNew = s => !!B.seen_prints && !(s.key in B.seen_prints);
 
   /* ---------- url ---------- */
+  /* query params that belong to the host, kept on every URL the board writes (the workbench's ?page=) */
+  const kept = () => Object.fromEntries((ext.keepParams || []).filter(k => Q.get(k)).map(k => [k, Q.get(k)]));
   let urlTimer;
   function writeUrl() {
     clearTimeout(urlTimer);
     urlTimer = setTimeout(() => {
-      const p = new URLSearchParams();
+      const p = new URLSearchParams(kept());
       if (OLD()) { p.set('round', R.number); }
       p.set('step', ui.step);
       if (ui.mode !== 'options') { p.set('mode', ui.mode); }
       if (ui.dev.length) { p.set('dev', ui.dev.join(',')); }
-      if (ui.zoom !== '100') { p.set('zoom', ui.zoom); }
-      if (ui.arr !== 'col') { p.set('arr', ui.arr); }
+      if (ui.zoom !== DEF.zoom) { p.set('zoom', ui.zoom); }
+      if (ui.arr !== DEF.arr) { p.set('arr', ui.arr); }
       if (ui.opt) { p.set('opt', ui.opt); }
       if (ui.mode === 'real' && ui.w) { p.set('w', ui.w); }
       if (!ui.sync) { p.set('sync', 'off'); }
@@ -205,6 +214,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       ${ib('data-act="arr" id="arr"', 'arr', t('arrange'))}${ib('data-act="sync" id="sync"', 'sync', t('sync'))}${ib('data-act="mini" id="minib"', 'mini', t('mini'), true)}
       ${ib('data-act="panel"', 'panel', t('panel'), true)}
       <span id="statusb"></span>
+      <span class="k-extbar" id="extbar"></span>
       ${ib('data-act="copy"', 'copy', t('copy'), true)}
     </header>
     <nav class="k-side" id="side"></nav>
@@ -224,17 +234,19 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   /* ---------- frames, through the agent ---------- */
   const bridge = createBridge({ win: window });
   const ORIGINS = allowedOrigins(R.base_url, location.origin);
+  (hosting.origins || []).forEach(o => ORIGINS.add(o));
   let frames = [];
   let userMoved = false;
 
   function newFrame(attrs = {}) {
     const ifr = document.createElement('iframe');
-    ifr.setAttribute('sandbox', 'allow-scripts');
+    if (hosting.sandbox !== null) { ifr.setAttribute('sandbox', hosting.sandbox || 'allow-scripts'); }
     ifr.setAttribute('referrerpolicy', 'no-referrer');
     ifr.title = 'preview';
     Object.assign(ifr, attrs);
     return ifr;
   }
+  const loadFrame = (ifr, url) => (hosting.load ? hosting.load(ifr, url) : (ifr.src = url));
 
   /* one hidden frame of index.html tells the board each step's trade-offs and frames */
   function probeSteps() {
@@ -245,7 +257,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       const done = steps => { clearTimeout(timer); bridge.remove(ifr.contentWindow); ifr.remove(); resolve(steps); };
       const timer = setTimeout(() => done(null), 8000);
       bridge.add(ifr.contentWindow, { origins: ORIGINS, on: (type, d) => { if (type === 'ready') { done(Array.isArray(d.steps) ? d.steps : null); } } });
-      ifr.src = pageUrl();
+      loadFrame(ifr, pageUrl());
     });
   }
 
@@ -456,13 +468,13 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
   function boardRow(b) {
     const cur = b.slug === B.slug;
-    return `<a class="pg" href="${esc(b.url)}" data-board="${esc(b.slug)}" aria-current="${cur}" title="${esc(b.label || b.title)}">${DOC}<span class="t">${esc(b.label || b.title)}</span>${b.updated && !cur ? `<span class="wt">${t('updated')}</span>` : ''}</a>`;
+    return `<a class="pg" href="${esc(b.url)}" data-board="${esc(b.slug)}" aria-current="${cur}" title="${esc(b.label || b.title)}">${DOC}<span class="t">${esc(b.label || b.title)}</span>${b.waiting ? `<span class="wt">${t('waiting')}</span>` : b.updated && !cur ? `<span class="wt">${t('updated')}</span>` : ''}</a>`;
   }
   function boardsHtml() {
     if (!BOARDS?.length) { return ''; }
     const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug)
       .sort((a, b) => String(b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.round?.pushed_at || a.updated_at || '')));
-    return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span><a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a></div>
+    return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span>${ext.boardsTool ? ext.boardsTool(host) : `<a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a>`}</div>
       ${open.map(boardRow).join('')}</div><div class="divide"></div>`;
   }
   function renderSide() {
@@ -474,11 +486,13 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
         const alone = s.group === s.title && STEPS[i + 1]?.group !== s.group;
         const head = s.group && s.group !== STEPS[i - 1]?.group && !alone ? `<h4 class="k-sec">${esc(s.group)}</h4>` : '';
         return head + stepRow(s, i + 1);
-      }).join('');
+      }).join('')
+      + (ext.sideEnd ? ext.sideEnd(host) : '');
   }
 
   /* who picked an option: avatars, the name on hover (owner's pick B + C, 2026-10-27) */
   function pickers(key, opt, cls = 'sm') {
+    if (!caps.multiUser) { return ''; }
     const ps = picksFor(key).filter(p => p.options.includes(opt));
     return ps.length ? `<span class="k-avs k-pickers">${ps.map(p => avatar(p.user, { cls, tip: isMe(p.user) ? `${p.user.name} (${t('you')})` : p.user.name })).join('')}</span>` : '';
   }
@@ -505,7 +519,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
           <span class="k-optkey">${esc(o.key)}</span>
           <span class="k-optbody"><span class="lb">${esc(o.label)}</span>${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${pickers(key, o.key)}</span>
           <span class="k-optmark">${CHECK}</span></label>`).join('')}</div>` : ''}
-      ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
+      ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length && caps.multiUser ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
       <div class="k-hr"></div>
       <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
       <div class="k-thread">${entries.map(x => x.html).join('')}</div>
@@ -527,7 +541,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const mine = c.mine ?? isMe(c.user);
     /* small actions are icons with a tooltip (owner, 2026-10-28) */
     const act = (attr, k, label) => `<button ${attr}="${c.id}" data-tip="${esc(label)}" aria-label="${esc(label)}">${svg(k)}</button>`;
-    const acts = CAN_WRITE() ? [top && !pop ? act('data-reply', 'reply', t('reply')) : '', mine && !c.edit && !pop ? act('data-cedit', 'pencil', t('edit')) : '', mine ? act('data-cdel', 'trash', t('delete')) : ''].join('') : '';
+    const acts = CAN_WRITE() ? [top && !pop && caps.multiUser ? act('data-reply', 'reply', t('reply')) : '', mine && !c.edit && !pop ? act('data-cedit', 'pencil', t('edit')) : '', mine ? act('data-cdel', 'trash', t('delete')) : ''].join('') : '';
     const edited = c.updated_at && c.created_at && Date.parse(c.updated_at) - Date.parse(c.created_at) > 1000 ? ` · ${t('edited')}` : '';
     return `<div class="k-cm" ${pop ? '' : `id="c-${c.id}"`} data-cid="${c.id}">${avatar(c.user, { tip: c.user.name })}<div class="h"><b>${esc(c.user.name)}</b><span data-tip="${esc(shortDate(c.created_at, true))}">${esc(when(c.created_at))}${edited}</span>${acts ? `<span class="acts">${acts}</span>` : ''}</div>
       ${where(c)}${c.body ? `<div class="b">${esc(c.body)}</div>` : ''}
@@ -559,7 +573,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       bridge.add(ifr.contentWindow, { origins: ORIGINS, on: onFrame, f });
       /* the frame object is what onFrame gets as its third argument */
       bridge.frames.set(ifr.contentWindow, Object.assign(f, { win: ifr.contentWindow, origins: ORIGINS, on: onFrame }));
-      ifr.src = f.crop ? pageUrl() : c.shot.src;
+      loadFrame(ifr, f.crop ? pageUrl() : c.shot.src);
       frames.push(f);
     });
     sizeFrames();
@@ -826,9 +840,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
 
   /* ---------- writes ---------- */
-  async function setPicks(keys, seen = false) {
+  async function setPicks(keys, seen = false, st = step()) {
     if (!CAN_PICK()) { return; }
-    const st = step();
     const want = new Set(keys);
     const options = st.options.map(o => o.key).filter(k => want.has(k));
     /* optimistic: the mark moves now, the server's answer replaces it */
@@ -927,7 +940,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     el.innerHTML = here + tools + '<hr>'
       + item('fit', t('fit').replace(/ \(.*\)/, ''), '⇧1', { ic: icon('fit') }) + item('z100', t('view_100'), '⇧0', { ic: '<span class="k-one">100</span>' })
       + item('mini', t('mini').replace(/ \(.*\)/, ''), 'M', { check: ui.mini, ic: icon('mini') })
-      + '<hr>' + item('copy', t('copy'))
+      + '<hr>' + item('copy', t('copy')) + (ext.menu ? ext.menu(host, item) : '')
       + `<div class="foot">${esc(t('browser_menu'))}</div>`;
     document.body.appendChild(el);
     el.style.left = Math.min(x, innerWidth - el.offsetWidth - 8) + 'px';
@@ -947,16 +960,22 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       if (a === 'z100') { zoomCenter(1 / view.z); }
       if (a === 'mini') { toggleMini(); }
       if (a === 'copy') { openCopy(); }
+      if (a.startsWith('ext:')) { ext.act?.(a.slice(4), host); }
     });
   }
 
   /* ---------- คัดลอกให้ Claude: the server's export.md ---------- */
   async function openCopy() {
     closePop(true);
-    const m = modal(`<div class="box"><pre>${esc(t('loading'))}</pre><div class="row"><button class="k-btn" data-x>${t('close')}</button><button class="k-btn k-primary" data-copy disabled>${t('copy')}</button></div></div>`);
+    const m = modal(`<div class="box">${ext.copyHead ? `<div data-exthead>${ext.copyHead(host)}</div>` : ''}<pre>${esc(t('loading'))}</pre><div class="row"><button class="k-btn" data-x>${t('close')}</button><button class="k-btn k-primary" data-copy disabled>${t('copy')}</button></div></div>`);
     let text = '';
-    try { text = await api.exportMd(B.slug); } catch { $('pre', m).textContent = t('offline'); return; }
-    $('pre', m).textContent = text;
+    const fill = async () => {
+      try { text = await api.exportMd(B.slug); } catch { $('pre', m).textContent = t('offline'); return false; }
+      $('pre', m).textContent = text;
+      return true;
+    };
+    if (!await fill()) { return; }
+    ext.copyOpened?.(host, m, fill);
     const btn = $('[data-copy]', m);
     btn.disabled = false;
     btn.onclick = async () => {
@@ -966,6 +985,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
         return;
       }
       btn.textContent = t('copied');
+      ext.copied?.(host);
     };
   }
 
@@ -995,7 +1015,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     el.className = 'k-ctx';
     const b = BOARDS?.find(z => z.slug === slug);
     el.innerHTML = `<button data-bopen><span class="ck"></span>${esc(t('open_new_tab'))}</button>`
-      + (ME.can?.manage && b?.status === 'open' ? `<hr><button data-barchive><span class="ck"></span>${esc(t('archive'))}</button>` : '');
+      + (caps.decide && ME.can?.manage && b?.status === 'open' ? `<hr><button data-barchive><span class="ck"></span>${esc(t('archive'))}</button>` : '');
     document.body.appendChild(el);
     el.style.left = Math.min(x, innerWidth - el.offsetWidth - 8) + 'px';
     el.style.top = Math.min(y, innerHeight - el.offsetHeight - 8) + 'px';
@@ -1010,14 +1030,14 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
 
   /* ---------- rounds: the title opens the list; ดูทุกรอบ shows every round's answers ---------- */
-  const roundUrl = (r, n = 1) => `?${new URLSearchParams({ ...(r.number !== LATEST() ? { round: r.number } : {}), step: n })}`;
+  const roundUrl = (r, n = 1) => `?${new URLSearchParams({ ...kept(), ...(r.number !== LATEST() ? { round: r.number } : {}), step: n })}`;
   function openRounds(anchor) {
     closeCtx();
     const el = document.createElement('div');
     el.className = 'k-ctx k-rmenu';
     el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
       + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
-      + (ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
+      + (caps.decide && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
     document.body.appendChild(el);
     const b = anchor.getBoundingClientRect();
     el.style.left = Math.min(b.left, innerWidth - el.offsetWidth - 8) + 'px';
@@ -1158,6 +1178,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       return;
     }
     const act = d.act;
+    if (act && ext.act?.(act, host, t0)) { return; }
     if (act === 'prev') { go(ui.step - 1); }
     if (act === 'next') { go(ui.step + 1); }
     if (act === 'sync') { ui.sync = !ui.sync; $('#sync').setAttribute('aria-pressed', ui.sync); writeUrl(); }
@@ -1305,6 +1326,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   let presence = null;
   let lastChanged = B.changed_at || null;
   function renderAvatars(viewers, online) {
+    if (!caps.presence) { return; }
     $('#avs').innerHTML = avatarRow(viewers, { me: ME.id, online });
   }
 
@@ -1317,9 +1339,28 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     applyView();
     items.renderSelection();
   }
+  /* ---------- what a host's ext sees: the steps, the answers' state and a few moves ---------- */
+  const unanswered = () => STEPS.map((s, i) => i + 1).filter(n => !answeredBy(ME.id, STEPS[n - 1].key) || looked.upd.has(n));
+  const host = {
+    t, store: api, caps, boot,
+    board: () => B, round: () => R, steps: () => STEPS, step, old: OLD,
+    go: n => go(n), renderSide: () => renderSide(), reloadBoards: () => loadBoards(),
+    /* the steps this viewer hasn't answered, or whose update they haven't looked at (numbered from 1) */
+    missing: unanswered,
+    why: n => (looked.upd.has(n) ? 'unseen' : STEPS[n - 1].pickable ? 'unpicked' : 'unread'),
+    /* ข้ามที่เหลือ: every update counts as looked at, and every unanswered step gets ข้าม or อ่านแล้ว */
+    async skipRest() {
+      for (const n of unanswered()) {
+        lookAt(n);
+        const st = STEPS[n - 1];
+        if (!answeredBy(ME.id, st.key)) { await setPicks([], true, st); }
+      }
+      renderSide(); renderPanel();
+    },
+  };
   const items = createItems({
     api, bridge, ME, view, frameSrc, docPoint,
-    board: () => B, round: () => R, step, frames: () => frames, tool: () => ui.tool, canWrite: CAN_WRITE, centerOn,
+    board: () => B, round: () => R, step, frames: () => frames, tool: () => ui.tool, canWrite: CAN_WRITE, centerOn, multiUser: caps.multiUser,
     onChange: () => { renderSide(); if (!document.activeElement?.closest?.('.k-panel textarea')) { renderPanel(); } },
   });
 
@@ -1348,6 +1389,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     });
     presence.start(B.viewers || []);
     loadBoards();
+    if (ext.bar) { $('#extbar').innerHTML = ext.bar(host); }
+    ext.start?.(host);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); } });
   });
 }

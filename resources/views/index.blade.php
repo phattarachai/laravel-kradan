@@ -1,7 +1,7 @@
 {{-- Kradan index shell. The backend renders it with $boot (the boot payload, 2-board-payload.md) and $assets
      (the URL of the folder serving dist/, no trailing slash). Everything else is board.js. --}}
 <!doctype html>
-<html lang="{{ $boot['locale'] ?? 'th' }}">
+<html lang="{{ $boot['locale'] ?? 'th' }}" class="{{ $boot['theme']['name'] ?? 'kradan' }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
