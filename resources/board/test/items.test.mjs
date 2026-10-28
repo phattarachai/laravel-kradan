@@ -68,3 +68,17 @@ test('dropping onto a frame, off it, or onto another option re-anchors with x/y 
   assert.deepEqual(movePatch(onFrame, { anchor: phone, x: 5, y: 6 }).anchor, phone, 'onto the same option at another device');
   assert.deepEqual(movePatch(beside, null), { x: 900, y: 40 }, 'nowhere to land: plain move');
 });
+
+test('ความเห็น holds real notes; plain drawings go under ภาพวาด', async () => {
+  const { isNoted } = await import('../src/board/items.js');
+  assert.equal(isNoted({ kind: 'note', text: 'เพิ่มกราฟ' }), true);
+  assert.equal(isNoted({ kind: 'text', text: 'ยอด' }), true);
+  assert.equal(isNoted({ kind: 'image', file: { name: 'จอ.png' } }), true, 'an upload is something someone meant to say');
+  assert.equal(isNoted({ kind: 'file', file: { name: 'ราคา.xlsx' } }), true);
+  assert.equal(isNoted({ kind: 'stroke', points: [[0, 0], [4, 4]] }), false);
+  assert.equal(isNoted({ kind: 'arrow', texts: ['ยืนยัน'] }), false, 'the text it points at is not a note');
+  assert.equal(isNoted({ kind: 'rect', texts: ['1', '2', '3'] }), false, 'nor the texts a box covers');
+  assert.equal(isNoted({ kind: 'ellipse', texts: [], text: '  ' }), false);
+  assert.equal(isNoted({ kind: 'rect', texts: ['1'], text: 'ตัวเลขซ้อนกัน' }), true, 'a note typed on it');
+  assert.equal(isNoted({ kind: 'arrow' }, true), true, 'a drawing someone replied to');
+});

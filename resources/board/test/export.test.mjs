@@ -32,3 +32,17 @@ test('one person\'s review prints the workbench shape: no names, A + B, ↳ note
   got.forEach((line, i) => assert.equal(line, want[i], `line ${i + 1}`));
   assert.equal(got.length, want.length);
 });
+
+test('a bare line or arrow stays out of the review; a box with the texts it covers stays in', async () => {
+  const { bare, reviewLocal } = await import('../src/board/export.js');
+  assert.equal(bare({ kind: 'stroke' }), true);
+  assert.equal(bare({ kind: 'arrow', texts: ['ยืนยัน'] }), true);
+  assert.equal(bare({ kind: 'arrow', texts: ['ยืนยัน'], text: 'ตรงนี้' }), false);
+  assert.equal(bare({ kind: 'stroke' }, true), false, 'someone replied to it');
+  assert.equal(bare({ kind: 'rect', texts: ['1', '2', '3'] }), false);
+  assert.equal(bare({ kind: 'ellipse', texts: [] }), false);
+  const md = reviewLocal({ title: 'x', steps: [{ key: 's', title: 'หน้า', kind: 'screen', options: [] }],
+    items: [{ id: 1, step: 's', kind: 'rect', anchor: { device: 'phone', src: 'a.html' }, texts: ['1', '2', '3'] }, { id: 2, step: 's', kind: 'stroke', anchor: {} }] });
+  assert.match(md, /▭ มือถือ ตีกรอบ “1”, “2”, “3”/);
+  assert.doesNotMatch(md, /〰/);
+});

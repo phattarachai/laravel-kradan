@@ -34,6 +34,9 @@ function quoted(text) {
 function block(indent, text) {
   return String(text).replace(/\r\n/g, '\n').trim().split('\n').map((line, i) => indent + (i ? '  ' : '') + line);
 }
+/* a line or an arrow with no note and no reply says nothing to whoever reads the review (owner, 2026-10-28); a box
+   or a ring stays, since the text it covers is what it points at */
+export const bare = (it, replied = false) => ['stroke', 'arrow'].includes(it.kind) && !String(it.text || '').trim() && !replied;
 /* by time, comments before items at the same moment, then by id */
 const order = (at, type, id) => `${String(Date.parse(at || '') || 0).padStart(15, '0')}|${type}|${String(id).padStart(12, '0')}`;
 
@@ -43,7 +46,7 @@ export function exportMd({ board, round, picks = [], comments = [], items = [], 
   const top = comments.filter(c => !c.parent_id && !c.item_id);
   /* pins are numbered across the round, in the order they were written */
   const pinNo = new Map(top.filter(c => c.pin && !c.edit).sort((a, b) => a.id - b.id).map((c, i) => [c.id, i + 1]));
-  const shown = items.filter(it => (it.round ?? round.number) <= round.number);
+  const shown = items.filter(it => (it.round ?? round.number) <= round.number && !bare(it, comments.some(c => c.item_id === it.id)));
 
   function answer(step) {
     const ps = picks.filter(p => p.step === step.key);
@@ -154,7 +157,7 @@ export function reviewLocal({ title, steps = [], picks = [], comments = [], item
         return `${p.box ? '▭' : '📍'}${i + 1} ${at(p.option, p.device, p.src, said)}: ${c.body}`;
       }),
       ...top.filter(c => c.edit).map(c => `✎ ${at(c.pin?.option, c.pin?.device, c.pin?.src)}: “${oneLine(c.edit.from)}” → “${oneLine(c.edit.to)}”`),
-      ...items.filter(it => it.step === key && !it.draft && !it.pending).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+      ...items.filter(it => it.step === key && !it.draft && !it.pending && !bare(it)).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
         .flatMap(it => block('', itemLine(it))),
     ];
   }

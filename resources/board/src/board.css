@@ -346,7 +346,17 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-item.pending { opacity: .85; }
 .k-item.sel:not(svg) { outline: 2px solid #1c7ed6; outline-offset: 2px; }
 svg.k-item { overflow: visible; }
-svg.k-item.sel { outline: 1.5px dashed #1c7ed6; outline-offset: -2px; }
+svg.k-item.sel { outline: 1.5px solid #1c7ed6; outline-offset: 0; }
+/* hover lights an item up (and its row lights it up); selected adds corner handles (owner, 2026-10-28) */
+.k-canvas.tool-hand .k-item:hover:not(.sel), .k-canvas.tool-use .k-item:hover:not(.sel), .k-item.hl:not(.sel) { outline: 1.5px solid rgba(28,126,214,.6); outline-offset: 2px; }
+.k-canvas.tool-hand svg.k-item:hover:not(.sel), .k-canvas.tool-use svg.k-item:hover:not(.sel), svg.k-item.hl:not(.sel) { outline-offset: 0; }
+.k-item.sel:not(svg)::after { content: ''; position: absolute; inset: -7px; pointer-events: none;
+  background: linear-gradient(#fff, #fff) left 1.5px top 1.5px / 5px 5px no-repeat, linear-gradient(#fff, #fff) right 1.5px top 1.5px / 5px 5px no-repeat,
+    linear-gradient(#fff, #fff) left 1.5px bottom 1.5px / 5px 5px no-repeat, linear-gradient(#fff, #fff) right 1.5px bottom 1.5px / 5px 5px no-repeat,
+    linear-gradient(#1c7ed6, #1c7ed6) left top / 8px 8px no-repeat, linear-gradient(#1c7ed6, #1c7ed6) right top / 8px 8px no-repeat,
+    linear-gradient(#1c7ed6, #1c7ed6) left bottom / 8px 8px no-repeat, linear-gradient(#1c7ed6, #1c7ed6) right bottom / 8px 8px no-repeat; }
+.k-i-image.sel { overflow: visible; }
+svg.k-item .hd { fill: #fff; stroke: #1c7ed6; stroke-width: 1.5; pointer-events: none; }
 .k-preview { position: absolute; overflow: visible; pointer-events: none; }
 .k-i-note { padding: 12px 12px 28px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 14px rgba(0,0,0,.08); font-size: 14px; line-height: 1.5; color: #1d2127; }
 .k-i-note .tx, .k-i-text .tx { white-space: pre-wrap; overflow-wrap: anywhere; outline: 0; min-height: 1.5em; }
@@ -375,6 +385,16 @@ svg.k-item.sel { outline: 1.5px dashed #1c7ed6; outline-offset: -2px; }
 .k-ibar button:hover { background: var(--soft); }
 .k-ibar .note { color: var(--mute); padding: 0 6px; }
 .k-ibar .vr { width: 1px; height: 16px; background: var(--line); margin: 0 2px; }
+.k-ibar .k-idot i { display: block; width: 16px; height: 16px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+.k-ibar .sws { display: none; align-items: center; gap: 4px; padding: 0 4px 0 2px; }
+.k-ibar.open .sws { display: flex; }
+.k-ibar .sw, .k-ictx .sw { width: 18px; height: 18px; padding: 0; border-radius: 50%; display: block; }
+.k-ictx { min-width: 180px; }
+.k-ictx .sws { display: flex; gap: 6px; padding: 6px 8px 4px; }
+.k-ictx .sws .sw { width: 20px; height: 20px; }
+.k-ictx .sws .sw:hover { background: none; }
+.k-ib:disabled { color: var(--faint); opacity: .5; cursor: default; }
+.k-ib:disabled:hover { background: none; }
 .sw { width: 18px; height: 18px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); padding: 0; flex: none; }
 .sw.on { box-shadow: 0 0 0 2px var(--ink); }
 .k-itip { position: fixed; z-index: 95; background: var(--ink); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; pointer-events: none; max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -395,11 +415,22 @@ svg.k-item.sel { outline: 1.5px dashed #1c7ed6; outline-offset: -2px; }
 .k-irow .ic, .k-i-ic { width: 28px; height: 28px; border-radius: 6px; background: var(--soft); display: grid; place-items: center; grid-row: span 2; }
 .k-i-ic { display: inline; background: none; }
 .k-irow .ic.k-i-ic-note, .k-irow .ic.k-i-ic-text { background: #fff3bf; }
-.k-irow .h { font-size: 12px; color: var(--mute); }
+.k-irow .h { font-size: 12px; color: var(--mute); grid-column: 2; grid-row: 1; padding-right: 28px; }
 .k-irow .h b { color: var(--ink); font-weight: 500; }
 .k-irow .b { grid-column: 2; line-height: 1.5; overflow-wrap: anywhere; }
 .k-irow .th, .k-icm .th { grid-column: 2; max-width: 180px; max-height: 110px; border-radius: 6px; object-fit: cover; display: block; }
 .k-icm { cursor: pointer; }
+/* a row and its item light each other up; the selected item's row stays marked */
+.k-irow.hl { background: var(--soft); }
+.k-irow.on { background: var(--k-accent-bg); }
+.k-icm.hl, .k-icm.on { border-radius: 8px; background: var(--soft); box-shadow: 0 0 0 6px var(--soft); }
+.k-icm.on { background: var(--k-accent-bg); box-shadow: 0 0 0 6px var(--k-accent-bg); }
+.k-irow .acts button { width: 24px; height: 24px; border: 0; background: none; padding: 0; border-radius: 6px; display: inline-grid; place-items: center; color: var(--mute); }
+.k-irow .acts button svg { width: 15px; height: 15px; }
+.k-irow .acts button:hover { color: var(--ink); background: var(--hover); }
+[data-irm] { opacity: 0; }
+.k-irow:hover [data-irm], .k-icm:hover > .h [data-irm], [data-irm]:focus-visible { opacity: 1; }
+.k-fold + .k-ilist { margin-top: 10px; }
 .k-icm:hover > .b { text-decoration: underline; text-decoration-color: var(--line); }
 .k-tools { gap: 2px; align-items: center; }
 

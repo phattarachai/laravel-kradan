@@ -10,6 +10,7 @@
 import { t } from './i18n.js';
 import { $, $$, esc, clamp, shortDate, when, toast } from './util.js';
 import { avatar } from './presence.js';
+import { createUndo, undoKey, typing, fieldsOf } from './undo.js';
 
 export const DRAW_TOOLS = ['note', 'text', 'pen', 'arrow', 'rect', 'ellipse'];
 export const STROKES = { ink: '#1d2127', red: '#d6336c', orange: '#e8590c', green: '#2f9e44', blue: '#1c7ed6' };
@@ -22,6 +23,8 @@ const ICONS = {
   pencil: '<path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 7l3 3"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
   download: '<path d="M12 4v11M7 10l5 5 5-5"/><path d="M5 20h14"/>',
+  note: '<path d="M5 4h14v10l-5 6H5z"/><path d="M14 20v-6h5"/>',
+  copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h2"/>',
 };
 const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[k]}</svg>`;
 const iconLink = url => `<a class="k-ia" href="${esc(url)}" download rel="noopener" data-tip="${esc(t('download'))}" aria-label="${esc(t('download'))}">${icon('download')}</a>`;
@@ -65,9 +68,13 @@ export function summary(it) {
     default: return withNote(t('stroke'), it.text);
   }
 }
-/* a drawing may carry a note: why it was drawn (the old กรอบ asked for one straight away) */
+/* a drawing may carry a note: why it was drawn, added from its menu (ใส่โน้ต) */
 const withNote = (line, note) => (String(note || '').trim() ? `${line}: ${String(note).trim()}` : line);
-const MARKS = ['rect', 'ellipse'];
+const DRAWN = ['arrow', 'rect', 'ellipse', 'stroke'];
+const UPLOADS = ['image', 'file'];
+/* what ความเห็น holds (owner, 2026-10-28): notes, text, uploads, and a drawing someone wrote a note on or replied to.
+   The rest (a line, an arrow, a box with only the text it covers) goes under ภาพวาด */
+export const isNoted = (it, replied = false) => !DRAWN.includes(it.kind) || !!String(it.text || '').trim() || replied;
 const kb = n => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const extOf = name => (String(name).includes('.') ? String(name).split('.').pop() : '').slice(0, 4).toUpperCase();
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'];
@@ -83,7 +90,7 @@ export function typeAllowed(file, types) {
 export function createItems(ctx) {
   const { api, bridge, ME } = ctx;
   let ITEMS = (ctx.board().items || []).slice();
-  let selected = null, editing = null, dragging = null, drawing = null, temp = -1;
+  let selected = null, hovered = null, editing = null, dragging = null, drawing = null, temp = -1;
   const state = { color: 'orange', noteColor: 'yellow', mouse: null };
   const isMine = it => it.mine ?? String(it.user?.id) === String(ME.id);
   const forStep = key => ITEMS.filter(it => it.step === key);
@@ -123,7 +130,10 @@ export function createItems(ctx) {
         ? `<defs><marker id="ah${it.id}" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${stroke}"/></marker></defs><polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="3" stroke-linecap="round" marker-end="url(#ah${it.id})"/>`
         : `<polyline points="${pts}" fill="none" stroke="${stroke}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
     }
-    return `<svg ${base} style="${box}" viewBox="0 0 ${w + PAD * 2} ${h + PAD * 2}">${shape}<rect class="hit" x="0" y="0" width="${w + PAD * 2}" height="${h + PAD * 2}" fill="transparent"/></svg>`;
+    /* selected: handles at the corners, as on the notes and pictures (their handles are CSS) */
+    const W = w + PAD * 2, H = h + PAD * 2;
+    const handles = sel ? [[0, 0], [W, 0], [0, H], [W, H]].map(([a, b]) => `<rect class="hd" x="${a - 3.5}" y="${b - 3.5}" width="7" height="7" rx="1.5"/>`).join('') : '';
+    return `<svg ${base} style="${box}" viewBox="0 0 ${W} ${H}">${shape}<rect class="hit" x="0" y="0" width="${W}" height="${H}" fill="transparent"/>${handles}</svg>`;
   }
 
   function render() {
@@ -137,7 +147,7 @@ export function createItems(ctx) {
       inner.style.transform = f.crop ? '' : `translateY(${-f.scrollY}px)`;
       inner.innerHTML = list.filter(it => onFrame(it, where(f))).map(itemHtml).join('');
     });
-    renderSelection();
+    renderBar();
   }
   const where = f => ({ option: f.opt.key || null, device: f.cell.dev, src: ctx.frameSrc(f) });
 
@@ -222,9 +232,6 @@ export function createItems(ctx) {
       const o = agentPoint(d.tg, b.x, b.y);
       const r = await bridge.ask(d.tg.f.ifr.contentWindow, 'box', { rect: { x: o.x, y: o.y, w: b.w, h: b.h } });
       if (r?.texts?.length) { fields.texts = r.texts; }
-      /* a box over a screen asks why straight away, as the workbench's กรอบ did; Esc keeps the box without one */
-      const note = await askNote(fields, '');
-      if (note) { fields.text = note; }
     }
     if (d.tg.f && kind === 'arrow') {
       const tip = d.points.at(-1);
@@ -239,7 +246,7 @@ export function createItems(ctx) {
     await create(fields);
   }
 
-  /* the note of a box or a ring over a screen, in a popover by the mouse; resolves with the text, or '' (Esc, ข้าม) */
+  /* the note of a drawing, in a popover by the mouse; resolves with the text, or '' (Esc, ไม่ใส่โน้ต) */
   function askNote(it, text) {
     return new Promise(done => {
       $('.k-pop.k-inote')?.remove();
@@ -313,34 +320,73 @@ export function createItems(ctx) {
     el.addEventListener('keydown', onKey);
   }
 
-  /* ---------- writes ---------- */
-  async function create(fields) {
+  /* ---------- writes; mine go on the undo stack unless undo itself is writing ---------- */
+  async function create(fields, { record = true } = {}) {
     const body = { round: ctx.round().number, step: ctx.step().key, ...fields };
     const local = { ...body, id: temp--, pending: true, user: { id: ME.id, name: ME.name, avatar: ME.avatar ?? null }, mine: true, created_at: new Date().toISOString() };
     ITEMS.push(local);
     render();
+    let it = null;
     try {
-      const it = await api.createItem(ctx.board().slug, body);
+      it = await api.createItem(ctx.board().slug, body);
       ITEMS = ITEMS.map(x => (x === local ? it : x));
+      if (record && !UPLOADS.includes(it.kind)) { history().record.add(it); }
     } catch { ITEMS = ITEMS.filter(x => x !== local); toast(t('save_failed')); }
     changed();
+    return it;
   }
-  async function patch(it, fields) {
-    const before = { ...it };
+  /* `from` is the item as it was when a drag began, since a drag moves it before the write */
+  async function patch(it, fields, { record = true, from = it } = {}) {
+    const before = Object.fromEntries(Object.keys(fields).map(k => [k, structuredClone(from[k] ?? null)]));
     Object.assign(it, fields);
     render();
     try {
       const fresh = await api.patchItem(it.id, fields);
       ITEMS = ITEMS.map(x => (x.id === it.id ? fresh : x));
-    } catch { Object.assign(it, before); toast(t('save_failed')); }
-    changed();
+      if (record && isMine(it)) { history().record.patch(fresh, before, structuredClone(fields)); }
+      changed();
+      return fresh;
+    } catch { Object.assign(it, before); toast(t('save_failed')); changed(); return null; }
   }
-  async function remove(it) {
-    if (!isMine(it)) { return; }
+  async function remove(it, { record = true } = {}) {
+    if (!isMine(it)) { return false; }
     ITEMS = ITEMS.filter(x => x !== it);
-    selected = null;
+    if (String(selected) === String(it.id)) { selected = null; }
+    if (String(hovered) === String(it.id)) { hovered = null; }
     changed();
-    try { await api.deleteItem(it.id); } catch { ITEMS.push(it); toast(t('save_failed')); changed(); }
+    try {
+      await api.deleteItem(it.id);
+      if (record && !UPLOADS.includes(it.kind)) { history().record.remove(it); }
+      return true;
+    } catch { ITEMS.push(it); toast(t('save_failed')); changed(); return false; }
+  }
+  /* a copy of a drawing or a note of mine, a little down and to the right */
+  async function duplicate(it) {
+    const copy = await create({ ...fieldsOf(it), x: Math.round(+it.x + 16), y: Math.round(+it.y + 16) });
+    if (copy) { select(copy.id); }
+  }
+  /* a drawing's note, from its bar, its menu or a double click */
+  function noteOn(it) {
+    askNote(it, it.text || '').then(text => { if (text !== String(it.text || '').trim()) { patch(it, { text }); } });
+  }
+
+  /* ---------- undo and redo: one stack per board and round, this visit only ---------- */
+  const missing = () => Object.assign(new Error('gone'), { status: 404 });
+  const ops = {
+    create: async fields => (await create(fields, { record: false })) || Promise.reject(missing()),
+    patch: async (id, fields) => { const it = byId(id); return (it && await patch(it, fields, { record: false })) || Promise.reject(missing()); },
+    remove: async id => { const it = byId(id); return (it && await remove(it, { record: false })) || Promise.reject(missing()); },
+  };
+  const stacks = new Map();
+  function history() {
+    const key = `${ctx.board().slug}:${ctx.round().number}`;
+    if (!stacks.has(key)) { stacks.set(key, createUndo(ops, () => ctx.onHistory?.())); }
+    return stacks.get(key);
+  }
+  async function undoRedo(which) {
+    if (!ctx.canWrite() || editing !== null || dragging !== null || drawing !== null) { return; }
+    $('.k-ibar')?.remove();
+    await history()[which]();
   }
   function changed() { render(); ctx.onChange(); }
 
@@ -405,28 +451,100 @@ export function createItems(ctx) {
     if (tg) { [...e.dataTransfer.files].forEach((f, i) => upload(f, tg, i * 264)); }
   }
 
-  /* ---------- select, move, resize ---------- */
-  function select(id) { selected = id; render(); }
-  function renderSelection() {
+  /* ---------- select, hover, the action bar and the item menu ---------- */
+  function select(id) { selected = id; render(); markRows(); }
+  const canAct = it => !!it && isMine(it) && ctx.canWrite() && it.id > 0;
+  const paletteOf = it => (it.kind === 'note' ? STICKIES : UPLOADS.includes(it.kind) ? {} : STROKES);
+  const btn = (attr, k, label) => `<button ${attr} data-tip="${esc(label)}" aria-label="${esc(label)}">${icon(k)}</button>`;
+  /* ลบ · เปลี่ยนสี · ใส่โน้ต · ทำซ้ำ (owner, 2026-10-28); a note or a text line edits its own words instead */
+  function actionsHtml(it) {
+    const pal = paletteOf(it);
+    const swatches = Object.entries(pal).map(([k, c]) => `<button class="sw ${k === it.color ? 'on' : ''}" data-icolor="${k}" style="background:${c}" aria-label="${k}"></button>`).join('');
+    return [
+      swatches ? `<button class="k-idot" data-icolors data-tip="${esc(t('recolor'))}" aria-label="${esc(t('recolor'))}"><i style="background:${pal[it.color] || Object.values(pal)[0]}"></i></button><span class="sws">${swatches}</span>` : '',
+      ['note', 'text'].includes(it.kind) ? btn('data-iedit', 'pencil', t('edit')) : DRAWN.includes(it.kind) ? btn('data-inote', 'note', it.text ? t('edit_note') : t('add_note')) : '',
+      UPLOADS.includes(it.kind) ? '' : btn('data-idup', 'copy', t('duplicate')),
+      it.file?.url ? iconLink(it.file.url) : '',
+      btn('data-idel', 'trash', t('delete')),
+    ].filter(Boolean).join('');
+  }
+  /* the bar sits by the item under the mouse when it is mine, else by the selected one; someone else's item shows
+     whose it is when selected, and only lights up on hover */
+  function renderBar() {
     $('.k-ibar')?.remove();
-    const it = selected !== null && byId(selected);
+    if (editing !== null || dragging !== null || drawing !== null) { return; }
+    const h = hovered !== null && byId(hovered);
+    const it = canAct(h) ? h : selected !== null && byId(selected);
     const el = it && $(`[data-item="${it.id}"]`);
-    if (!el || editing !== null) { return; }
-    const r = el.getBoundingClientRect();
+    if (!el) { return; }
     const bar = document.createElement('div');
     bar.className = 'k-ibar';
-    const mine = isMine(it) && ctx.canWrite();
-    const palette = it.kind === 'note' ? STICKIES : ['image', 'file'].includes(it.kind) ? {} : STROKES;
-    bar.innerHTML = mine
-      ? Object.entries(palette).map(([k, c]) => `<button class="sw ${k === it.color ? 'on' : ''}" data-icolor="${k}" style="background:${c}" aria-label="${k}"></button>`).join('')
-        + (Object.keys(palette).length ? '<span class="vr"></span>' : '')
-        + (['note', 'text'].includes(it.kind) ? `<button data-iedit data-tip="${esc(t('edit'))}" aria-label="${esc(t('edit'))}">${icon('pencil')}</button>` : '')
-        + (it.file?.url ? iconLink(it.file.url) : '')
-        + `<button data-idel data-tip="${esc(t('delete'))}" aria-label="${esc(t('delete'))}">${icon('trash')}</button>`
+    bar.dataset.for = it.id;
+    bar.innerHTML = canAct(it) ? actionsHtml(it)
       : `<span class="note">${esc(t('item_of', { name: it.user?.name || '', date: shortDate(it.created_at, true) }))}</span>${it.file?.url ? iconLink(it.file.url) : ''}`;
     document.body.appendChild(bar);
+    const r = el.getBoundingClientRect();
     bar.style.left = `${clamp(r.left, 8, innerWidth - bar.offsetWidth - 8)}px`;
     bar.style.top = `${r.bottom + 8 + bar.offsetHeight > innerHeight ? r.top - bar.offsetHeight - 8 : r.bottom + 8}px`;
+  }
+  /* the item under the mouse; leaving it (and its bar) clears it after a moment, so the bar can be reached */
+  let leaveT = 0;
+  function hoverOn(id) {
+    if (id !== null) {
+      clearTimeout(leaveT);
+      leaveT = 0;
+      if (String(id) !== String(hovered)) { hovered = id; renderBar(); markRows(); }
+      return;
+    }
+    if (hovered === null || leaveT) { return; }
+    leaveT = setTimeout(() => { leaveT = 0; hovered = null; renderBar(); markRows(); }, 300);
+  }
+  /* the panel row of the item under the mouse, and of the selected one */
+  function markRows() {
+    $$('[data-goitem]').forEach(r => {
+      r.classList.toggle('on', String(r.dataset.goitem) === String(selected));
+      r.classList.toggle('hl', String(r.dataset.goitem) === String(hovered));
+    });
+  }
+  /* right click on an item of mine: the bar's actions as a menu */
+  let menu = null;
+  function closeMenu() { menu?.remove(); menu = null; }
+  function contextMenu(e) {
+    const el = e.target.closest?.('[data-item]');
+    const it = el && byId(el.dataset.item);
+    if (!canAct(it)) { return false; }
+    e.preventDefault();
+    closeMenu();
+    hideTip();
+    select(it.id);
+    $('.k-ibar')?.remove();
+    const pal = paletteOf(it);
+    const row = (attr, k, label, kb = '') => `<button ${attr}><span class="ic">${icon(k)}</span>${esc(label)}${kb ? `<span class="kb">${kb}</span>` : ''}</button>`;
+    menu = document.createElement('div');
+    menu.className = 'k-ctx k-ictx';
+    menu.innerHTML = [
+      Object.keys(pal).length ? `<div class="sws">${Object.entries(pal).map(([k, c]) => `<button class="sw ${k === it.color ? 'on' : ''}" data-icolor="${k}" style="background:${c}" aria-label="${k}"></button>`).join('')}</div><hr>` : '',
+      ['note', 'text'].includes(it.kind) ? row('data-iedit', 'pencil', t('edit'), '↵') : DRAWN.includes(it.kind) ? row('data-inote', 'note', it.text ? t('edit_note') : t('add_note')) : '',
+      UPLOADS.includes(it.kind) ? '' : row('data-idup', 'copy', t('duplicate')),
+      `<hr>${row('data-idel', 'trash', t('delete'), '⌫')}`,
+    ].join('');
+    document.body.appendChild(menu);
+    menu.style.left = `${Math.min(e.clientX, innerWidth - menu.offsetWidth - 8)}px`;
+    menu.style.top = `${Math.min(e.clientY, innerHeight - menu.offsetHeight - 8)}px`;
+    menu.addEventListener('click', ev => { const b = ev.target.closest('button'); if (b) { closeMenu(); act(b, it); } });
+    return true;
+  }
+  /* one action from the bar, the menu or a panel row */
+  function act(b, it) {
+    if (!it) { return false; }
+    const d = b.dataset;
+    if (d.icolors !== undefined) { b.closest('.k-ibar')?.classList.toggle('open'); return true; }
+    if (d.icolor) { if (d.icolor !== it.color) { patch(it, { color: d.icolor }); } return true; }
+    if (d.iedit !== undefined) { $('.k-ibar')?.remove(); edit(it.id); return true; }
+    if (d.inote !== undefined) { $('.k-ibar')?.remove(); noteOn(it); return true; }
+    if (d.idup !== undefined) { duplicate(it); return true; }
+    if (d.idel !== undefined || d.irm !== undefined) { remove(it); return true; }
+    return false;
   }
   function startMove(it, ev) {
     const el = $(`[data-item="${it.id}"]`);
@@ -434,6 +552,7 @@ export function createItems(ctx) {
     const sx = ev.clientX, sy = ev.clientY, x0 = +it.x, y0 = +it.y;
     const resizing = ev.target.closest('.rz') && it.kind === 'note';
     const w0 = +it.w || 180, h0 = +it.h || 120;
+    const from = { ...it, anchor: structuredClone(it.anchor), w: w0, h: h0 };
     let moved = false;
     dragging = it.id;
     $('.k-ibar')?.remove();
@@ -458,35 +577,39 @@ export function createItems(ctx) {
       removeEventListener('pointermove', move);
       removeEventListener('pointerup', up);
       dragging = null;
-      if (!moved || it.id <= 0) { renderSelection(); return; }
-      if (resizing) { patch(it, { w: it.w, h: it.h }); return; }
+      if (!moved || it.id <= 0) { renderBar(); return; }
+      if (resizing) { patch(it, { w: it.w, h: it.h }, { from }); return; }
       /* where it was dropped decides its anchor: its middle picks the frame or group, its top-left becomes x/y there */
       const r = el.getBoundingClientRect(), pad = el.tagName.toLowerCase() === 'svg' ? PAD * ctx.view.z : 0;
-      patch(it, movePatch(it, targetAt(r.left + r.width / 2, r.top + r.height / 2, { x: r.left + pad, y: r.top + pad })));
+      patch(it, movePatch(it, targetAt(r.left + r.width / 2, r.top + r.height / 2, { x: r.left + pad, y: r.top + pad })), { from });
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
   }
 
-  /* ---------- the panel: the ข้อมูลเพิ่มเติม tab (pick B) and items in the thread (pick C) ---------- */
+  /* ---------- the panel: ความเห็น holds the real notes, ภาพวาด the rest (owner, 2026-10-28) ---------- */
+  function split(key, comments = []) {
+    const replied = it => comments.some(c => String(c.item_id) === String(it.id));
+    const list = forStep(key).filter(it => !it.draft);
+    return { notes: list.filter(it => isNoted(it, replied(it))), drawings: list.filter(it => !isNoted(it, replied(it))) };
+  }
+  /* ลบ shows on a row of mine when hovered */
+  const rmBtn = it => (canAct(it) ? `<button data-irm="${it.id}" data-tip="${esc(t('delete'))}" aria-label="${esc(t('delete'))}">${icon('trash')}</button>` : '');
   function rowHtml(it) {
-    const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
-    const file = it.kind === 'file' && it.file?.url ? iconLink(it.file.url) : '';
     const where = isOn(it) && it.anchor.option ? ` ${t('on_option', { o: it.anchor.option })}` : '';
+    const acts = rmBtn(it);
     return `<div class="k-irow" data-goitem="${it.id}"><span class="ic k-i-ic-${it.kind}">${ICON[it.kind] || '•'}</span><span class="h"><b>${esc(it.user?.name || '')}</b> ${esc(when(it.created_at))}</span>
-      <span class="b">${esc(summary(it))}${esc(where)}</span>${file ? `<span class="acts">${file}</span>` : ''}${thumb}</div>`;
+      <span class="b">${esc(summary(it))}${esc(where)}</span>${acts ? `<span class="acts">${acts}</span>` : ''}</div>`;
   }
-  function tabHtml(key) {
-    const list = forStep(key);
-    return list.length ? `<div class="k-ilist">${list.map(rowHtml).join('')}</div>` : `<div class="k-lab">${t('no_items')}</div>`;
-  }
+  const rowsHtml = list => `<div class="k-ilist">${list.map(rowHtml).join('')}</div>`;
   /* an item as an entry of the thread, with its replies (comments whose item_id is this item) */
   function threadEntry(it, comments, commentHtml, composer) {
     const replies = comments.filter(c => String(c.item_id) === String(it.id));
     const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
     const file = it.kind === 'file' && it.file?.url ? iconLink(it.file.url) : '';
-    const reply = ctx.canWrite() && ctx.multiUser !== false && it.id > 0 ? `<span class="acts">${file}<button data-ireply="${it.id}" data-tip="${esc(t('reply'))}" aria-label="${esc(t('reply'))}">${icon('reply')}</button></span>` : file ? `<span class="acts">${file}</span>` : '';
-    return `<div class="k-cm k-icm" data-goitem="${it.id}">${avatar(it.user, { tip: it.user?.name })}<div class="h"><b>${esc(it.user?.name || '')}</b><span>${esc(when(it.created_at))} · ${esc(t(`added_${it.kind}`))}</span>${reply}</div>
+    const reply = ctx.canWrite() && ctx.multiUser !== false && it.id > 0 ? `<button data-ireply="${it.id}" data-tip="${esc(t('reply'))}" aria-label="${esc(t('reply'))}">${icon('reply')}</button>` : '';
+    const acts = file + reply + rmBtn(it);
+    return `<div class="k-cm k-icm" data-goitem="${it.id}">${avatar(it.user, { tip: it.user?.name })}<div class="h"><b>${esc(it.user?.name || '')}</b><span>${esc(when(it.created_at))} · ${esc(t(`added_${it.kind}`))}</span>${acts ? `<span class="acts">${acts}</span>` : ''}</div>
       <div class="b"><span class="k-i-ic">${ICON[it.kind] || ''}</span> ${esc(summary(it))}</div>${thumb ? `<div class="b">${thumb}</div>` : ''}
       ${replies.length ? `<div class="k-replies">${replies.map(r => commentHtml(r, false)).join('')}</div>` : ''}
       <div class="k-replybox" data-ireplybox="${it.id}" hidden>${composer(`item:${it.id}`, t('reply_ph'))}</div></div>`;
@@ -529,26 +652,28 @@ export function createItems(ctx) {
       if (ctx.canWrite()) { startMove(it, e); }
       return true;
     }
-    if (selected !== null && !e.target.closest('.k-ibar, .k-panel')) { selected = null; render(); }
+    if (selected !== null && !e.target.closest('.k-ibar, .k-ictx, .k-panel')) { selected = null; render(); markRows(); }
     return false;
   }
   function click(e) {
-    const b = e.target.closest('[data-icolor], [data-iedit], [data-idel], [data-ireply], [data-goitem]');
+    const b = e.target.closest('[data-icolors], [data-icolor], [data-iedit], [data-inote], [data-idup], [data-idel], [data-irm], [data-ireply], [data-goitem]');
     if (!b) { return false; }
     if (b.closest('a') || e.target.closest('a')) { return false; }
-    const it = byId(selected);
-    if (b.dataset.icolor && it) { patch(it, { color: b.dataset.icolor }); return true; }
-    if (b.dataset.iedit !== undefined && it) { $('.k-ibar')?.remove(); edit(it.id); return true; }
-    if (b.dataset.idel !== undefined && it) { remove(it); return true; }
+    if (b.dataset.irm) { act(b, byId(b.dataset.irm)); return true; }
+    const bar = b.closest('.k-ibar');
+    if (bar) { act(b, byId(bar.dataset.for)); return true; }
     if (b.dataset.ireply) { const box = $(`[data-ireplybox="${b.dataset.ireply}"]`); if (box) { box.hidden = false; $('textarea', box)?.focus(); } return true; }
     if (b.dataset.goitem && !e.target.closest('.k-replies, .k-replybox, .acts')) { goTo(b.dataset.goitem); return true; }
     return false;
   }
   function keyDown(e) {
-    if (editing !== null || e.target.closest?.('input, textarea, [contenteditable]')) { return false; }
+    if (editing !== null || typing(e.target)) { return false; }
+    const k = undoKey(e);
+    if (k) { e.preventDefault(); undoRedo(k); return true; }
+    if (e.key === 'Escape' && menu) { closeMenu(); return true; }
     const it = selected !== null && byId(selected);
     if (it && (e.key === 'Delete' || e.key === 'Backspace') && isMine(it)) { e.preventDefault(); remove(it); return true; }
-    if (it && e.key === 'Enter' && isMine(it)) { e.preventDefault(); edit(it.id); return true; }
+    if (it && e.key === 'Enter' && isMine(it)) { e.preventDefault(); if (DRAWN.includes(it.kind)) { noteOn(it); } else { edit(it.id); } return true; }
     if (it && e.key === 'Escape') { select(null); return true; }
     return false;
   }
@@ -556,11 +681,8 @@ export function createItems(ctx) {
     const el = e.target.closest?.('[data-item]');
     if (!el) { return false; }
     const it = byId(el.dataset.item);
-    /* a box or a ring of mine: its note again */
-    if (it && MARKS.includes(it.kind) && isMine(it) && ctx.canWrite() && it.id > 0) {
-      askNote(it, it.text || '').then(text => { if (text !== (it.text || '').trim() && (text || it.text)) { patch(it, { text }); } });
-      return true;
-    }
+    /* a drawing of mine: its note */
+    if (it && DRAWN.includes(it.kind) && canAct(it)) { noteOn(it); return true; }
     edit(el.dataset.item);
     return true;
   }
@@ -576,9 +698,19 @@ export function createItems(ctx) {
   document.addEventListener('mousemove', e => {
     state.mouse = { x: e.clientX, y: e.clientY };
     const el = e.target.closest?.('[data-item]');
-    const it = el && !dragging && byId(el.dataset.item);
-    if (it) { showTip(it, e); } else { hideTip(); }
+    const it = el && dragging === null && drawing === null && byId(el.dataset.item);
+    if (it && !menu) { showTip(it, e); } else { hideTip(); }
+    /* the item under the mouse, or the one whose bar the mouse is on */
+    if (dragging === null && drawing === null) { hoverOn(it ? it.id : e.target.closest?.('.k-ibar') ? hovered : null); }
   });
+  /* a row in the panel lights its item up on the canvas */
+  document.addEventListener('mouseover', e => {
+    const row = e.target.closest?.('#panel [data-goitem]');
+    $$('.k-item.hl').forEach(x => x.classList.remove('hl'));
+    if (row) { $(`[data-item="${row.dataset.goitem}"]`)?.classList.add('hl'); }
+  });
+  document.addEventListener('pointerdown', e => { if (menu && !e.target.closest('.k-ictx')) { closeMenu(); } }, true);
+  addEventListener('blur', closeMenu);
 
   /* fresh items from the server; whatever is being typed or dragged here stays as it is */
   function merge(fresh) {
@@ -588,8 +720,9 @@ export function createItems(ctx) {
   }
 
   return {
-    render, merge, pointerDown, click, keyDown, dblclick, tabHtml, threadEntry, state, renderSelection,
+    render, merge, pointerDown, click, keyDown, dblclick, contextMenu, split, rowsHtml, threadEntry, markRows, state, renderSelection: renderBar,
     forStep, all: () => ITEMS, busy: () => editing !== null || dragging !== null || drawing !== null,
-    deselect: () => { selected = null; $('.k-ibar')?.remove(); },
+    deselect: () => { selected = null; $('.k-ibar')?.remove(); markRows(); },
+    undo: () => undoRedo('undo'), redo: () => undoRedo('redo'), canUndo: () => history().canUndo(), canRedo: () => history().canRedo(),
   };
 }

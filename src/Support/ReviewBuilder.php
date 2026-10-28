@@ -156,6 +156,7 @@ final class ReviewBuilder
         $comments = $this->comments->where('step_key', $stepKey)
             ->map(fn (Comment $comment): array => [self::order($comment->created_at, 0, $comment->id), $this->commentLine($comment), $comment->replies]);
         $items = $this->items->where('step_key', $stepKey)
+            ->reject(fn (Item $item): bool => self::bare($item))
             ->map(fn (Item $item): array => [self::order($item->created_at, 1, $item->id), $this->itemLine($item), $item->replies]);
 
         return $comments->concat($items)
@@ -197,6 +198,17 @@ final class ReviewBuilder
         $drawn = in_array($item->kind, [ItemKind::Arrow, ItemKind::Rect, ItemKind::Ellipse, ItemKind::Stroke], strict: true);
 
         return $drawn && $note !== '' ? "{$line}: {$note}" : $line;
+    }
+
+    /**
+     * A line or an arrow with no note and no reply says nothing to whoever reads the review, so it stays out. A box
+     * or a ring stays, since the text it covers is what it points at.
+     */
+    private static function bare(Item $item): bool
+    {
+        return in_array($item->kind, [ItemKind::Stroke, ItemKind::Arrow], strict: true)
+            && trim((string) $item->text) === ''
+            && $item->replies->isEmpty();
     }
 
     /**
