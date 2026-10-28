@@ -12,6 +12,10 @@
  * Sign in as someone else with ?as=2 (users below). The session is a cookie (HttpOnly, SameSite=Lax), and
  * writes need the boot payload's CSRF token, like Laravel's web middleware.
  *
+ * /design/_workbench/index.html is the design workbench (dist/workbench.js on a LocalStore) over the fixture folder
+ * resources/board/dev/design, as the design skill links it into a project's public/design. pages.php is mocked
+ * here (archive, restore, delete and upload change memory only).
+ *
  * /dev/secret answers only with the session cookie, and /dev/log lists every call it got, with the origin
  * and whether the cookie came along: open a frame's console and fetch it to prove a frame can't.
  */
@@ -463,9 +467,51 @@ function exportMd(b, me) {
   return lines.join('\n') + '\n';
 }
 
+/* ---------- the design workbench over a fixture public/design (dist/workbench.*, pages.php mocked) ---------- */
+const DESIGN = path.join(HERE, 'design');
+const WB_PAGES = JSON.parse(fs.readFileSync(path.join(DESIGN, 'index.json'), 'utf8'));
+const WB_FILES = {};
+async function serveDesign(req, res, url) {
+  if (!url.pathname.startsWith('/design/')) { return false; }
+  const rel = decodeURIComponent(url.pathname.slice('/design/'.length));
+  if (rel === 'index.json') { sendJson(res, 200, WB_PAGES); return true; }
+  if (rel === '_workbench/pages.php' && req.method === 'POST') {
+    /* upload as the skill's pages.php takes it: the raw file, ?action=upload&slug=&name=, X-Workbench-Upload: 1 */
+    if (url.searchParams.get('action') === 'upload') {
+      if (req.headers['x-workbench-upload'] !== '1') { sendJson(res, 403, { ok: false, why: 'header' }); return true; }
+      const buf = await readRaw(req), slug = url.searchParams.get('slug') || '';
+      if (buf.length > 20 * 1024 * 1024) { sendJson(res, 413, { ok: false, why: 'too big' }); return true; }
+      const name = `${Date.now().toString(36)}-${(url.searchParams.get('name') || 'file').replace(/[^\p{L}\p{M}\p{N}._-]+/gu, '-')}`;
+      const mime = req.headers['content-type'] || 'application/octet-stream';
+      WB_FILES[`${slug}/attachments/${name}`] = { buf, type: mime };
+      sendJson(res, 200, { ok: true, url: `/design/${slug}/attachments/${name}`, name, size: buf.length, mime });
+      return true;
+    }
+    const b = await readBody(req) || {};
+    const done = [], skipped = [];
+    (b.slugs || []).forEach(slug => {
+      const i = WB_PAGES.findIndex(p => p.slug === slug);
+      if (i < 0) { skipped.push({ slug, why: 'ไม่มีหน้านี้' }); return; }
+      if (b.action === 'delete') { WB_PAGES.splice(i, 1); } else { WB_PAGES[i].archived = b.action === 'archive'; }
+      done.push(slug);
+    });
+    sendJson(res, 200, { ok: true, done, skipped });
+    return true;
+  }
+  if (WB_FILES[rel]) { send(res, 200, WB_FILES[rel].buf, { 'Content-Type': WB_FILES[rel].type }); return true; }
+  const file = rel.startsWith('_workbench/')
+    ? (rel === '_workbench/index.html' || rel === '_workbench/' ? path.join(HERE, 'workbench.html') : path.join(ROOT, 'dist', path.basename(rel)))
+    : path.join(DESIGN, rel);
+  if (!file.startsWith(HERE) && !file.startsWith(path.join(ROOT, 'dist'))) { send(res, 403, 'no'); return true; }
+  if (!exists(file) || fs.statSync(file).isDirectory()) { send(res, 404, 'not found'); return true; }
+  send(res, 200, fs.readFileSync(file), { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' });
+  return true;
+}
+
 async function app(req, res) {
   const url = new URL(req.url, APP);
   if (serveContent(req, res, url)) { return; }
+  if (await serveDesign(req, res, url)) { return; }
   const jar = cookies(req);
   let me = +jar.kradan_dev_session || 0;
   const setCookie = [];
@@ -508,7 +554,7 @@ async function app(req, res) {
 }
 
 http.createServer((req, res) => app(req, res).catch(err => { console.error(err); send(res, 500, String(err)); })).listen(PORT, () => {
-  console.log(`kradan dev → ${APP}/kradan  (${BOARDS.length} boards, content from ${CONTENT})`);
+  console.log(`kradan dev → ${APP}/kradan  (${BOARDS.length} boards, content from ${CONTENT})  · workbench → ${APP}/design/_workbench/index.html`);
 });
 if (OPTION_C) {
   http.createServer((req, res) => serveContent(req, res, new URL(req.url, CONTENT)) || send(res, 404, 'content host')).listen(CONTENT_PORT);

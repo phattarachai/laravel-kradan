@@ -5,10 +5,14 @@ import { mountBoard } from './board.js';
 import { KradanStore } from './api.js';
 import { mountIndex } from './index.js';
 import { setFavicon } from './icon.js';
+import { applyTheme } from './theme.js';
 
 const boot = window.Kradan || {};
 setLocale(boot.locale || 'th');
 document.documentElement.lang = boot.locale === 'en' ? 'en' : 'th';
+
+/* the theme first (kradan.theme), then the app's accent on top of it */
+applyTheme(boot.theme);
 
 /* branding: the app's accent shows on the workspace badge; Kradan's own green does the picking */
 const accent = boot.brand?.accent;
@@ -18,7 +22,6 @@ if (accent && /^#[0-9a-f]{6}$/i.test(accent)) {
 }
 
 setFavicon();
-
 
 const root = document.getElementById('kradan');
 try {

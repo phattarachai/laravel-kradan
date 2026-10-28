@@ -1,0 +1,6 @@
+{"slug": "2610-90-wb-demo", "title": "Workbench demo รอบ 1", "sent": true, "savedAt": "2026-10-26T12:00:00.000Z", "overall": "",
+ "steps": [
+  {"n": 1, "group": "ตะกร้า", "title": "ปุ่มยืนยัน", "options": ["A", "B"], "picks": ["B"], "note": "สองขั้นดีกว่า", "pins": [], "edits": [], "seen": false},
+  {"n": 2, "group": "ตะกร้า", "title": "ยอดรวมเดิม", "options": ["A", "B"], "picks": [], "note": "", "pins": [], "edits": [], "seen": true},
+  {"n": 3, "group": "หน้าจอ", "title": "หน้ายืนยัน", "options": [], "picks": [], "note": "", "pins": [], "edits": [], "seen": true}
+ ], "missing": []}

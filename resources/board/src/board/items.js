@@ -450,7 +450,7 @@ export function createItems(ctx) {
     const replies = comments.filter(c => String(c.item_id) === String(it.id));
     const thumb = it.kind === 'image' && (it.file?.thumb || it.preview) ? `<img class="th" src="${esc(it.file?.thumb || it.preview)}" alt="" referrerpolicy="no-referrer">` : '';
     const file = it.kind === 'file' && it.file?.url ? iconLink(it.file.url) : '';
-    const reply = ctx.canWrite() && it.id > 0 ? `<span class="acts">${file}<button data-ireply="${it.id}" data-tip="${esc(t('reply'))}" aria-label="${esc(t('reply'))}">${icon('reply')}</button></span>` : file ? `<span class="acts">${file}</span>` : '';
+    const reply = ctx.canWrite() && ctx.multiUser !== false && it.id > 0 ? `<span class="acts">${file}<button data-ireply="${it.id}" data-tip="${esc(t('reply'))}" aria-label="${esc(t('reply'))}">${icon('reply')}</button></span>` : file ? `<span class="acts">${file}</span>` : '';
     return `<div class="k-cm k-icm" data-goitem="${it.id}">${avatar(it.user, { tip: it.user?.name })}<div class="h"><b>${esc(it.user?.name || '')}</b><span>${esc(when(it.created_at))} · ${esc(t(`added_${it.kind}`))}</span>${reply}</div>
       <div class="b"><span class="k-i-ic">${ICON[it.kind] || ''}</span> ${esc(summary(it))}</div>${thumb ? `<div class="b">${thumb}</div>` : ''}
       ${replies.length ? `<div class="k-replies">${replies.map(r => commentHtml(r, false)).join('')}</div>` : ''}
