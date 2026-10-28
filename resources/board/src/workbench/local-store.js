@@ -44,7 +44,7 @@ export async function readPage(raw, pageUrl, { parse, fetchText }) {
   return { html, title, steps, prints };
 }
 
-export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.localStorage, fetch: fetchFn = globalThis.fetch?.bind(globalThis), parse, agentUrl = '', origin = globalThis.location?.origin, me = ME, now = () => Date.now() }) {
+export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.localStorage, fetch: fetchFn = globalThis.fetch?.bind(globalThis), parse, agentUrl = '', origin = globalThis.location?.origin, me = ME, now = () => Date.now(), XMLHttpRequest: XMLHttpRequestImpl = globalThis.XMLHttpRequest }) {
   const MAIN = new URL(page);
   const PATH = MAIN.pathname;
   const SLUG = PATH.split('/').slice(-2)[0];
@@ -171,18 +171,45 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
   }
 
   const guard = round => { if (+round !== ROUNDS.at(-1).number) { throw readOnly(); } };
-  async function upload(file) {
+  /*
+   * pages.php upload (the skill, phase 3a): POST <workbench dir>/pages.php?action=upload&slug=&name= with the raw file
+   * and X-Workbench-Upload: 1 → {ok, url, name, size, mime}, url root-relative. 413 is too big (20 MB), 400/403 a
+   * refusal. With no pages.php (404, or no PHP at all) the file stays in the browser as a data URL, up to a cap.
+   */
+  const NO_PHP = Symbol('no php');
+  function post(file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const u = new URL(pagesUrl, MAIN);
+      Object.entries({ action: 'upload', slug: SLUG, name: file.name }).forEach(([k, v]) => u.searchParams.set(k, v));
+      const xhr = new XMLHttpRequestImpl();
+      xhr.open('POST', u.href);
+      xhr.setRequestHeader('X-Workbench-Upload', '1');
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = e => { if (e.lengthComputable) { onProgress?.(e.loaded / e.total * 100); } };
+      xhr.onload = () => {
+        let r = null;
+        try { r = JSON.parse(xhr.responseText); } catch { /* not pages.php */ }
+        if (xhr.status >= 200 && xhr.status < 300 && r?.ok && r.url) { resolve(r); return; }
+        if (xhr.status === 404 || (xhr.status < 300 && !r)) { reject(NO_PHP); return; }
+        reject(Object.assign(new Error(r?.why || String(xhr.status)), { status: xhr.status }));
+      };
+      xhr.onerror = () => reject(NO_PHP);
+      xhr.send(file);
+    });
+  }
+  async function upload(file, onProgress) {
     try {
-      const form = new FormData();
-      form.append('action', 'upload');
-      form.append('slug', SLUG);
-      form.append('file', file, file.name);
-      const r = await (await fetchFn(pagesUrl, { method: 'POST', body: form })).json();
-      if (r?.ok && r.url) { return { url: new URL(r.url, MAIN).href, path: r.path || '' }; }
-    } catch { /* no PHP here */ }
+      const r = await post(file, onProgress);
+      const url = new URL(r.url, MAIN);
+      /* where it sits next to the page, for review.md: attachments/<name> */
+      const dir = new URL('./', MAIN).pathname;
+      return { url: url.href, path: url.pathname.startsWith(dir) ? decodeURIComponent(url.pathname.slice(dir.length)) : '', name: r.name || file.name };
+    } catch (err) {
+      if (err !== NO_PHP) { throw err; }
+    }
     if (file.size > DATA_URL_MAX) { throw Object.assign(new Error('too big'), { status: 413 }); }
     const url = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(file); });
-    return { url, path: '' };
+    return { url, path: '', name: file.name };
   }
   const putItems = list => { set(ITEMS_KEY, list); changedAt = new Date(now()).toISOString(); listeners.forEach(fn => fn()); };
   const newItem = body => {
@@ -242,7 +269,7 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     },
     deleteItem: async id => { putItems(items().filter(x => x.id !== id)); return null; },
     uploadItem: async (slug, fields, file, onProgress) => {
-      const f = await upload(file);
+      const f = await upload(file, onProgress);
       onProgress?.(100);
       /* the board sends the multipart fields: anchor[option] and friends, numbers as text */
       const body = { step: fields.step, x: +fields.x || 0, y: +fields.y || 0, w: +fields.w || 0, h: +fields.h || 0,

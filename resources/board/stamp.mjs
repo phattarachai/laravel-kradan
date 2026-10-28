@@ -1,8 +1,11 @@
 /*
- * The workbench bundle's stamp (dist/workbench.json): the package version, the git short sha, and src_hash, a
- * sha256 over resources/board/src/** sorted by path. harness.sh hashes the package's source the same way to tell
- * when the skill's vendored copy is behind: for each file, its path relative to resources/board/src, a NUL, its
- * bytes, a NUL; all of it through one sha256.
+ * The workbench bundle's stamp (dist/workbench.json): the package version, the git short sha, and src_hash.
+ * harness.sh hashes the package's source the same way to tell when the skill's vendored copy is behind:
+ *   every regular file under resources/board/src (names starting with "." skipped, no symlinks followed),
+ *   paths relative to it with "/" separators, sorted by byte order; a manifest of one
+ *   "<sha256 hex of the file>  <path>\n" line per file (sha256sum style); src_hash = sha256 hex of the manifest.
+ * Shell: find . -name '.*' -prune -o -type f -print | sed 's|^\./||' | LC_ALL=C sort | while IFS= read -r f; do
+ *   printf '%s  %s\n' "$(shasum -a 256 "$f" | cut -d' ' -f1)" "$f"; done | shasum -a 256 | cut -d' ' -f1
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -13,17 +16,20 @@ import { execFileSync } from 'node:child_process';
 export const SKILL_DIR = path.join(os.homedir(), '.claude/skills/design/workbench');
 
 function files(dir, base = dir) {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(e => {
+  return fs.readdirSync(dir, { withFileTypes: true }).filter(e => !e.name.startsWith('.')).flatMap(e => {
     const p = path.join(dir, e.name);
-    return e.isDirectory() ? files(p, base) : [path.relative(base, p).split(path.sep).join('/')];
+    if (e.isDirectory()) { return files(p, base); }
+    return e.isFile() ? [path.relative(base, p).split(path.sep).join('/')] : [];
   });
 }
+/* byte order, as LC_ALL=C sort */
+const byBytes = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b));
 
 export function srcHash(root) {
   const dir = path.join(root, 'resources/board/src');
-  const h = crypto.createHash('sha256');
-  files(dir).sort().forEach(rel => { h.update(rel); h.update('\0'); h.update(fs.readFileSync(path.join(dir, rel))); h.update('\0'); });
-  return h.digest('hex');
+  const sha = buf => crypto.createHash('sha256').update(buf).digest('hex');
+  const manifest = files(dir).sort(byBytes).map(rel => `${sha(fs.readFileSync(path.join(dir, rel)))}  ${rel}\n`).join('');
+  return sha(manifest);
 }
 
 export function stamp(root) {

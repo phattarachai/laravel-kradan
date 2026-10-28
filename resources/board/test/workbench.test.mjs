@@ -121,3 +121,23 @@ test('the bundle stamp: src_hash is stable, and the build says when a vendored c
   assert.equal(behindLine(ROOT, dir), '');
   fs.rmSync(dir, { recursive: true });
 });
+
+test('src_hash is the skill recipe: sha256 over "<sha256>  <path>\\n" lines, paths sorted by bytes, dot names skipped', async () => {
+  const crypto = await import('node:crypto');
+  const sha = b => crypto.createHash('sha256').update(b).digest('hex');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wbh-'));
+  const src = path.join(root, 'resources/board/src');
+  const put = (rel, body) => { fs.mkdirSync(path.dirname(path.join(src, rel)), { recursive: true }); fs.writeFileSync(path.join(src, rel), body); };
+  put('b.js', 'b'); put('a/Z.js', 'z'); put('a/a.js', 'a'); put('.DS_Store', 'x'); put('.cache/skip.js', 'x'); put('B.css', 'B');
+  const manifest = ['B.css', 'a/Z.js', 'a/a.js', 'b.js'].map(rel => `${sha(fs.readFileSync(path.join(src, rel)))}  ${rel}\n`).join('');
+  assert.equal(srcHash(root), sha(manifest));
+  fs.rmSync(root, { recursive: true });
+});
+
+test('src_hash of the board source at 8c37484 is the value harness.sh got', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wb8-'));
+  try { execFileSync('sh', ['-c', `git -C "${ROOT}" archive 8c37484 resources/board/src | tar -x -C "${root}"`], { stdio: 'ignore' }); } catch { fs.rmSync(root, { recursive: true }); return; }
+  assert.equal(srcHash(root), '0b221b849784556c2dc1da7e55e5d15f0e05ab6eacb567582b2578d08ee9aaeb');
+  fs.rmSync(root, { recursive: true });
+});

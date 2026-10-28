@@ -476,13 +476,15 @@ async function serveDesign(req, res, url) {
   const rel = decodeURIComponent(url.pathname.slice('/design/'.length));
   if (rel === 'index.json') { sendJson(res, 200, WB_PAGES); return true; }
   if (rel === '_workbench/pages.php' && req.method === 'POST') {
-    const type = req.headers['content-type'] || '';
-    if (type.startsWith('multipart/form-data')) {
-      const mp = multipart(await readRaw(req), type);
-      if (mp.fields.action !== 'upload' || !mp.file) { sendJson(res, 422, { ok: false, why: 'no file' }); return true; }
-      const name = `${Date.now().toString(36)}-${mp.file.name.replace(/[^\p{L}\p{N}._-]+/gu, '-')}`;
-      WB_FILES[`${mp.fields.slug}/attachments/${name}`] = mp.file;
-      sendJson(res, 200, { ok: true, path: `attachments/${name}`, url: `/design/${mp.fields.slug}/attachments/${name}` });
+    /* upload as the skill's pages.php takes it: the raw file, ?action=upload&slug=&name=, X-Workbench-Upload: 1 */
+    if (url.searchParams.get('action') === 'upload') {
+      if (req.headers['x-workbench-upload'] !== '1') { sendJson(res, 403, { ok: false, why: 'header' }); return true; }
+      const buf = await readRaw(req), slug = url.searchParams.get('slug') || '';
+      if (buf.length > 20 * 1024 * 1024) { sendJson(res, 413, { ok: false, why: 'too big' }); return true; }
+      const name = `${Date.now().toString(36)}-${(url.searchParams.get('name') || 'file').replace(/[^\p{L}\p{M}\p{N}._-]+/gu, '-')}`;
+      const mime = req.headers['content-type'] || 'application/octet-stream';
+      WB_FILES[`${slug}/attachments/${name}`] = { buf, type: mime };
+      sendJson(res, 200, { ok: true, url: `/design/${slug}/attachments/${name}`, name, size: buf.length, mime });
       return true;
     }
     const b = await readBody(req) || {};
