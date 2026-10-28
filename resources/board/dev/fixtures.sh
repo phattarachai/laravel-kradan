@@ -2,9 +2,9 @@
 # Copies real review pages from a local project's public/design/ into dev/fixtures/local/ (gitignored:
 # they hold that project's data, and this repo is public). The dev server picks them up when present.
 #
-#   bash resources/board/dev/fixtures.sh [path/to/public/design]
+#   bash resources/board/dev/fixtures.sh path/to/public/design
 set -euo pipefail
-src="${1:-$HOME/www/f11-dr-backend/public/design}"
+src="${1:?usage: fixtures.sh path/to/public/design}"
 dst="$(cd "$(dirname "$0")" && pwd)/fixtures/local"
 rm -rf "$dst" && mkdir -p "$dst"
 copy() { [[ -f "$src/$1" ]] && mkdir -p "$dst/$2" && cp "$src/$1" "$dst/$2/index.html" && echo "fixture → $2"; }

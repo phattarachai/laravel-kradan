@@ -1,6 +1,6 @@
 {
     "name": "phattarachai/laravel-kradan",
-    "description": "A review board inside your Laravel app: Claude pushes design, decision and flow pages; your signed-in users pick options, comment and pin; Claude pulls the answers back.",
+    "description": "A review board inside your Laravel app: Claude pushes pages that ask for a decision; your signed-in users pick options, comment and pin; Claude pulls the answers back.",
     "keywords": [
         "laravel",
         "design-review",
@@ -62,6 +62,7 @@
             "@php vendor/bin/pest"
         ],
         "analyse": "vendor/bin/phpstan analyse",
-        "format": "vendor/bin/pint"
+        "format": "vendor/bin/pint",
+        "test:js": "npm test"
     }
 }
