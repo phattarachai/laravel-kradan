@@ -13,6 +13,7 @@ import { avatar, avatarRow, startPresence } from './presence.js';
 import { corner } from './icon.js';
 import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
+import { createKeep, answersKey } from './keep.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -510,11 +511,23 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const ps = picksFor(key).filter(p => p.options.includes(opt));
     return ps.length ? `<span class="k-avs k-pickers">${ps.map(p => avatar(p.user, { cls, tip: isMe(p.user) ? `${p.user.name} (${t('you')})` : p.user.name })).join('')}</span>` : '';
   }
+  /* what is typed in the panel outlives its re-render: drafts per step, and the focus and caret (T192) */
+  const keep = createKeep(), popKeep = createKeep();
+  let panelKey = null, panelStale = false;
+  const grow = ta => { ta.style.height = 'auto'; ta.style.height = Math.min(innerHeight * 0.5, ta.scrollHeight + 2) + 'px'; };
+  /* a draft whose box the render left out: a reply box that was open, an edit that was going on */
+  function reopen(what) {
+    const [kind, id] = [what.slice(0, what.indexOf(':')), what.slice(what.indexOf(':') + 1)];
+    if (kind === 'edit') { openEdit(+id, false); }
+    if (kind === 'compose' && /^\d+$/.test(id)) { openReply(id, false); }
+  }
   function renderPanel() {
     const st = step(), n = ui.step, key = st.key;
     const keys = myKeys(key);
     const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
+    if (panelKey !== null) { keep.save($('#panel'), panelKey); }
+    panelStale = false;
     const { notes, drawings } = items.split(key, COMMENTS);
     const count = panelCounts({ threads: threads(key), notes, drawings });
     /* comments and the notes people added, one thread by time (owner's pick C) */
@@ -542,6 +555,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       <div class="k-ppane" role="tabpanel" id="ppane-drawings" aria-labelledby="ptab-drawings" ${panelTab === 'drawings' ? '' : 'hidden'}>
         ${drawings.length ? items.rowsHtml(drawings) : `<div class="k-lab">${esc(t('no_drawings'))}</div>`}</div>
       ${ext.panelEnd ? ext.panelEnd(host) : ''}`;
+    panelKey = key;
+    keep.restore($('#panel'), key, reopen).forEach(ta => { const box = ta.closest('.k-replybox'); if (box) { box.hidden = false; } grow(ta); });
     $('#panel').scrollTop = scroll;
     renderThread();
     items.markRows();
@@ -586,6 +601,20 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       ${where(c)}${c.body ? `<div class="b">${esc(c.body)}</div>` : ''}
       ${top && (c.replies || []).length ? `<div class="k-replies">${c.replies.map(r => commentHtml(r, false, pop)).join('')}</div>` : ''}
       ${top && !pop ? `<div class="k-replybox" data-replybox="${c.id}" hidden></div>` : ''}</div>`;
+  }
+  function openReply(id, focus = true) {
+    const box = $(`#panel [data-replybox="${id}"]`);
+    if (!box) { return; }
+    box.hidden = false;
+    box.innerHTML = composer(id, t('reply_ph'));
+    if (focus) { $('textarea', box).focus(); }
+  }
+  function openEdit(id, focus = true) {
+    const c = COMMENTS.flatMap(x => [x, ...(x.replies || [])]).find(x => x.id === id);
+    const b = $(`#c-${id} > .b`);
+    if (!c || !b) { return; }
+    b.innerHTML = `<form class="k-compose" data-editform="${c.id}"><textarea rows="2">${esc(c.body)}</textarea><button class="k-btn" type="submit">${t('save')}</button></form>`;
+    if (focus) { $('textarea', b).focus(); }
   }
   const composer = (parent, ph = t('comment_ph')) => `<form class="k-compose" data-compose="${parent}"><textarea rows="1" placeholder="${esc(ph)}"></textarea><button class="k-btn" type="submit">${t('send')}</button></form>`;
 
@@ -698,7 +727,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       if (w) { w.innerHTML = pickers(st.key, g.dataset.key, ''); }
     });
     renderSide();
-    renderPanel();
+    panelSoon();
   }
 
   function sizeFrames() {
@@ -801,7 +830,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
   /* a pin's thread opens next to it on the canvas (owner's pick C), and stays in the panel too (A) */
   let threadPop = null;
-  function closeThread() { threadPop?.el.remove(); threadPop = null; }
+  function closeThread() { if (threadPop) { popKeep.save(threadPop.el, 'pop'); threadPop.el.remove(); } threadPop = null; }
   function openThread(id, anchor) {
     closeThread();
     closePop(true);
@@ -816,9 +845,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (!threadPop) { return; }
     const c = COMMENTS.find(x => x.id === threadPop.id);
     if (!c) { closeThread(); return; }
-    const typing = threadPop.el.contains(document.activeElement) ? document.activeElement.value : null;
+    popKeep.save(threadPop.el, 'pop');
     threadPop.el.innerHTML = `<div class="k-thread">${commentHtml(c, true, true)}</div>${CAN_WRITE() ? composer(c.id, t('reply_ph')) : ''}`;
-    if (typing !== null) { const ta = $('textarea', threadPop.el); if (ta) { ta.value = typing; ta.focus(); } }
+    popKeep.restore(threadPop.el, 'pop').forEach(grow);
     const r = (threadPop.anchor.isConnected ? threadPop.anchor : $(`[data-pin="${c.id}"]`) || threadPop.anchor).getBoundingClientRect();
     const el = threadPop.el;
     el.style.left = Math.max(8, Math.min(innerWidth - el.offsetWidth - 8, r.right + 10)) + 'px';
@@ -943,18 +972,32 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const latest = fresh.rounds.at(-1);
     const same = fresh.rounds.find(r => r.number === R.number);
     $('#freshb').hidden = !(latest.number !== LATEST() || JSON.stringify(same?.prints || {}) !== JSON.stringify(R.prints || {}));
-    const typing = document.activeElement?.closest?.('.k-panel textarea, .k-pop');
-    const changed = JSON.stringify([fresh.picks, fresh.comments, fresh.items]) !== JSON.stringify([PICKS, COMMENTS, items.all().filter(x => !x.pending && !x.draft)]);
+    /* my own write comes back in the store's order and shape; only a real change re-renders */
+    const changed = answersKey(fresh) !== answersKey({ picks: PICKS, comments: COMMENTS, items: items.all().filter(x => !x.pending && !x.draft) });
     B = { ...B, status: fresh.status, decided_at: fresh.decided_at, decided_by: fresh.decided_by, picks_locked: fresh.picks_locked, uploads: fresh.uploads ?? B.uploads };
     if (!changed) { return; }
     items.merge(fresh.items || []);
     PICKS = fresh.picks || [];
     COMMENTS = fresh.comments || [];
-    renderSide();
-    if (!typing) { renderPanel(); }
     renderPins();
     refreshPicks();
   }
+  /* a box being typed in is never rebuilt under the caret (T192): the panel catches up once typing stops,
+     and after the click that stopped it, so the click still lands */
+  const TYPING = '.k-panel textarea, .k-pop textarea';
+  const typing = () => !!document.activeElement?.closest?.(TYPING);
+  let pressed = false, afterUp = false;
+  function panelSoon() { if (typing()) { panelStale = true; return; } renderPanel(); }
+  function catchUp() {
+    if (!panelStale || typing()) { return; }
+    if (pressed) { afterUp = true; return; }
+    renderPanel();
+  }
+  document.addEventListener('focusout', e => { if (panelStale && e.target.closest?.(TYPING)) { setTimeout(catchUp, 0); } });
+  document.addEventListener('pointerdown', () => { pressed = true; }, true);
+  const up = () => { pressed = false; if (afterUp) { afterUp = false; setTimeout(catchUp, 0); } };
+  document.addEventListener('pointerup', up, true);
+  document.addEventListener('pointercancel', up, true);
 
   /* ---------- right-click menu ---------- */
   let ctx = null;
@@ -1223,16 +1266,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (d.pick) { togglePick(d.pick); return; }
     if (d.pickall !== undefined) { setPicks(step().options.map(o => o.key)); return; }
     if (d.pickclear !== undefined) { setPicks([]); return; }
-    if (d.reply) { const box = $(`[data-replybox="${d.reply}"]`); box.hidden = false; box.innerHTML = composer(d.reply, t('reply_ph')); $('textarea', box).focus(); return; }
+    if (d.reply) { openReply(d.reply); return; }
     if (d.cdel) { removeComment(+d.cdel); return; }
-    if (d.cedit) {
-      const c = COMMENTS.flatMap(x => [x, ...(x.replies || [])]).find(x => x.id === +d.cedit);
-      const b = $(`#c-${d.cedit} > .b`);
-      if (!c || !b) { return; }
-      b.innerHTML = `<form class="k-compose" data-editform="${c.id}"><textarea rows="2">${esc(c.body)}</textarea><button class="k-btn" type="submit">${t('save')}</button></form>`;
-      $('textarea', b).focus();
-      return;
-    }
+    if (d.cedit) { openEdit(+d.cedit); return; }
     const act = d.act;
     if (act && ext.act?.(act, host, t0)) { return; }
     if (act === 'prev') { go(ui.step - 1); }
@@ -1290,7 +1326,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   });
   document.addEventListener('input', e => {
     /* every note box grows with what is typed (owner, round 2) */
-    if (e.target.matches('.k-compose textarea, .k-pop textarea')) { e.target.style.height = 'auto'; e.target.style.height = Math.min(innerHeight * 0.5, e.target.scrollHeight + 2) + 'px'; }
+    if (e.target.matches('.k-compose textarea, .k-pop textarea')) { grow(e.target); }
   });
   document.addEventListener('contextmenu', e => {
     const row = !e.shiftKey && e.target.closest('#side [data-board]');
@@ -1423,7 +1459,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const items = createItems({
     api, bridge, ME, view, frameSrc, docPoint,
     board: () => B, round: () => R, step, frames: () => frames, tool: () => ui.tool, canWrite: CAN_WRITE, centerOn, multiUser: caps.multiUser,
-    onChange: () => { renderSide(); if (!document.activeElement?.closest?.('.k-panel textarea')) { renderPanel(); } },
+    onChange: () => { renderSide(); panelSoon(); },
     onHistory: () => paintUndo(),
   });
 
