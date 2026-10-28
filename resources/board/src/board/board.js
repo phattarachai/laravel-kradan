@@ -38,6 +38,8 @@ const IC = {
   sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   mini: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" rx="1"/>',
   reload: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
   reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
   pencil: '<path d="M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z"/><path d="M14 7l3 3"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 13h10l1-13M9 7V4h6v3"/>',
@@ -442,16 +444,18 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   const DOC = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>';
   const GRID = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>';
+  /* what ความเห็น counts: comments, notes, uploads and drawings with a note; plain drawings don't (owner, 2026-10-28) */
+  const noteCount = key => (items ? items.split(key, COMMENTS).notes.length : 0);
   function everyone(s) {
     const ps = picksFor(s.key);
     const counts = s.options.filter(o => o.key).map(o => [o.key, ps.filter(p => p.options.includes(o.key)).length]).filter(([, c]) => c);
     const seen = ps.filter(p => p.seen).length;
-    const cm = threads(s.key).length + (items?.forStep(s.key).length || 0);
+    const cm = threads(s.key).length + noteCount(s.key);
     return [...counts.map(([k, c]) => `${k} ${c}`), seen ? `${s.pickable ? t('skipped') : t('read')} ${seen}` : '', cm ? t('comments_n', { n: cm }) : ''].filter(Boolean).join(' · ');
   }
   function stepRow(s, n) {
     const done = answeredBy(ME.id, s.key), upd = looked.upd.has(n), keys = myKeys(s.key);
-    const noted = threads(s.key).length + (items?.forStep(s.key).length || 0) > 0;
+    const noted = threads(s.key).length + noteCount(s.key) > 0;
     const mark = done && !upd ? `<span class="st done">${CHECK}</span>` : `<span class="st tnum ${upd ? 'upd' : ''}">${n}</span>`;
     const right = upd ? `<span class="key upd">${isNew(s) ? t('new_step') : t('updated')}</span>`
       : s.pickable && keys.length ? `<span class="key">${esc(pickLabel(s, keys))}</span>`
@@ -508,12 +512,12 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const keys = myKeys(key);
     const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
-    const added = items.forStep(key);
-    /* what people added sits in its own section at the end, folded like a Figma section (owner, 2026-10-28) */
-    const extra = `<div class="k-hr"></div><button class="k-fold" data-addedfold aria-expanded="${addedOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('tab_items'))}${added.length ? ` <span class="tnum">${added.length}</span>` : ''}</button>${addedOpen ? items.tabHtml(key) : ''}`;
-    /* comments and what people added, one thread by time (owner's pick C) */
+    const { notes, drawings } = items.split(key, COMMENTS);
+    /* plain drawings sit in their own section at the end, folded until opened (owner, 2026-10-28) */
+    const extra = drawings.length ? `<div class="k-hr"></div><button class="k-fold" data-drawfold aria-expanded="${drawOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('drawings'))} <span class="tnum">${drawings.length}</span></button>${drawOpen ? items.rowsHtml(drawings) : ''}` : '';
+    /* comments and the notes people added, one thread by time (owner's pick C) */
     const entries = [...threads(key).map(c => ({ at: c.created_at, html: commentHtml(c, true) })),
-      ...added.filter(it => !it.draft).map(it => ({ at: it.created_at, html: items.threadEntry(it, COMMENTS, commentHtml, composer) }))]
+      ...notes.map(it => ({ at: it.created_at, html: items.threadEntry(it, COMMENTS, commentHtml, composer) }))]
       .sort((a, b) => String(a.at).localeCompare(String(b.at)));
     $('#panel').innerHTML = `
       ${st.group ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}
@@ -534,8 +538,10 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       ${extra}${ext.panelEnd ? ext.panelEnd(host) : ''}`;
     $('#panel').scrollTop = scroll;
     renderThread();
+    items.markRows();
   }
-  let addedOpen = !!getLocal('kradan:added-open');
+  const DRAW_OPEN = ext.localKeys?.drawingsFold || 'kradan:drawings-open';
+  let drawOpen = !!getLocal(DRAW_OPEN);
   function where(c) {
     const p = c.pin;
     if (!p) { return ''; }
@@ -588,14 +594,23 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (ui.zoom === 'fit') { fit(); } else { $('#board').classList.toggle('col', ui.mode !== 'real' && ui.arr !== 'row'); view.z = clamp(+ui.zoom / 100 || 1, 0.05, 4); view.x = 32; view.y = 32; applyView(); }
     items.render();
     paintColor();
+    paintUndo();
   }
   /* มือจับ กดในจอ | ปักโน้ต แก้คำ | โน้ต ข้อความ ปากกา ลูกศร สี่เหลี่ยม วงรี | สี */
   function toolbar() {
     const btn = k => `<button class="k-ib" data-tool="${k}" data-tip="${esc(t(`tool_${k}`))} (${TOOL_KEYS[k]})">${svg(k)}</button>`;
     const sep = '<span class="k-tsep"></span>';
     if (!CAN_WRITE()) { return VIEW_TOOLS.map(btn).join(''); }
+    const mod = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+';
     return [VIEW_TOOLS, ['pin', 'edit'], DRAW_TOOLS].map(g => g.map(btn).join('')).join(sep)
-      + `${sep}<button class="k-ib k-colorb" data-act="colors" data-tip="${esc(t('colour'))}"><span class="k-dot" id="colordot"></span></button>`;
+      + `${sep}<button class="k-ib k-colorb" data-act="colors" data-tip="${esc(t('colour'))}"><span class="k-dot" id="colordot"></span></button>`
+      + `${sep}<button class="k-ib" data-act="undo" data-tip="${esc(t('undo'))} (${mod}Z)" aria-label="${esc(t('undo'))}" disabled>${svg('undo')}</button><button class="k-ib" data-act="redo" data-tip="${esc(t('redo'))} (${mod}⇧Z)" aria-label="${esc(t('redo'))}" disabled>${svg('redo')}</button>`;
+  }
+  /* the undo and redo buttons follow the stack */
+  function paintUndo() {
+    const u = $('#tools [data-act="undo"]'), r = $('#tools [data-act="redo"]');
+    if (u) { u.disabled = !items.canUndo(); }
+    if (r) { r.disabled = !items.canRedo(); }
   }
   function paintColor() {
     const dot = $('#colordot');
@@ -1175,7 +1190,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
     if (t0.dataset.boardfold !== undefined) { boardsOpen = !boardsOpen; setLocal(BOARDS_OPEN, boardsOpen); renderSide(); return; }
-    if (t0.dataset.addedfold !== undefined) { addedOpen = !addedOpen; setLocal('kradan:added-open', addedOpen); renderPanel(); return; }
+    if (t0.dataset.drawfold !== undefined) { drawOpen = !drawOpen; setLocal(DRAW_OPEN, drawOpen); renderPanel(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -1207,6 +1222,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (act === 'panel') { ui.panel = !ui.panel; $('#app').classList.toggle('nopanel', !ui.panel); writeUrl(); requestAnimationFrame(() => (ui.zoom === 'fit' ? fit() : applyView())); }
     if (act === 'copy') { openCopy(); }
     if (act === 'colors') { openColors(t0); }
+    if (act === 'undo') { items.undo(); }
+    if (act === 'redo') { items.redo(); }
     if (act === 'view') { openView(t0); }
     if (act === 'rounds') { openRounds(t0); }
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
@@ -1251,6 +1268,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const row = !e.shiftKey && e.target.closest('#side [data-board]');
     if (row) { e.preventDefault(); openBoardMenu(e.clientX, e.clientY, row.dataset.board); return; }
     if (e.shiftKey || !e.target.closest('#canvas')) { return; }
+    closeCtx();
+    if (items.contextMenu(e)) { return; }
     e.preventDefault();
     openCtx(e.clientX, e.clientY, frames.find(f => f.fig.contains(e.target)));
   });
@@ -1377,6 +1396,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     api, bridge, ME, view, frameSrc, docPoint,
     board: () => B, round: () => R, step, frames: () => frames, tool: () => ui.tool, canWrite: CAN_WRITE, centerOn, multiUser: caps.multiUser,
     onChange: () => { renderSide(); if (!document.activeElement?.closest?.('.k-panel textarea')) { renderPanel(); } },
+    onHistory: () => paintUndo(),
   });
 
   /* ---------- start ---------- */

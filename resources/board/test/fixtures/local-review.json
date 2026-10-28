@@ -26,6 +26,8 @@
   "items": [
     {"id": 1761000004000, "step": "หน้าจอ|หน้ายอด", "kind": "rect", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "texts": ["ยอดวันนี้", "11,651"], "text": "ยอดไม่ชัด", "created_at": "2026-10-28T09:04:00Z"},
     {"id": 1761000005000, "step": "หน้าจอ|หน้ายอด", "kind": "image", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "file": {"name": "จอ.png", "path": "attachments/mvr1-จอ.png"}, "created_at": "2026-10-28T09:05:00Z"},
-    {"id": 1761000006000, "step": "หน้าจอ|หน้ายอด", "kind": "note", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "text": "เพิ่มกราฟ", "created_at": "2026-10-28T09:06:00Z"}
+    {"id": 1761000006000, "step": "หน้าจอ|หน้ายอด", "kind": "note", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "text": "เพิ่มกราฟ", "created_at": "2026-10-28T09:06:00Z"},
+    {"id": 1761000007000, "step": "หน้าจอ|หน้ายอด", "kind": "stroke", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "points": [[0, 0], [12, 4]], "texts": ["11,651"], "created_at": "2026-10-28T09:07:00Z"},
+    {"id": 1761000008000, "step": "หน้าจอ|หน้ายอด", "kind": "arrow", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "points": [[0, 0], [40, 30]], "texts": ["ยอดวันนี้"], "text": "ตรงนี้กดได้ไหม", "created_at": "2026-10-28T09:08:00Z"}
   ]
 }

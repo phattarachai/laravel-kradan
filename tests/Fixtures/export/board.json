@@ -65,7 +65,7 @@
      "texts": [], "created_at": "2026-10-28T09:36:00+07:00"},
     {"id": 6, "round": 2, "step": "ตะกร้า|ปุ่มยืนยัน", "kind": "stroke", "user": {"id": 2, "name": "วิภา", "avatar": null},
      "anchor": {"option": "B", "device": "desktop", "src": "crop", "on": true}, "x": 0, "y": 0, "points": [[0, 0], [14, 3]],
-     "texts": ["เลข SO ระบุเอง"], "created_at": "2026-10-28T10:00:00+07:00"},
+     "texts": ["เลข SO ระบุเอง"], "text": "ช่องนี้ต้องพิมพ์ได้", "created_at": "2026-10-28T10:00:00+07:00"},
     {"id": 7, "round": 2, "step": "ตะกร้า|ปุ่มยืนยัน", "kind": "file", "user": {"id": 3, "name": "นิดา", "avatar": null},
      "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "x": 0, "y": 0,
      "file": {"name": "ตะกร้าที่ยืนยันข้ามขั้น 179.xlsx", "type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "size": 9000}, "created_at": "2026-10-28T10:05:00+07:00"},
