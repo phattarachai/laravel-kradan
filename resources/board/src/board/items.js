@@ -75,6 +75,12 @@ const UPLOADS = ['image', 'file'];
 /* what ความเห็น holds (owner, 2026-10-28): notes, text, uploads, and a drawing someone wrote a note on or replied to.
    The rest (a line, an arrow, a box with only the text it covers) goes under ภาพวาด */
 export const isNoted = (it, replied = false) => !DRAWN.includes(it.kind) || !!String(it.text || '').trim() || replied;
+/* one step's items as the panel's two tabs: ความเห็น's notes and ภาพวาด's drawings; a draft being typed is in neither */
+export function splitItems(list, comments = []) {
+  const replied = it => comments.some(c => String(c.item_id) === String(it.id));
+  const shown = list.filter(it => !it.draft);
+  return { notes: shown.filter(it => isNoted(it, replied(it))), drawings: shown.filter(it => !isNoted(it, replied(it))) };
+}
 const kb = n => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const extOf = name => (String(name).includes('.') ? String(name).split('.').pop() : '').slice(0, 4).toUpperCase();
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'];
@@ -499,11 +505,16 @@ export function createItems(ctx) {
     if (hovered === null || leaveT) { return; }
     leaveT = setTimeout(() => { leaveT = 0; hovered = null; renderBar(); markRows(); }, 300);
   }
-  /* the panel row of the item under the mouse, and of the selected one */
+  /* the panel row of the item under the mouse, and of the selected one; when that row sits in the tab not shown,
+     the tab's count is marked instead */
   function markRows() {
     $$('[data-goitem]').forEach(r => {
       r.classList.toggle('on', String(r.dataset.goitem) === String(selected));
       r.classList.toggle('hl', String(r.dataset.goitem) === String(hovered));
+    });
+    $$('#panel [role="tab"]').forEach(tab => {
+      const pane = document.getElementById(tab.getAttribute('aria-controls'));
+      tab.classList.toggle('mark', tab.getAttribute('aria-selected') !== 'true' && !!pane?.querySelector('[data-goitem].on, [data-goitem].hl'));
     });
   }
   /* right click on an item of mine: the bar's actions as a menu */
@@ -588,11 +599,7 @@ export function createItems(ctx) {
   }
 
   /* ---------- the panel: ความเห็น holds the real notes, ภาพวาด the rest (owner, 2026-10-28) ---------- */
-  function split(key, comments = []) {
-    const replied = it => comments.some(c => String(c.item_id) === String(it.id));
-    const list = forStep(key).filter(it => !it.draft);
-    return { notes: list.filter(it => isNoted(it, replied(it))), drawings: list.filter(it => !isNoted(it, replied(it))) };
-  }
+  const split = (key, comments = []) => splitItems(forStep(key), comments);
   /* ลบ shows on a row of mine when hovered */
   const rmBtn = it => (canAct(it) ? `<button data-irm="${it.id}" data-tip="${esc(t('delete'))}" aria-label="${esc(t('delete'))}">${icon('trash')}</button>` : '');
   function rowHtml(it) {

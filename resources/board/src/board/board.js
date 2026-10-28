@@ -12,6 +12,7 @@ import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
 import { corner } from './icon.js';
 import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
+import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -38,6 +39,8 @@ const IC = {
   sync: '<path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/>',
   mini: '<rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="6" height="5" rx="1"/>',
   reload: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
+  comments: '<path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-8l-4.5 4v-4H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z"/>',
+  drawings: '<path d="M3.5 20.5l1-4L14 7l3 3-9.5 9.5z"/><path d="M12 9l3 3"/><circle cx="18" cy="18" r="2.8"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/>',
   reply: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 6 6v4"/>',
@@ -513,8 +516,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const seenBy = picksFor(key).filter(p => p.seen);
     const scroll = $('#panel').scrollTop;
     const { notes, drawings } = items.split(key, COMMENTS);
-    /* plain drawings sit in their own section at the end, folded until opened (owner, 2026-10-28) */
-    const extra = drawings.length ? `<div class="k-hr"></div><button class="k-fold" data-drawfold aria-expanded="${drawOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('drawings'))} <span class="tnum">${drawings.length}</span></button>${drawOpen ? items.rowsHtml(drawings) : ''}` : '';
+    const count = panelCounts({ threads: threads(key), notes, drawings });
     /* comments and the notes people added, one thread by time (owner's pick C) */
     const entries = [...threads(key).map(c => ({ at: c.created_at, html: commentHtml(c, true) })),
       ...notes.map(it => ({ at: it.created_at, html: items.threadEntry(it, COMMENTS, commentHtml, composer) }))]
@@ -532,16 +534,40 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
           <span class="k-optmark">${CHECK}</span></label>`).join('')}</div>` : ''}
       ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length && caps.multiUser ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
       <div class="k-hr"></div>
-      <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
-      <div class="k-thread">${entries.map(x => x.html).join('')}</div>
-      ${CAN_WRITE() ? composer('') : ''}
-      ${extra}${ext.panelEnd ? ext.panelEnd(host) : ''}`;
+      ${tabsHtml(count)}
+      <div class="k-ppane" role="tabpanel" id="ppane-comments" aria-labelledby="ptab-comments" ${panelTab === 'comments' ? '' : 'hidden'}>
+        ${entries.length ? '' : `<div class="k-lab">${esc(t('no_comments'))}</div>`}
+        <div class="k-thread">${entries.map(x => x.html).join('')}</div>
+        ${CAN_WRITE() ? composer('') : ''}</div>
+      <div class="k-ppane" role="tabpanel" id="ppane-drawings" aria-labelledby="ptab-drawings" ${panelTab === 'drawings' ? '' : 'hidden'}>
+        ${drawings.length ? items.rowsHtml(drawings) : `<div class="k-lab">${esc(t('no_drawings'))}</div>`}</div>
+      ${ext.panelEnd ? ext.panelEnd(host) : ''}`;
     $('#panel').scrollTop = scroll;
     renderThread();
     items.markRows();
   }
-  const DRAW_OPEN = ext.localKeys?.drawingsFold || 'kradan:drawings-open';
-  let drawOpen = !!getLocal(DRAW_OPEN);
+  /* ความเห็น and ภาพวาด as two icon tabs where the ความเห็น header was (owner, 2026-10-28); the open one per viewer */
+  const PANEL_TAB = ext.localKeys?.panelTab || 'kradan:panel-tab';
+  let panelTab = tabOf(getLocal(PANEL_TAB));
+  function tabsHtml(count) {
+    return `<div class="k-ptabs" role="tablist">${PANEL_TABS.map(k => {
+      const on = k === panelTab, name = t(k === 'comments' ? 'comments' : 'drawings');
+      return `<button class="k-ptab" role="tab" id="ptab-${k}" data-ptab="${k}" aria-controls="ppane-${k}" aria-selected="${on}" tabindex="${on ? 0 : -1}" title="${esc(name)}" aria-label="${esc(`${name} ${count[k]}`)}">${svg(k)}<span class="tnum">${count[k]}</span></button>`;
+    }).join('')}</div>`;
+  }
+  /* switch in place, so what is typed in the composer stays */
+  function setTab(k, focus = false) {
+    panelTab = tabOf(k);
+    setLocal(PANEL_TAB, panelTab);
+    $$('#panel [data-ptab]').forEach(b => {
+      const on = b.dataset.ptab === panelTab;
+      b.setAttribute('aria-selected', on);
+      b.tabIndex = on ? 0 : -1;
+      if (on && focus) { b.focus(); }
+    });
+    $$('#panel .k-ppane').forEach(p => { p.hidden = p.id !== `ppane-${panelTab}`; });
+    items.markRows();
+  }
   function where(c) {
     const p = c.pin;
     if (!p) { return ''; }
@@ -1190,7 +1216,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
     if (t0.dataset.boardfold !== undefined) { boardsOpen = !boardsOpen; setLocal(BOARDS_OPEN, boardsOpen); renderSide(); return; }
-    if (t0.dataset.drawfold !== undefined) { drawOpen = !drawOpen; setLocal(DRAW_OPEN, drawOpen); renderPanel(); return; }
+    if (t0.dataset.ptab) { setTab(t0.dataset.ptab); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
@@ -1246,6 +1272,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   document.addEventListener('keydown', e => {
     if (e.target.closest?.('.k-compose textarea') && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); e.target.form?.requestSubmit(); return; }
     if (e.target.closest?.('textarea, input, [contenteditable="true"], [contenteditable="plaintext-only"]')) { return; }
+    const tk = e.target.closest?.('[data-ptab]') && !e.metaKey && !e.ctrlKey && !e.altKey && tabKey(e.key, panelTab);
+    if (tk) { e.preventDefault(); setTab(tk, true); return; }
     if (items.keyDown(e)) { return; }
     if (e.code === 'Space') { e.preventDefault(); spacePan(true); return; }
     if (!e.metaKey && !e.ctrlKey && !e.altKey && toolKey(e.code)) { return; }

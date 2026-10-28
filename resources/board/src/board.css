@@ -430,7 +430,18 @@ svg.k-item .hd { fill: #fff; stroke: #1c7ed6; stroke-width: 1.5; pointer-events:
 .k-irow .acts button:hover { color: var(--ink); background: var(--hover); }
 [data-irm] { opacity: 0; }
 .k-irow:hover [data-irm], .k-icm:hover > .h [data-irm], [data-irm]:focus-visible { opacity: 1; }
-.k-fold + .k-ilist { margin-top: 10px; }
+/* ความเห็น | ภาพวาด: icon tabs with a count, the open one underlined (owner, 2026-10-28) */
+.k-ptabs { display: flex; gap: 4px; margin: -6px 0 -4px; border-bottom: 1px solid var(--line); }
+.k-ptab { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--mute); font-size: 12px; border-radius: 6px 6px 0 0; }
+.k-ptab svg { width: 17px; height: 17px; }
+.k-ptab:hover { color: var(--ink); background: var(--soft); }
+.k-ptab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--k-accent); }
+.k-ptab .tnum { min-width: 1ch; }
+.k-ptab:focus-visible { outline: 2px solid var(--k-accent); outline-offset: -2px; }
+/* the selected item's row is in the tab not shown */
+.k-ptab.mark .tnum { color: #1c7ed6; font-weight: 600; }
+.k-ppane { display: flex; flex-direction: column; gap: 14px; }
+.k-ppane[hidden] { display: none; }
 .k-icm:hover > .b { text-decoration: underline; text-decoration-color: var(--line); }
 .k-tools { gap: 2px; align-items: center; }
 
