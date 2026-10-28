@@ -156,12 +156,30 @@ php artisan vendor:publish --tag=kradan-config
 | `content_url` | `KRADAN_CONTENT_URL` | `null` | A separate content host |
 | `signed_ttl` | `KRADAN_SIGNED_TTL` | `240` | Minutes a content URL stays valid |
 | `brand` | `KRADAN_BRAND`, `KRADAN_LOGO`, `KRADAN_ACCENT` | app name | |
+| `theme` | `KRADAN_THEME` | `kradan` | `kradan`, `workbench` or a token map, see below |
 | `redirect_guests_to` | `KRADAN_LOGIN_ROUTE` | `login` | Route name or URL a guest is sent to; null 403s |
 | `presence` | `KRADAN_PRESENCE` | `auto` | `auto`, `reverb`, `polling` or `off` |
 | `uploads.max_kb` | `KRADAN_UPLOAD_MAX_KB` | `20480` | Largest image or file a user may add |
 | `uploads.types` | | images, pdf, office, csv, txt, zip | Allowed file extensions |
 | `tokens` | `KRADAN_TOKEN_HASHES` | none | sha256 hashes, comma separated |
 | `locale` | `KRADAN_LOCALE` | `th` | `th` or `en` |
+
+### Theme
+
+The board is green by default. To match your app, pick another theme or override its tokens in
+`config/kradan.php`. Tokens are the board's CSS custom properties without the leading `--`:
+
+```php
+'theme' => [
+    'name' => 'kradan',          // optional: the theme the tokens sit on
+    'k-accent' => '#ba1a1a',     // the accent, Kradan's green
+    'chrome' => '#1f2937',       // the top bar and toolbars
+],
+```
+
+Values must be a colour (`#hex`, `rgb()`, `hsl()`, `oklch()`, a keyword) or a length (`260px`, `1.5rem`).
+Anything else is dropped before it reaches the page, and `kradan:doctor` names it. `brand.accent` still colours
+the workspace badge.
 
 ## Translations
 
