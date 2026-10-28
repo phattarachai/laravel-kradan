@@ -44,7 +44,7 @@ export async function readPage(raw, pageUrl, { parse, fetchText }) {
   return { html, title, steps, prints };
 }
 
-export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.localStorage, fetch: fetchFn = globalThis.fetch?.bind(globalThis), parse, agentUrl = '', origin = globalThis.location?.origin, me = ME, now = () => Date.now(), XMLHttpRequest: XMLHttpRequestImpl = globalThis.XMLHttpRequest }) {
+export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.localStorage, fetch: fetchFn = globalThis.fetch?.bind(globalThis), parse, agentUrl = '', origin = globalThis.location?.origin, me = ME, now = () => Date.now(), XMLHttpRequest: XMLHttpRequestImpl = globalThis.XMLHttpRequest, events = globalThis }) {
   const MAIN = new URL(page);
   const PATH = MAIN.pathname;
   const SLUG = PATH.split('/').slice(-2)[0];
@@ -57,6 +57,10 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
   let ROUNDS = [];           // the board's rounds, oldest first, each with dir/title/state key
   let latest = null;         // the page as read last: {html, title, steps, prints}
   let changedAt = new Date(now()).toISOString();
+  /* another tab of this browser wrote this page's answers: the next heartbeat refreshes this one (T192) */
+  events.addEventListener?.('storage', e => {
+    if (e.key === null || e.key.startsWith(`wb:${PATH}:`) || e.key === `wb:items:${PATH}`) { changedAt = new Date(now()).toISOString(); }
+  });
   const cache = new Map();   // round number → {html, steps, prints}
   const listeners = new Set();
   const waiting = new Set();

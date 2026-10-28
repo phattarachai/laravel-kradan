@@ -17,7 +17,7 @@ const PAGE = `${BASE}2610-90-wb-demo/index.html`;
 const KEY = 'wb:/design/2610-90-wb-demo/index.html:Workbench demo รอบ 2';
 
 /* the fixture design folder over a fake fetch, and localStorage as a Map */
-function env(seed = {}) {
+function env(seed = {}, more = {}) {
   const map = new Map(Object.entries(seed).map(([k, v]) => [k, JSON.stringify(v)]));
   const storage = { getItem: k => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)) };
   const fetch = async u => {
@@ -26,7 +26,7 @@ function env(seed = {}) {
     const ok = fs.existsSync(file) && fs.statSync(file).isFile();
     return { ok, status: ok ? 200 : 404, text: async () => (ok ? fs.readFileSync(file, 'utf8') : ''), json: async () => JSON.parse(fs.readFileSync(file, 'utf8')) };
   };
-  const store = LocalStore({ page: PAGE, storage, fetch, parse: html => new DOMParser().parseFromString(html, 'text/html'), agentUrl: `${BASE}_workbench/agent.js`, origin: 'http://localhost', now: () => Date.parse('2026-10-28T10:00:00Z') });
+  const store = LocalStore({ page: PAGE, storage, fetch, parse: html => new DOMParser().parseFromString(html, 'text/html'), agentUrl: `${BASE}_workbench/agent.js`, origin: 'http://localhost', now: () => Date.parse('2026-10-28T10:00:00Z'), ...more });
   return { store, read: k => JSON.parse(map.get(k) || 'null') };
 }
 
@@ -164,4 +164,16 @@ test('the page list marks this page and the pages Claude waits on; the rest fold
   assert.deepEqual(rows.map(r => [r.slug, r.pinned]), [['2610-90-wb-demo', true], ['2610-91-wb-plain', true], ['2610-80-old', false]]);
   store.waiting.clear();
   assert.equal((await store.boards()).boards.find(r => r.slug === '2610-91-wb-plain').pinned, false);
+});
+
+test('another tab writing this page moves changed_at, so the next heartbeat refreshes this one', async () => {
+  const events = new EventTarget();
+  let t = Date.parse('2026-10-28T10:00:00Z');
+  const { store } = env({}, { events, now: () => (t += 1000) });
+  const first = (await store.heartbeat(store.slug, 3)).changed_at;
+  const storage = (key) => Object.assign(new Event('storage'), { key });
+  events.dispatchEvent(storage('wb:look:/design/other/index.html'));
+  assert.equal((await store.heartbeat(store.slug, 3)).changed_at, first, 'another page is not ours');
+  events.dispatchEvent(storage(KEY));
+  assert.ok((await store.heartbeat(store.slug, 3)).changed_at > first, 'this page\'s answers were written elsewhere');
 });

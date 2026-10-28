@@ -606,7 +606,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const box = $(`#panel [data-replybox="${id}"]`);
     if (!box) { return; }
     box.hidden = false;
-    box.innerHTML = composer(id, t('reply_ph'));
+    /* pressing ตอบ again keeps what is already written */
+    if (!$('textarea', box)) { box.innerHTML = composer(id, t('reply_ph')); }
     if (focus) { $('textarea', box).focus(); }
   }
   function openEdit(id, focus = true) {
@@ -982,22 +983,22 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     renderPins();
     refreshPicks();
   }
-  /* a box being typed in is never rebuilt under the caret (T192): the panel catches up once typing stops,
-     and after the click that stopped it, so the click still lands */
+  /* a box being typed in is never rebuilt under the caret (T192): the panel catches up once typing stops. A blur that a
+     press caused waits for its release, so the click still lands, or a second when the release lands in a frame or
+     outside the window */
   const TYPING = '.k-panel textarea, .k-pop textarea';
   const typing = () => !!document.activeElement?.closest?.(TYPING);
-  let pressed = false, afterUp = false;
   function panelSoon() { if (typing()) { panelStale = true; return; } renderPanel(); }
-  function catchUp() {
-    if (!panelStale || typing()) { return; }
-    if (pressed) { afterUp = true; return; }
-    renderPanel();
-  }
-  document.addEventListener('focusout', e => { if (panelStale && e.target.closest?.(TYPING)) { setTimeout(catchUp, 0); } });
-  document.addEventListener('pointerdown', () => { pressed = true; }, true);
-  const up = () => { pressed = false; if (afterUp) { afterUp = false; setTimeout(catchUp, 0); } };
-  document.addEventListener('pointerup', up, true);
-  document.addEventListener('pointercancel', up, true);
+  function catchUp() { if (panelStale && !typing()) { renderPanel(); } }
+  let pressAt = -1e9;
+  document.addEventListener('pointerdown', () => { pressAt = performance.now(); }, true);
+  document.addEventListener('focusout', e => {
+    if (!panelStale || !e.target.closest?.(TYPING)) { return; }
+    if (performance.now() - pressAt > 250) { setTimeout(catchUp, 0); return; }
+    const done = () => { clearTimeout(timer); ['pointerup', 'pointercancel'].forEach(k => document.removeEventListener(k, done, true)); setTimeout(catchUp, 0); };
+    const timer = setTimeout(done, 1000);
+    ['pointerup', 'pointercancel'].forEach(k => document.addEventListener(k, done, true));
+  });
 
   /* ---------- right-click menu ---------- */
   let ctx = null;
@@ -1327,6 +1328,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   document.addEventListener('input', e => {
     /* every note box grows with what is typed (owner, round 2) */
     if (e.target.matches('.k-compose textarea, .k-pop textarea')) { grow(e.target); }
+    /* a draft is kept from the first keystroke, whatever renders next */
+    if (panelKey !== null && e.target.closest?.('#panel')) { keep.note(e.target, panelKey); }
+    if (threadPop?.el.contains(e.target)) { popKeep.note(e.target, 'pop'); }
   });
   document.addEventListener('contextmenu', e => {
     const row = !e.shiftKey && e.target.closest('#side [data-board]');
