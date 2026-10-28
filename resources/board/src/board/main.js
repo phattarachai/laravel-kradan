@@ -2,6 +2,7 @@
 import { setLocale, t } from './i18n.js';
 import { esc, tint } from './util.js';
 import { mountBoard } from './board.js';
+import { KradanStore } from './api.js';
 import { mountIndex } from './index.js';
 import { setFavicon } from './icon.js';
 
@@ -21,7 +22,7 @@ setFavicon();
 
 const root = document.getElementById('kradan');
 try {
-  if (boot.page === 'board' || boot.board) { mountBoard(boot, root); } else { mountIndex(boot, root); }
+  if (boot.page === 'board' || boot.board) { mountBoard(boot, root, { store: KradanStore(boot) }); } else { mountIndex(boot, root); }
 } catch (err) {
   root.innerHTML = `<div class="k-empty">${esc(t('cant_open', { why: err.message }))}</div>`;
   throw err;

@@ -7,7 +7,7 @@
  */
 import { t } from './i18n.js';
 import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText, getLocal, setLocal } from './util.js';
-import { createApi } from './api.js';
+import { KradanStore } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
 import { avatar, avatarRow, startPresence } from './presence.js';
 import { corner } from './icon.js';
@@ -57,8 +57,12 @@ const IC = {
 const svg = (k, inner = IC[k]) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 const ib = (attrs, k, tip, end = false) => `<button class="k-ib" ${attrs} data-tip="${esc(tip)}" ${end ? 'data-tip-end' : ''}>${svg(k)}</button>`;
 
-export function mountBoard(boot, root) {
-  const api = createApi(boot);
+/*
+ * `store` is where everything is read and written (KradanStore by default, the workbench's LocalStore locally);
+ * `ext` holds the hooks a host adds (3-shared-core.md). The core never asks which store it has.
+ */
+export function mountBoard(boot, root, { store, ext = {} } = {}) {
+  const api = store || KradanStore(boot);
   const ME = boot.user || {};
   const Q = new URLSearchParams(location.search);
   let B = boot.board;

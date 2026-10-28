@@ -1,5 +1,11 @@
-/* The board JSON API: session cookie + CSRF, like any Laravel web route. */
-export function createApi(boot) {
+/*
+ * KradanStore: the board JSON API, with the session cookie + CSRF like any Laravel web route.
+ * A store is the board's only way out (3-shared-core.md): every method returns the shapes in 2-board-payload.md,
+ * and `caps` says what this store offers. The workbench's LocalStore is the other one.
+ */
+export const KRADAN_CAPS = { multiUser: true, presence: true, decide: true, send: false, pages: false, uploads: true };
+
+export function KradanStore(boot) {
   const base = String(boot.routes?.api || '/kradan/api').replace(/\/$/, '');
   async function call(method, path, body, { text = false } = {}) {
     const res = await fetch(`${base}/${path}`, {
@@ -23,6 +29,7 @@ export function createApi(boot) {
   }
   const seg = s => encodeURIComponent(s);
   return {
+    caps: KRADAN_CAPS,
     boards: panel => call('GET', `boards${panel ? `?panel=${seg(panel)}` : ''}`),
     board: (slug, round) => call('GET', `boards/${seg(slug)}${round ? `?round=${round}` : ''}`),
     pick: (slug, round, step, body) => call('PUT', `boards/${seg(slug)}/rounds/${round}/picks/${seg(step)}`, body),
