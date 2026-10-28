@@ -227,7 +227,7 @@ export function createExt({ store, stamp = {}, fetch: fetchFn = globalThis.fetch
     /* the workbench opens fitted, side by side when that stays readable (its own default, as before) */
     view: { zoom: 'fit', arr: 'auto' },
     /* the keys the old workbench kept: the sidebar widths and whether หน้าอื่น was open */
-    localKeys: { side: 'wb:sw', panel: 'wb:pw', boardsFold: 'wb:pgopen', drawingsFold: 'wb:drawopen' },
+    localKeys: { side: 'wb:sw', panel: 'wb:pw', boardsFold: 'wb:pgopen', panelTab: 'wb:ptab' },
     /* ภาพรวม: one note for the whole page, at the end of the panel, saved as you type (not in an older round) */
     panelEnd: h => (h.old() ? '' : `<div class="k-hr"></div><div class="k-lab">${esc(w('overall'))}</div><textarea class="wb-overall" data-wboverall rows="2">${esc(store.overall())}</textarea>`),
     bar: h => `<button class="k-btn k-primary wb-send" data-act="wb-send" id="sendb" disabled data-tip="${esc(w('send_off'))}" data-tip-end>${esc(w('send'))}</button>`,
