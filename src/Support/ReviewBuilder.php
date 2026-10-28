@@ -201,14 +201,20 @@ final class ReviewBuilder
     }
 
     /**
-     * A line or an arrow with no note and no reply says nothing to whoever reads the review, so it stays out. A box
-     * or a ring stays, since the text it covers is what it points at.
+     * A drawing that says nothing to whoever reads the review stays out: a line or an arrow with no note and no reply,
+     * and a box or a ring that also covers no text.
      */
     private static function bare(Item $item): bool
     {
-        return in_array($item->kind, [ItemKind::Stroke, ItemKind::Arrow], strict: true)
-            && trim((string) $item->text) === ''
-            && $item->replies->isEmpty();
+        if (trim((string) $item->text) !== '' || $item->replies->isNotEmpty()) {
+            return false;
+        }
+
+        return match ($item->kind) {
+            ItemKind::Stroke, ItemKind::Arrow => true,
+            ItemKind::Rect, ItemKind::Ellipse => ($item->texts ?? []) === [],
+            default => false,
+        };
     }
 
     /**

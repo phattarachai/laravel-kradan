@@ -34,9 +34,13 @@ function quoted(text) {
 function block(indent, text) {
   return String(text).replace(/\r\n/g, '\n').trim().split('\n').map((line, i) => indent + (i ? '  ' : '') + line);
 }
-/* a line or an arrow with no note and no reply says nothing to whoever reads the review (owner, 2026-10-28); a box
-   or a ring stays, since the text it covers is what it points at */
-export const bare = (it, replied = false) => ['stroke', 'arrow'].includes(it.kind) && !String(it.text || '').trim() && !replied;
+/* a drawing that says nothing to whoever reads the review stays out (owner, 2026-10-28): a line or an arrow with no
+   note and no reply, and a box or a ring that also covers no text */
+export function bare(it, replied = false) {
+  if (String(it.text || '').trim() || replied) { return false; }
+  if (['stroke', 'arrow'].includes(it.kind)) { return true; }
+  return ['rect', 'ellipse'].includes(it.kind) && !(it.texts || []).length;
+}
 /* by time, comments before items at the same moment, then by id */
 const order = (at, type, id) => `${String(Date.parse(at || '') || 0).padStart(15, '0')}|${type}|${String(id).padStart(12, '0')}`;
 

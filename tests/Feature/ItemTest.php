@@ -232,6 +232,7 @@ it('writes item lines and their replies into the export', function (): void {
     $file = upload($nida, 'file', UploadedFile::fake()->create('ตะกร้าที่ยืนยันข้ามขั้น 179.xlsx', 2))->json();
     addItem($somchai, 'arrow', ['points' => [[0, 0], [5, 5]], 'texts' => ['ยืนยันตะกร้า']]);
     addItem($wipa, 'rect', ['w' => 10, 'h' => 10, 'texts' => ['11,651 / 10,000']]);
+    addItem($wipa, 'rect', ['w' => 10, 'h' => 10]);
     addItem($wipa, 'stroke', ['points' => [[0, 0], [1, 1]], 'texts' => ['เลข SO ระบุเอง'], 'text' => 'ช่องนี้ต้องพิมพ์ได้', 'anchor' => ['option' => 'B', 'device' => 'desktop', 'src' => 'crop', 'on' => true]]);
     actingAs($somchai)->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => STEP, 'body' => 'จริง', 'item_id' => $note['id']])->assertCreated();
 
@@ -246,8 +247,9 @@ it('writes item lines and their replies into the export', function (): void {
            ▭ วิภา (A, desktop) ตีกรอบ “11,651 / 10,000”
            〰 วิภา (B, desktop) วาดเส้น ใกล้ “เลข SO ระบุเอง”: ช่องนี้ต้องพิมพ์ได้
         MD)
-        // a bare arrow says nothing to whoever reads the review
-        ->not->toContain('➚');
+        // a bare arrow, or a box over no text, says nothing to whoever reads the review
+        ->not->toContain('➚')
+        ->not->toMatch('/ตีกรอบ$/mu');
 });
 
 it('carries items into later rounds of the same step, not earlier ones', function (): void {
