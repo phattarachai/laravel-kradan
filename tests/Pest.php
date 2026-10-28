@@ -89,6 +89,18 @@ function publishRound(string $slug = 't188-manual-so', string $title = 'Manual S
     return $result['round'];
 }
 
+/**
+ * The `window.Kradan` boot payload a board or index page prints.
+ *
+ * @return array<string, mixed>
+ */
+function bootOf(string $html): array
+{
+    preg_match('#window\.Kradan = (.*?);</script>#s', $html, $match);
+
+    return json_decode($match[1], true);
+}
+
 function boardOf(Round $round): Board
 {
     return Board::query()->findOrFail($round->board_id);

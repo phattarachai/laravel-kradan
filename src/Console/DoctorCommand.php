@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\View;
 use Phattarachai\Kradan\Http\Controllers\AssetController;
 use Phattarachai\Kradan\Kradan;
 use Phattarachai\Kradan\Support\RoundPublisher;
+use Phattarachai\Kradan\Support\Theme;
 use Throwable;
 
 /**
@@ -37,6 +38,7 @@ final class DoctorCommand extends Command
         $failures += $this->check('Board assets built', $this->assets(...));
         $failures += $this->check('Views', fn (): ?string => View::exists('kradan::board') && View::exists('kradan::index') ? null : 'kradan::board or kradan::index is missing.');
         $failures += $this->check('Guest login route', $this->loginRoute(...));
+        $failures += $this->check('Theme ['.Theme::resolve()['name'].']', fn (): ?string => Theme::problems() === [] ? null : implode("\n  ", Theme::problems()));
         $failures += $this->check('Token API', fn (): ?string => config('kradan.tokens') === [] ? 'KRADAN_TOKEN_HASHES is empty, so kradan:push cannot reach this app (fine on a developer checkout).' : null);
 
         $this->components->twoColumnDetail('Presence', Kradan::presenceMode());

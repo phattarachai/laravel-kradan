@@ -20,16 +20,6 @@ function pickUrl(int $round = 1, string $step = QUESTION): string
     return '/kradan/api/boards/t188-manual-so/rounds/'.$round.'/picks/'.rawurlencode($step);
 }
 
-/**
- * @return array<string, mixed>
- */
-function bootOf(string $html): array
-{
-    preg_match('#window\.Kradan = (.*?);</script>#s', $html, $match);
-
-    return json_decode($match[1], true);
-}
-
 it('renders the board shell with the boot payload', function (): void {
     publishRound();
 

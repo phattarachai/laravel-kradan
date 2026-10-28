@@ -269,11 +269,22 @@ final readonly class BoardPresenter
             'version' => AssetController::version(),
             'page' => $page,
             'brand' => (array) config('kradan.brand'),
+            'theme' => $this->theme(),
             'locale' => (string) config('kradan.locale', 'th'),
             'user' => [...Kradan::present($user), 'can' => ['manage' => Kradan::allows($user, Ability::Manage)]],
             'csrf' => csrf_token(),
             'routes' => ['api' => url(trim((string) config('kradan.path'), '/').'/api'), 'index' => route('kradan.index')],
         ];
+    }
+
+    /**
+     * @return array{name: string, tokens: object}
+     */
+    private function theme(): array
+    {
+        $theme = Theme::resolve();
+
+        return ['name' => $theme['name'], 'tokens' => (object) $theme['tokens']];
     }
 
     /**

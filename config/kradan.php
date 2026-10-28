@@ -90,6 +90,17 @@ return [
     ],
 
     /*
+    | The board's theme: a name (kradan, workbench) or a map of its CSS
+    | tokens, without the leading --, on top of a theme:
+    |
+    |   'theme' => ['name' => 'kradan', 'k-accent' => '#ba1a1a', 'chrome' => '#1f2937'],
+    |
+    | Values must be a colour or a length; anything else is dropped, and
+    | kradan:doctor says which.
+    */
+    'theme' => env('KRADAN_THEME', 'kradan'),
+
+    /*
     |--------------------------------------------------------------------------
     | Presence
     |--------------------------------------------------------------------------

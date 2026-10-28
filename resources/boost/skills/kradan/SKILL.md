@@ -1,7 +1,7 @@
 ---
 name: kradan
 description: "Share a finished public/design/<slug> page that needs a decision with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
-version: 2026.10.28.2
+version: 2026.10.28.3
 ---
 
 # Kradan: design review with the app's own users
@@ -66,7 +66,12 @@ T188 Manual SO ก่อนยืนยัน · รอบ 2 · https://…/krad
 - `php artisan kradan:list`: every board, its status and latest round.
 - `php artisan kradan:decide <slug>`: file a board as decided. Picks lock and
   comments stay open. Do it once the decision is made and recorded, and only when the user agrees.
-- `php artisan kradan:doctor`: checks the install on the server side (enabled, tables, disk, assets).
+- `php artisan kradan:doctor`: checks the install on the server side (enabled, tables, disk, assets, theme).
+
+To make the board match the app's colours, set `kradan.theme` in `config/kradan.php`: a theme name
+(`kradan`, `workbench`) or a map of the board's CSS tokens without `--`, e.g.
+`['k-accent' => '#ba1a1a', 'chrome' => '#1f2937']`. Only colours and lengths pass; the doctor names a
+dropped token.
 
 ## When a command fails
 
