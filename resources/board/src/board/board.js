@@ -534,7 +534,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const cv = $('#canvas');
     bridge.clear();
     const groups = plan();
-    cv.innerHTML = `<div class="k-board" id="board">${groups.map((g, gi) => groupHtml(st, g, gi)).join('')}</div>
+    cv.innerHTML = `<div class="k-board" id="board">${questionHtml(st)}<div class="grps" id="grps">${groups.map((g, gi) => groupHtml(st, g, gi)).join('')}</div></div>
       <div class="k-hint">${t('hint')}</div>
       <div class="k-tools" id="tools">${toolbar()}</div>
       <div class="k-mini ${ui.mini ? '' : 'off'}" id="mini"><div class="k-mini-in"></div></div>`;
@@ -593,12 +593,21 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     });
   }
 
+  /* the question sits on the canvas above its screens, at one size on screen, so the eye reads top to bottom instead
+     of across to the panel (owner, 2026-10-28). Outside เทียบแบบ it also names the option on show and its trade-off */
+  function questionHtml(st) {
+    const n = ui.step, o = st.pickable && ui.mode !== 'options' ? currentOpt(st) : null;
+    return `<header class="qhead"><div class="qin">${st.group && st.group !== st.title ? `<div class="kick">${esc(st.group)}</div>` : ''}<h1>${esc(st.title)}</h1>
+      ${looked.upd.has(n) ? `<div class="upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
+      ${st.sub ? `<p class="qsub">${esc(st.sub)}</p>` : ''}
+      ${o ? `<div class="qopt"><b>${esc(o.key)} ${esc(o.label)}</b>${o.trade ? `<br><span>${esc(o.trade)}</span>` : ''}</div>` : ''}</div></header>`;
+  }
   function groupHtml(st, g, gi) {
     const picked = st.pickable && myKeys(st.key).includes(g.opt.key);
     const head = (ui.mode === 'options' && st.pickable)
       ? `<div class="grp-h"><span class="key">${esc(g.opt.key)}</span><span class="lbl">${esc(g.opt.label)}</span>
          <span class="k-headwho">${pickers(st.key, g.opt.key, '')}</span>
-         ${CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>`
+         ${CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>${g.opt.trade ? `<div class="grp-t">${esc(g.opt.trade)}</div>` : ''}`
       : (g.shotCap ? `<div class="grp-h"><span class="lbl">${esc(g.shotCap)}</span></div>` : '');
     const cells = g.cells.map((c, ci) => `<figure class="k-fr" data-g="${gi}" data-c="${ci}">
         <figcaption><span class="cap">${esc(ui.mode === 'sizes' ? '' : c.shot.cap)}</span><span class="dim tnum"></span></figcaption>
@@ -675,7 +684,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       return z;
     };
     let col = false;
-    if (ui.mode !== 'real' && board.children.length > 1) {
+    if (ui.mode !== 'real' && $('#grps').children.length > 1) {
       if (ui.arr === 'col') { col = true; } else if (ui.arr === 'auto') { const zr = measure(false), zc = measure(true); col = zr < 0.6 && zc > zr * 1.3; }
     }
     /* a whole page (a flow without steps) reads like a document: fit its width, start at the top */
@@ -1234,7 +1243,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       return;
     }
     if (!e.target.closest('#canvas') || e.target.closest('button, .pinlayer, .pinmark, .boxmark, .handle, .k-tools, [data-item]')) { return; }
-    const onBackground = e.target === cv || e.target.id === 'board' || e.target.matches('.grp, .shots, .k-hint');
+    const onBackground = e.target === cv || e.target.id === 'board' || e.target.matches('.grp, .grps, .shots, .k-hint, .grp-t') || !!e.target.closest('.qhead');
     const handy = cv.classList.contains('tool-hand') || cv.classList.contains('spacepan');
     if (!(handy || onBackground || e.button === 1)) { return; }
     e.preventDefault();

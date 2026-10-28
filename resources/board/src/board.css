@@ -114,8 +114,21 @@ img.k-logo { background: none; }
 .k-canvas.tool-hand iframe, .k-canvas.spacepan iframe, .k-canvas.tool-pin iframe, .k-canvas.tool-box iframe, .k-canvas.tool-edit iframe, .k-canvas.dragging iframe { pointer-events: none; }
 .k-canvas.editing iframe { pointer-events: auto !important; }
 .k-canvas.editing .pinlayer { pointer-events: none !important; }
-.k-board { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; display: flex; gap: 80px; align-items: flex-start; }
-.k-board.col { flex-direction: column; gap: calc(48px / var(--z, 1)); }
+.k-board { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; display: flex; flex-direction: column; gap: calc(28px / var(--z, 1)); }
+.grps { display: flex; gap: 80px; align-items: flex-start; }
+.k-board.col .grps { flex-direction: column; gap: calc(48px / var(--z, 1)); }
+/* the question on the canvas, at one size on screen; width:0 + min-width:100% wraps it at the screens' width
+   without widening the board */
+.qhead { width: 0; min-width: 100%; user-select: none; }
+.qhead .qin { max-width: calc(820px / var(--z, 1)); }
+.qhead .kick { font-size: calc(12px / var(--z, 1)); font-weight: 600; color: var(--mute); margin-bottom: calc(2px / var(--z, 1)); }
+.qhead h1 { margin: 0; font-size: calc(22px / var(--z, 1)); line-height: 1.35; font-weight: 600; }
+.qhead .qsub { margin: calc(6px / var(--z, 1)) 0 0; font-size: calc(15px / var(--z, 1)); line-height: 1.55; color: var(--mute); }
+.qhead .upd { margin-top: calc(6px / var(--z, 1)); font-size: calc(13px / var(--z, 1)); color: var(--upd); font-weight: 500; }
+.qhead .qopt { margin-top: calc(10px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); line-height: 1.5; }
+.qhead .qopt b { font-weight: 600; }
+.qhead .qopt span { color: var(--mute); }
+.grp-t { width: 0; min-width: 100%; font-size: calc(13px / var(--z, 1)); line-height: 1.5; color: var(--mute); }
 .grp { display: flex; flex-direction: column; gap: calc(8px / var(--z, 1)); }
 .grp-h { display: flex; align-items: center; gap: calc(8px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); min-height: calc(28px / var(--z, 1)); white-space: nowrap; overflow: hidden; }
 .grp-h .key { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; border-radius: .4em; background: #fff; border: 1px solid var(--line); font-weight: 600; padding: 0 .35em; }
@@ -387,7 +400,7 @@ svg.k-item.sel { outline: 1.5px dashed #1c7ed6; outline-offset: -2px; }
 :root { --brand: #2563eb; --brand-bg: #e8efff; --k-accent: var(--brand); --k-accent-bg: var(--brand-bg);
   --font-head: 'Anuphan', 'IBM Plex Sans Thai', system-ui, sans-serif; }
 .k-logo { background: var(--brand); }
-.k-panel h2, .k-ttl, .k-ws .k-bname, .k-modal h2 { font-family: var(--font-head); }
+.k-panel h2, .qhead h1, .k-ttl, .k-ws .k-bname, .k-modal h2 { font-family: var(--font-head); }
 .k-panel h2 { font-size: 19px; font-weight: 600; }
 
 /* the chrome is the board's dark green frame, the canvas a whiteboard */
