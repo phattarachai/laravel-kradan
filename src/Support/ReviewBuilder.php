@@ -182,7 +182,7 @@ final class ReviewBuilder
         $where = $this->where($item->anchor['option'] ?? null, $item->anchor['device'] ?? null);
         $texts = $item->texts ?? [];
 
-        return match ($item->kind) {
+        $line = match ($item->kind) {
             ItemKind::Note, ItemKind::Text => "🗒 {$name}: ".trim((string) $item->text),
             ItemKind::Image => "🖼 {$name}: {$item->file_name} ({$item->localPath()})",
             ItemKind::File => "📎 {$name}: {$item->file_name} ({$item->localPath()})",
@@ -191,6 +191,12 @@ final class ReviewBuilder
             ItemKind::Ellipse => "▭ {$name}{$where} ".Kradan::trans('item_ellipse').$this->quoted($texts),
             ItemKind::Stroke => "〰 {$name}{$where} ".Kradan::trans('item_stroke').($texts === [] ? '' : ' '.Kradan::trans('item_near').$this->quoted($texts[0])),
         };
+
+        // A drawing may carry a note on why it was drawn: "▭ วิภา (A, desktop) ตีกรอบ “…”: why".
+        $note = trim((string) $item->text);
+        $drawn = in_array($item->kind, [ItemKind::Arrow, ItemKind::Rect, ItemKind::Ellipse, ItemKind::Stroke], strict: true);
+
+        return $drawn && $note !== '' ? "{$line}: {$note}" : $line;
     }
 
     /**
@@ -232,7 +238,7 @@ final class ReviewBuilder
             $where = $this->where($comment->pin['option'] ?? null);
             $body = trim($comment->body) === '' ? '' : ": {$comment->body}";
 
-            return "✎ {$name}{$where}: “{$comment->edit['from']}” → “{$comment->edit['to']}”{$body}";
+            return "✎ {$name}{$where}: “".self::oneLine($comment->edit['from']).'” → “'.self::oneLine($comment->edit['to'])."”{$body}";
         }
 
         if ($comment->pin !== null) {
@@ -255,6 +261,14 @@ final class ReviewBuilder
         $lines = explode("\n", trim(str_replace("\r\n", "\n", $text)));
 
         return array_map(fn (string $line, int $i): string => $indent.($i === 0 ? '' : '  ').$line, $lines, array_keys($lines));
+    }
+
+    /**
+     * An edit's from/to on one line: a multi-line text would break the review's lines and indent.
+     */
+    private static function oneLine(mixed $text): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', (string) $text));
     }
 
     private function where(?string ...$parts): string

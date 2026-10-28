@@ -21,10 +21,10 @@
     {"id": 1761000002000, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "ตัวเลขเล็กไป",
      "pin": {"option": "A", "device": "desktop", "src": "crop", "x": 0, "y": 0, "text": "", "box": {"w": 90, "h": 40, "texts": ["11,651 / 10,000", "เกิน 1,651"]}}, "edit": null, "created_at": "2026-10-28T09:02:00Z"},
     {"id": 1761000003000, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "",
-     "pin": {"option": "A", "device": "phone", "src": "screen.html#s=today", "x": 0, "y": 0, "text": "", "box": null}, "edit": {"from": "คาดว่าเหลือสิ้นเดือน", "to": "สิ้นเดือนน่าจะเหลือ"}, "created_at": "2026-10-28T09:03:00Z"}
+     "pin": {"option": "A", "device": "phone", "src": "screen.html#s=today", "x": 0, "y": 0, "text": "", "box": null}, "edit": {"from": "คาดว่าเหลือ\nสิ้นเดือน", "to": "สิ้นเดือนน่าจะเหลือ"}, "created_at": "2026-10-28T09:03:00Z"}
   ],
   "items": [
-    {"id": 1761000004000, "step": "หน้าจอ|หน้ายอด", "kind": "rect", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "texts": ["ยอดวันนี้", "11,651"], "created_at": "2026-10-28T09:04:00Z"},
+    {"id": 1761000004000, "step": "หน้าจอ|หน้ายอด", "kind": "rect", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "texts": ["ยอดวันนี้", "11,651"], "text": "ยอดไม่ชัด", "created_at": "2026-10-28T09:04:00Z"},
     {"id": 1761000005000, "step": "หน้าจอ|หน้ายอด", "kind": "image", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "file": {"name": "จอ.png", "path": "attachments/mvr1-จอ.png"}, "created_at": "2026-10-28T09:05:00Z"},
     {"id": 1761000006000, "step": "หน้าจอ|หน้ายอด", "kind": "note", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "text": "เพิ่มกราฟ", "created_at": "2026-10-28T09:06:00Z"}
   ]

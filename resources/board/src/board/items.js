@@ -59,12 +59,15 @@ export function summary(it) {
   switch (it.kind) {
     case 'note': case 'text': return it.text || '';
     case 'image': case 'file': return it.file?.name || '';
-    case 'arrow': return said ? t('points_at', { what: said }) : t('arrow');
-    case 'rect': return said ? t('boxed', { what: said }) : t('box_drawn');
-    case 'ellipse': return said ? t('circled', { what: said }) : t('ellipse');
-    default: return t('stroke');
+    case 'arrow': return withNote(said ? t('points_at', { what: said }) : t('arrow'), it.text);
+    case 'rect': return withNote(said ? t('boxed', { what: said }) : t('box_drawn'), it.text);
+    case 'ellipse': return withNote(said ? t('circled', { what: said }) : t('ellipse'), it.text);
+    default: return withNote(t('stroke'), it.text);
   }
 }
+/* a drawing may carry a note: why it was drawn (the old กรอบ asked for one straight away) */
+const withNote = (line, note) => (String(note || '').trim() ? `${line}: ${String(note).trim()}` : line);
+const MARKS = ['rect', 'ellipse'];
 const kb = n => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 const extOf = name => (String(name).includes('.') ? String(name).split('.').pop() : '').slice(0, 4).toUpperCase();
 const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'avif'];
@@ -183,9 +186,9 @@ export function createItems(ctx) {
       removeEventListener('pointerup', up);
       const d = drawing;
       drawing = null;
-      d.preview.remove();
-      if (d.points.length < 2) { return; }
-      await finishDraw(d);
+      if (d.points.length < 2) { d.preview.remove(); return; }
+      /* the drawing stays in view while its note is asked for, until the saved item replaces it */
+      try { await finishDraw(d); } finally { d.preview.remove(); }
     };
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
@@ -219,6 +222,9 @@ export function createItems(ctx) {
       const o = agentPoint(d.tg, b.x, b.y);
       const r = await bridge.ask(d.tg.f.ifr.contentWindow, 'box', { rect: { x: o.x, y: o.y, w: b.w, h: b.h } });
       if (r?.texts?.length) { fields.texts = r.texts; }
+      /* a box over a screen asks why straight away, as the workbench's กรอบ did; Esc keeps the box without one */
+      const note = await askNote(fields, '');
+      if (note) { fields.text = note; }
     }
     if (d.tg.f && kind === 'arrow') {
       const tip = d.points.at(-1);
@@ -231,6 +237,35 @@ export function createItems(ctx) {
       if (r?.text) { fields.texts = [r.text]; }
     }
     await create(fields);
+  }
+
+  /* the note of a box or a ring over a screen, in a popover by the mouse; resolves with the text, or '' (Esc, ข้าม) */
+  function askNote(it, text) {
+    return new Promise(done => {
+      $('.k-pop.k-inote')?.remove();
+      const el = document.createElement('div');
+      el.className = 'k-pop k-inote';
+      const m = state.mouse || { x: innerWidth / 2, y: innerHeight / 2 };
+      el.innerHTML = `<div class="at">${esc(summary({ ...it, text: '' }))}</div><textarea placeholder="${esc(t('pin_ph'))}">${esc(text)}</textarea><div class="row"><button class="k-btn" data-x>${t('no_note')}</button><button class="k-btn k-primary" data-ok>${t('save')}</button></div>`;
+      document.body.appendChild(el);
+      el.style.left = Math.max(8, Math.min(innerWidth - el.offsetWidth - 8, m.x + 12)) + 'px';
+      el.style.top = Math.max(8, Math.min(innerHeight - el.offsetHeight - 8, m.y + 12)) + 'px';
+      const ta = $('textarea', el);
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      let closed = false;
+      const finish = keep => { if (closed) { return; } closed = true; const v = ta.value.trim(); el.remove(); document.removeEventListener('pointerdown', away, true); done(keep ? v : ''); };
+      const away = e => { if (!el.contains(e.target)) { finish(true); } };
+      $('[data-x]', el).onclick = () => finish(false);
+      $('[data-ok]', el).onclick = () => finish(true);
+      ta.addEventListener('keydown', e => {
+        e.stopPropagation();
+        if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); finish(true); }
+      });
+      ta.addEventListener('input', () => { ta.style.height = 'auto'; ta.style.height = Math.min(innerHeight * 0.5, ta.scrollHeight + 2) + 'px'; });
+      setTimeout(() => document.addEventListener('pointerdown', away, true), 0);
+    });
   }
 
   /* a note or a line of text, typed in place */
@@ -520,6 +555,12 @@ export function createItems(ctx) {
   function dblclick(e) {
     const el = e.target.closest?.('[data-item]');
     if (!el) { return false; }
+    const it = byId(el.dataset.item);
+    /* a box or a ring of mine: its note again */
+    if (it && MARKS.includes(it.kind) && isMine(it) && ctx.canWrite() && it.id > 0) {
+      askNote(it, it.text || '').then(text => { if (text !== (it.text || '').trim() && (text || it.text)) { patch(it, { text }); } });
+      return true;
+    }
     edit(el.dataset.item);
     return true;
   }
