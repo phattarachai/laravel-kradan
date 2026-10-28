@@ -22,6 +22,10 @@ export function localPath(id, name) {
   return `attachments/${id}-${clean}`;
 }
 
+/* an edit's from/to on one line: a multi-line text would break the review's lines and indent */
+const oneLine = s => String(s ?? '').replace(/\s+/g, ' ').trim();
+/* a drawing's note, after its line ("▭ … ตีกรอบ “…”: why") */
+const noted = (line, text) => (String(text ?? '').trim() ? `${line}: ${String(text).trim()}` : line);
 const where = (...parts) => { const p = parts.filter(x => x !== null && x !== undefined && x !== ''); return p.length ? ` (${p.join(', ')})` : ''; };
 function quoted(text) {
   const list = (text === null || text === undefined ? [] : Array.isArray(text) ? text : [text]).map(x => String(x).trim()).filter(Boolean);
@@ -54,7 +58,7 @@ export function exportMd({ board, round, picks = [], comments = [], items = [], 
     const who = name(c.user);
     if (c.edit) {
       const body = String(c.body || '').trim() === '' ? '' : `: ${c.body}`;
-      return `✎ ${who}${where(c.pin?.option)}: “${c.edit.from}” → “${c.edit.to}”${body}`;
+      return `✎ ${who}${where(c.pin?.option)}: “${oneLine(c.edit.from)}” → “${oneLine(c.edit.to)}”${body}`;
     }
     if (c.pin) {
       const box = c.pin.box || null;
@@ -69,10 +73,10 @@ export function exportMd({ board, round, picks = [], comments = [], items = [], 
       case 'note': case 'text': return `🗒 ${who}: ${String(it.text || '').trim()}`;
       case 'image': return `🖼 ${who}: ${it.file?.name} (${path})`;
       case 'file': return `📎 ${who}: ${it.file?.name} (${path})`;
-      case 'arrow': return `➚ ${who}${at}${texts.length ? ` ${w.arrow}${quoted(texts[0])}` : ''}`;
-      case 'rect': return `▭ ${who}${at} ${w.rect}${quoted(texts)}`;
-      case 'ellipse': return `▭ ${who}${at} ${w.ellipse}${quoted(texts)}`;
-      default: return `〰 ${who}${at} ${w.stroke}${texts.length ? ` ${w.near}${quoted(texts[0])}` : ''}`;
+      case 'arrow': return noted(`➚ ${who}${at}${texts.length ? ` ${w.arrow}${quoted(texts[0])}` : ''}`, it.text);
+      case 'rect': return noted(`▭ ${who}${at} ${w.rect}${quoted(texts)}`, it.text);
+      case 'ellipse': return noted(`▭ ${who}${at} ${w.ellipse}${quoted(texts)}`, it.text);
+      default: return noted(`〰 ${who}${at} ${w.stroke}${texts.length ? ` ${w.near}${quoted(texts[0])}` : ''}`, it.text);
     }
   }
   const repliesOf = list => [...list].sort((a, b) => a.id - b.id);
@@ -134,10 +138,10 @@ export function reviewLocal({ title, steps = [], picks = [], comments = [], item
       case 'note': case 'text': return `🗒 ${String(it.text || '').trim()}`;
       case 'image': return `🖼 ${it.file?.name}${it.file?.path ? ` (${it.file.path})` : ''}`;
       case 'file': return `📎 ${it.file?.name}${it.file?.path ? ` (${it.file.path})` : ''}`;
-      case 'arrow': return `➚${sp}${texts.length ? ` ${w.arrow} ${q([texts[0]])}` : ''}`;
-      case 'rect': return `▭${sp} ${w.rect}${texts.length ? ` ${q(texts)}` : ''}`;
-      case 'ellipse': return `▭${sp} ${w.ellipse}${texts.length ? ` ${q(texts)}` : ''}`;
-      default: return `〰${sp} ${w.stroke}${texts.length ? ` ${w.near} ${q([texts[0]])}` : ''}`;
+      case 'arrow': return noted(`➚${sp}${texts.length ? ` ${w.arrow} ${q([texts[0]])}` : ''}`, it.text);
+      case 'rect': return noted(`▭${sp} ${w.rect}${texts.length ? ` ${q(texts)}` : ''}`, it.text);
+      case 'ellipse': return noted(`▭${sp} ${w.ellipse}${texts.length ? ` ${q(texts)}` : ''}`, it.text);
+      default: return noted(`〰${sp} ${w.stroke}${texts.length ? ` ${w.near} ${q([texts[0]])}` : ''}`, it.text);
     }
   }
   function details(key) {
@@ -149,7 +153,7 @@ export function reviewLocal({ title, steps = [], picks = [], comments = [], item
         const p = c.pin, said = p.box ? q((p.box.texts || []).slice(0, 3)) : p.text ? q([p.text]) : '';
         return `${p.box ? '▭' : '📍'}${i + 1} ${at(p.option, p.device, p.src, said)}: ${c.body}`;
       }),
-      ...top.filter(c => c.edit).map(c => `✎ ${at(c.pin?.option, c.pin?.device, c.pin?.src)}: “${c.edit.from}” → “${c.edit.to}”`),
+      ...top.filter(c => c.edit).map(c => `✎ ${at(c.pin?.option, c.pin?.device, c.pin?.src)}: “${oneLine(c.edit.from)}” → “${oneLine(c.edit.to)}”`),
       ...items.filter(it => it.step === key && !it.draft && !it.pending).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
         .flatMap(it => block('', itemLine(it))),
     ];
