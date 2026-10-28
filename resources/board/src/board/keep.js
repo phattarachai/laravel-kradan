@@ -30,6 +30,13 @@ export function createKeep() {
     });
   }
 
+  /* on each keystroke: the draft is kept before any render asks */
+  function note(el, scope) {
+    const key = fieldKey(el, scope);
+    if (!key?.includes('|')) { return; }
+    if (!el.disabled && el.value !== el.defaultValue) { drafts.set(key, el.value); } else { drafts.delete(key); }
+  }
+
   /* after it: open(what) brings back a box the render left out ('compose:12', 'edit:7'); returns the boxes filled */
   function restore(root, scope, open = () => {}) {
     const here = () => [...root.querySelectorAll(BOXES)].map(el => [el, fieldKey(el, scope)]).filter(([, k]) => k);
@@ -49,7 +56,7 @@ export function createKeep() {
     return filled;
   }
 
-  return { save, restore, drafts };
+  return { save, note, restore, drafts };
 }
 
 /*

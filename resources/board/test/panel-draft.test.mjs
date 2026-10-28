@@ -52,7 +52,8 @@ const ROUND = { number: 1, prints: {}, steps: [{ key: 'a', title: 'หน้า�
 
 /* the server: rows in id order, a pick updated in place, its own shape on every answer */
 function server(seed = {}) {
-  const db = { picks: [], comments: [], ...structuredClone(seed) };
+  const { multiUser, ...rows } = seed;
+  const db = { picks: [], comments: [], ...structuredClone(rows) };
   let id = 100;
   const at = () => new Date(Date.UTC(2026, 9, 28, 10, 0, id)).toISOString();
   const pickOf = (step, user, body) => ({ step, user: { ...user }, options: body.options, seen: !!body.seen, updated_at: at() });
@@ -61,7 +62,7 @@ function server(seed = {}) {
     /* someone else's write, straight into the store */
     theyPick(step, options) { id++; const i = db.picks.findIndex(p => p.step === step && p.user.id === OTHER.id); const p = pickOf(step, OTHER, { options }); if (i < 0) { db.picks.push(p); } else { db.picks[i] = p; } },
     store: {
-      caps: { multiUser: false, presence: false, decide: false },
+      caps: { multiUser: !!seed.multiUser, presence: false, decide: false },
       frames: { load: () => setTimeout(() => window.dispatchEvent(Object.assign(new window.Event('message'), { source: undefined, origin: 'null', data: { kradan: 1, type: 'ready', steps: null } })), 0) },
       board: async () => ({ slug: 'demo', title: 'Demo', status: 'open', current: 1, rounds: [ROUND], viewers: [], items: [], ...structuredClone(db) }),
       boards: async () => [],
@@ -84,7 +85,7 @@ function server(seed = {}) {
 }
 
 const settle = () => new Promise(r => setTimeout(r, 30));
-async function mount({ seed, ext } = {}) {
+async function mount({ seed = {}, ext } = {}) {
   const window = browser();
   const { mountBoard } = await import('../src/board/board.js');
   const srv = server(seed);
@@ -98,6 +99,13 @@ async function mount({ seed, ext } = {}) {
     async pick(key) { const cb = $(`#panel input[name="pick"][value="${key}"]`); cb.checked = !cb.checked; cb.dispatchEvent(new window.Event('change', { bubbles: true })); await settle(); },
     /* back to the tab: what the board does on visibilitychange and on a heartbeat whose changed_at moved */
     async refresh() { document.dispatchEvent(new window.Event('visibilitychange')); await settle(); },
+    /* a mouse press: down, the blur it causes, then up (where the release lands, if it reaches this page at all) */
+    async press(el, { up = true } = {}) {
+      el.dispatchEvent(new window.Event('pointerdown', { bubbles: true }));
+      document.activeElement?.blur?.();
+      if (up) { el.dispatchEvent(new window.Event('pointerup', { bubbles: true })); }
+      await settle();
+    },
     async key(k) { document.body.dispatchEvent(Object.assign(new window.Event('keydown', { bubbles: true }), { key: k, code: k })); await settle(); },
   };
 }
@@ -214,4 +222,55 @@ test('a host\'s box (ภาพรวม) keeps what was typed before its own sav
   saved = 'ใหม่จากที่อื่น';
   await b.pick('A');
   assert.equal(box().value, 'ใหม่จากที่อื่น');
+});
+
+/* T192 round 2: the workbench session's Chrome retry */
+test('typed, a click on empty panel space, then a click on an option: the draft is kept', async () => {
+  const b = await mount();
+  const ta = b.composer();
+  b.type(ta, 'ร่างสอง');
+  await b.press(b.$('#panel .k-hr'));
+  const opt = b.$('#panel input[name="pick"][value="B"]');
+  await b.press(opt.closest('label'));
+  opt.checked = true; opt.dispatchEvent(new b.window.Event('change', { bubbles: true }));
+  await settle();
+  assert.ok(b.$('#panel input[name="pick"][value="B"]').hasAttribute('checked'), 'B is picked');
+  assert.equal(b.composer().value, 'ร่างสอง');
+});
+
+test('held stale while typing, then a click on empty panel space: the panel catches up', async () => {
+  const b = await mount();
+  b.type(b.composer(), 'ร่างสาม');
+  b.srv.theyPick('a', ['B']);
+  await b.refresh();
+  const h2 = b.$('#panel h2');
+  await b.press(b.$('#panel .k-hr'));
+  assert.notEqual(b.$('#panel h2'), h2, 'rendered with the new answers');
+  assert.equal(b.composer().value, 'ร่างสาม');
+});
+
+test('held stale, then a press whose release never reaches the page (a frame, outside the window): it still catches up', async () => {
+  const b = await mount();
+  b.type(b.composer(), 'ร่างสี่');
+  b.srv.theyPick('a', ['B']);
+  await b.refresh();
+  const h2 = b.$('#panel h2');
+  await b.press(b.$('#panel .k-hr'), { up: false });
+  await new Promise(r => setTimeout(r, 1100));
+  assert.notEqual(b.$('#panel h2'), h2);
+  assert.equal(b.composer().value, 'ร่างสี่');
+});
+
+test('a reply being written stays when ตอบ is pressed again or the panel re-renders', async () => {
+  const b = await mount({ seed: { multiUser: true, comments: [{ id: 7, step: 'a', parent_id: null, item_id: null, user: ME, mine: true, body: 'ปุ่มเล็กไป', pin: null, edit: null, created_at: '2026-10-28T09:00:00.000Z', updated_at: '2026-10-28T09:00:00.000Z', replies: [] }] } });
+  const reply = () => b.$('#panel [data-reply="7"]').dispatchEvent(new b.window.Event('click', { bubbles: true }));
+  reply();
+  const ta = b.$('#panel [data-compose="7"] textarea');
+  b.type(ta, 'ขยายเป็น 44');
+  ta.dispatchEvent(new b.window.Event('input', { bubbles: true }));
+  reply();
+  assert.equal(b.$('#panel [data-compose="7"] textarea').value, 'ขยายเป็น 44', 'pressing ตอบ again keeps it');
+  ta.blur();
+  await b.pick('A');
+  assert.equal(b.$('#panel [data-compose="7"] textarea')?.value, 'ขยายเป็น 44');
 });
