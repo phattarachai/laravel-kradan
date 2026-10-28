@@ -6,7 +6,7 @@
  * One local user; no presence, no decide.
  */
 import { readSteps } from '../agent.js';
-import { exportMd } from '../board/export.js';
+import { reviewLocal } from '../board/export.js';
 import { ME, upgrade, emptyState, syncNotes, createMapper, toPayload, setPick, addComment, editComment, deleteComment, answered, reviewJson, fromReviewJson } from './state.js';
 
 export const LOCAL_CAPS = { multiUser: false, presence: false, decide: false, send: true, pages: true, uploads: true };
@@ -72,10 +72,10 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     let list = [];
     try { list = await fetchJson(new URL('rounds/rounds.json', MAIN).href); } catch { list = []; }
     if (!Array.isArray(list)) { list = []; }
-    /* a round kept only as text (textOnly) has no screens to show */
-    const kept = list.filter(r => r && r.dir && !r.textOnly && r.title !== latest.title);
+    /* a round kept only as its review (textOnly) lists too, and shows as text */
+    const kept = list.filter(r => r && r.dir && r.title !== latest.title);
     ROUNDS = kept.map((r, i) => ({
-      number: i + 1, dir: r.dir, title: r.title, pushed_at: r.updated || r.created || '',
+      number: i + 1, dir: r.dir, title: r.title, pushed_at: r.updated || r.created || '', text_only: !!r.textOnly,
       base_url: new URL(`rounds/${r.dir}/`, MAIN).href, page_url: new URL(`rounds/${r.dir}/index.html`, MAIN).href,
     }));
     const own = list.find(r => r?.title === latest.title);
@@ -85,6 +85,7 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
   }
   async function readRound(r) {
     if (isLatest(r)) { return latest; }
+    if (r.text_only) { return { html: '', title: r.title, steps: [], prints: {} }; }
     if (!cache.has(r.number)) {
       try { cache.set(r.number, await readPage(await fetchText(r.page_url), r.page_url, { parse, fetchText })); } catch { cache.set(r.number, { html: '', title: r.title, steps: [], prints: {} }); }
     }
@@ -128,13 +129,14 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
 
   async function board(slug, number) {
     if (!latest) { await refreshLatest(); await loadRounds(); }
-    const r = roundOf(+number || ROUNDS.at(-1).number);
+    const asked = roundOf(+number || ROUNDS.at(-1).number);
+    const r = asked.text_only ? ROUNDS.at(-1) : asked;
     const shown = await readRound(r);
     const look = get(`wb:look:${PATH}`);
     const { picks, comments } = toPayload(await stateFor(r), mapperFor(shown.steps), me);
     const rounds = await Promise.all(ROUNDS.map(async x => {
       const p = await readRound(x);
-      return { number: x.number, dir: x.dir, title: x.title, pushed_at: x.pushed_at, steps: p.steps, prints: p.prints, base_url: x.base_url, page_url: x.page_url, readonly: !isLatest(x) };
+      return { number: x.number, dir: x.dir, text_only: x.text_only, title: x.title, pushed_at: x.pushed_at, steps: p.steps, prints: p.prints, base_url: x.base_url, page_url: x.page_url, readonly: !isLatest(x) };
     }));
     const itemReplies = comments.filter(c => c.item_id);
     return {
@@ -154,7 +156,7 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
         const path = pathOf(p), look = get(`wb:look:${path}`);
         const at = p.modified ? new Date(p.modified * 1000).toISOString() : '';
         return { slug: p.slug, title: p.title, label: p.title, status: p.archived ? 'archived' : 'open', url: `?page=${encodeURIComponent(p.path)}`,
-          updated: !!look && p.modified > (look.modified || 0), waiting: waiting.has(p.slug), updated_at: at, round: { pushed_at: at }, review: p.review || null, modified: p.modified, archived: !!p.archived, path: p.path, local: path };
+          updated: !!look && p.modified > (look.modified || 0), waiting: waiting.has(p.slug), pinned: waiting.has(p.slug) || path === PATH, updated_at: at, round: { pushed_at: at }, review: p.review || null, modified: p.modified, archived: !!p.archived, path: p.path, local: path };
       }),
     };
   }
@@ -277,11 +279,16 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
       const image = /^image\//.test(file.type);
       return newItem({ ...body, kind: image ? 'image' : 'file', file: { name: file.name, type: file.type, size: file.size, url: f.url, thumb: image ? f.url : null, path: f.path } });
     },
+    /* one person's review, in the shape the design skill reads (reviewLocal), with ภาพรวม and the compact line */
     exportMd: async () => {
-      const r = ROUNDS.at(-1);
-      const { picks, comments } = toPayload(await stateFor(r), mapperFor(latest.steps), me);
-      return exportMd({ board: { title: latest.title, task_ref: '', url: MAIN.href }, round: { number: r.number, steps: latest.steps }, picks, comments, items: items() });
+      const r = ROUNDS.at(-1), st = await stateFor(r);
+      const { picks, comments } = toPayload(st, mapperFor(latest.steps), me);
+      return reviewLocal({ title: latest.title, steps: latest.steps, picks, comments, items: items().filter(it => (it.round ?? r.number) <= r.number), overall: st.overall });
     },
+    roundText: async (slug, number) => { const r = roundOf(number); return r?.dir ? fetchText(new URL(`rounds/${r.dir}/review.md`, MAIN).href) : ''; },
+    /* ภาพรวม: one free note for the whole page, kept in the round's state as before */
+    overall: () => upgrade(get(stateKey(ROUNDS.at(-1).title)) || {}).overall || '',
+    setOverall: text => writeLatest(st => { st.overall = text; }),
 
     /* for the workbench's ext: what ส่ง and the page manager need */
     slug: SLUG,

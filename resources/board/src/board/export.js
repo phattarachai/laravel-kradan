@@ -101,3 +101,68 @@ export function exportMd({ board, round, picks = [], comments = [], items = [], 
   });
   return lines.join('\n') + '\n';
 }
+
+/*
+ * The review of one person (the design workbench, caps.multiUser false), in the shape the design skill and Claude
+ * read (workbench.md, "What comes back"): no names, the picks as "A + B", ↳ notes, then 📍/▭/✎ lines, then what was
+ * added; ภาพรวม at the end, and the compact "Q1:A+B  Q2:ข้าม" line last.
+ */
+const LOCAL = {
+  th: { all: 'ทั้งหมด', skip: 'ข้าม', read: 'อ่านแล้ว', overall: 'Overall', arrow: 'ชี้ที่', rect: 'ตีกรอบ', ellipse: 'วงไว้', stroke: 'วาดเส้น', near: 'ใกล้',
+    dev: { desktop: 'เดสก์ท็อป', laptop: 'โน้ตบุ๊ก', tablet: 'แท็บเล็ต', phone: 'มือถือ', custom: 'กว้าง' } },
+  en: { all: 'all', skip: 'skip', read: 'read', overall: 'Overall', arrow: 'points at', rect: 'boxed', ellipse: 'circled', stroke: 'drew', near: 'near',
+    dev: { desktop: 'desktop', laptop: 'laptop', tablet: 'tablet', phone: 'phone', custom: 'width' } },
+};
+
+export function reviewLocal({ title, steps = [], picks = [], comments = [], items = [], overall = '', locale = 'th' }) {
+  const w = LOCAL[locale] || LOCAL.th;
+  const q = list => list.filter(Boolean).map(x => `“${String(x).trim()}”`).join(', ');
+  /* "B มือถือ “วันนี้”": the option, the device (none on a cropped step) and the text it sits on */
+  const at = (option, device, src, said = '') => [option, src === 'crop' ? '' : w.dev[device] || device || '', said].filter(Boolean).join(' ');
+  const noteLines = txt => (String(txt || '').trim() ? String(txt).trim().split('\n').map((l, j) => `${j ? '  ' : '↳ '}${l}`) : []);
+  const mine = key => picks.find(p => p.step === key) || { options: [], seen: false };
+  function answer(s) {
+    const p = mine(s.key), keys = p.options || [];
+    if (s.kind !== 'screen' && (s.options || []).length) {
+      return (keys.length > 1 && keys.length === s.options.length ? w.all : keys.join(' + ')) || (p.seen ? w.skip : '?');
+    }
+    return p.seen ? w.read : '';
+  }
+  function itemLine(it) {
+    const where = at(it.anchor?.option, it.anchor?.device, it.anchor?.src), sp = where ? ` ${where}` : '', texts = it.texts || [];
+    switch (it.kind) {
+      case 'note': case 'text': return `🗒 ${String(it.text || '').trim()}`;
+      case 'image': return `🖼 ${it.file?.name}${it.file?.path ? ` (${it.file.path})` : ''}`;
+      case 'file': return `📎 ${it.file?.name}${it.file?.path ? ` (${it.file.path})` : ''}`;
+      case 'arrow': return `➚${sp}${texts.length ? ` ${w.arrow} ${q([texts[0]])}` : ''}`;
+      case 'rect': return `▭${sp} ${w.rect}${texts.length ? ` ${q(texts)}` : ''}`;
+      case 'ellipse': return `▭${sp} ${w.ellipse}${texts.length ? ` ${q(texts)}` : ''}`;
+      default: return `〰${sp} ${w.stroke}${texts.length ? ` ${w.near} ${q([texts[0]])}` : ''}`;
+    }
+  }
+  function details(key) {
+    const top = comments.filter(c => c.step === key && !c.parent_id && !c.item_id);
+    const pins = top.filter(c => c.pin && !c.edit).sort((a, b) => a.id - b.id);
+    return [
+      ...top.filter(c => !c.pin && !c.edit).flatMap(c => noteLines(c.body)),
+      ...pins.map((c, i) => {
+        const p = c.pin, said = p.box ? q((p.box.texts || []).slice(0, 3)) : p.text ? q([p.text]) : '';
+        return `${p.box ? '▭' : '📍'}${i + 1} ${at(p.option, p.device, p.src, said)}: ${c.body}`;
+      }),
+      ...top.filter(c => c.edit).map(c => `✎ ${at(c.pin?.option, c.pin?.device, c.pin?.src)}: “${c.edit.from}” → “${c.edit.to}”`),
+      ...items.filter(it => it.step === key && !it.draft && !it.pending).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
+        .flatMap(it => block('', itemLine(it))),
+    ];
+  }
+  const lines = [title, ''];
+  steps.forEach((s, i) => {
+    if (s.group && s.group !== steps[i - 1]?.group) { if (lines.at(-1) !== '') { lines.push(''); } lines.push(s.group); }
+    const a = answer(s);
+    lines.push(`${i + 1}. ${s.title}${a ? ` → ${a}` : ''}`);
+    details(s.key).forEach(l => lines.push(`${INDENT}${l}`));
+  });
+  if (String(overall).trim()) { lines.push('', w.overall, ...noteLines(overall).map(l => `${INDENT}${l}`)); }
+  const compact = steps.map((s, i) => (s.kind !== 'screen' && (s.options || []).length ? `Q${i + 1}:${mine(s.key).options?.join('+') || w.skip}` : '')).filter(Boolean).join('  ');
+  if (compact) { lines.push('', compact); }
+  return lines.join('\n') + '\n';
+}

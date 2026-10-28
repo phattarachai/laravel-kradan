@@ -14,7 +14,7 @@ const th = {
   sent: 'ส่งรีวิวแล้ว Claude ทำต่อได้เลย', send_failed: 'ส่งไม่ได้ ใช้คัดลอกให้ Claude แทน',
   missing_n: 'ยังไม่ได้ตอบ {n} ข้อ', unseen: 'มีอัปเดต ยังไม่ได้ดู', unpicked: 'ยังไม่เลือก', unread: 'ยังไม่อ่าน',
   skip_rest: 'ข้ามที่เหลือ', go_back: 'กลับไปตอบ', skip_send: 'ข้ามที่เหลือแล้วส่ง', check_sub: 'ข้อที่ไม่มีความเห็น ติ๊ก ข้ามข้อนี้ หรือ อ่านแล้ว ที่แผงขวา',
-  pages: 'หน้ารีวิว', manage: 'จัดการหน้ารีวิว', live: 'ใช้อยู่', archived: 'เก็บแล้ว', page: 'หน้า', status: 'สถานะ', edited: 'แก้ไข',
+  overall: 'ภาพรวม', pages: 'หน้ารีวิว', manage: 'จัดการหน้ารีวิว', live: 'ใช้อยู่', archived: 'เก็บแล้ว', page: 'หน้า', status: 'สถานะ', edited: 'แก้ไข',
   none_archived: 'ยังไม่มีหน้าที่เก็บไว้', no_pages: 'ไม่มีหน้า', old: 'เลือกที่ไม่ได้แก้เกิน 30 วัน', picked_n: 'เลือก {n} หน้า',
   archive: 'เก็บ', restore: 'เอากลับมา', delete: 'ลบ', close: 'ปิด', cancel: 'ยกเลิก', done_n: '{verb} {n} หน้าแล้ว', skipped: 'ข้าม {name} {why}',
   cant: 'ทำไม่ได้ {why}', delete_n: 'ลบ {n} หน้า', delete_sub: 'ย้ายไปถังขยะ กู้คืนจาก Trash ได้', waits: 'Claude รอคำตอบหน้านี้อยู่',
@@ -25,7 +25,7 @@ const en = {
   sent: 'Review sent, Claude can carry on', send_failed: 'Couldn’t send; copy it for Claude instead',
   missing_n: '{n} not answered yet', unseen: 'updated, not looked at', unpicked: 'not picked', unread: 'not read',
   skip_rest: 'Skip the rest', go_back: 'Go back', skip_send: 'Skip the rest and send', check_sub: 'With nothing to say, tick skip or read in the panel',
-  pages: 'Review pages', manage: 'Manage review pages', live: 'In use', archived: 'Archived', page: 'Page', status: 'Status', edited: 'Edited',
+  overall: 'Overall', pages: 'Review pages', manage: 'Manage review pages', live: 'In use', archived: 'Archived', page: 'Page', status: 'Status', edited: 'Edited',
   none_archived: 'Nothing archived yet', no_pages: 'No pages', old: 'Pick those not edited for 30 days', picked_n: '{n} picked',
   archive: 'Archive', restore: 'Bring back', delete: 'Delete', close: 'Close', cancel: 'Cancel', done_n: '{verb} {n} pages', skipped: 'skipped {name} {why}',
   cant: 'Couldn’t {why}', delete_n: 'Delete {n} pages', delete_sub: 'They go to the Trash and can be restored', waits: 'A Claude is waiting on this page',
@@ -35,8 +35,8 @@ const w = (k, vars = {}) => ((LOCALE.code === 'en' ? en : th)[k] ?? th[k] ?? k).
 
 /* the board's own strings that read differently here (a page, not a board) */
 export const STRINGS = {
-  th: { boards: 'หน้ารีวิว', steps_here: 'ข้อในหน้านี้', rounds: 'รอบของหน้านี้', copy: 'Review & copy', fresh: 'มีอัปเดต โหลดใหม่' },
-  en: { boards: 'Review pages', steps_here: 'Steps on this page', rounds: 'Rounds of this page', copy: 'Review & copy' },
+  th: { boards_more: 'หน้าอื่น {n}', boards: 'หน้ารีวิว', steps_here: 'ข้อในหน้านี้', rounds: 'รอบของหน้านี้', copy: 'Review & copy', fresh: 'มีอัปเดต โหลดใหม่' },
+  en: { boards_more: '{n} other pages', boards: 'Review pages', steps_here: 'Steps on this page', rounds: 'Rounds of this page', copy: 'Review & copy' },
 };
 
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -226,8 +226,10 @@ export function createExt({ store, stamp = {}, fetch: fetchFn = globalThis.fetch
     keepParams: ['page'],
     /* the workbench opens fitted, side by side when that stays readable (its own default, as before) */
     view: { zoom: 'fit', arr: 'auto' },
-    /* the sidebar widths the old workbench kept */
-    sizeKeys: { side: 'wb:sw', panel: 'wb:pw' },
+    /* the keys the old workbench kept: the sidebar widths and whether หน้าอื่น was open */
+    localKeys: { side: 'wb:sw', panel: 'wb:pw', boardsFold: 'wb:pgopen' },
+    /* ภาพรวม: one note for the whole page, at the end of the panel, saved as you type (not in an older round) */
+    panelEnd: h => (h.old() ? '' : `<div class="k-hr"></div><div class="k-lab">${esc(w('overall'))}</div><textarea class="wb-overall" data-wboverall rows="2">${esc(store.overall())}</textarea>`),
     bar: h => `<button class="k-btn k-primary wb-send" data-act="wb-send" id="sendb" disabled data-tip="${esc(w('send_off'))}" data-tip-end>${esc(w('send'))}</button>`,
     menu: (h, item) => item('ext:send', w('send_menu'), '', { disabled: !inbox.port || h.old() }),
     act(name, h) {
@@ -254,6 +256,15 @@ export function createExt({ store, stamp = {}, fetch: fetchFn = globalThis.fetch
       host = h;
       renderSend();
       store.onWrite(pushDraft);
+      let overallTimer;
+      document.addEventListener('input', e => {
+        const ta = e.target.closest?.('[data-wboverall]');
+        if (!ta) { return; }
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(innerHeight * 0.5, ta.scrollHeight + 2) + 'px';
+        clearTimeout(overallTimer);
+        overallTimer = setTimeout(() => store.setOverall(ta.value), 400);
+      });
       findInbox();
       setInterval(findInbox, 8000);
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { h.reloadBoards(); } });

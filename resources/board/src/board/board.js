@@ -226,8 +226,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   /* both sidebars widen by dragging their inner edge, within a min that keeps titles and options readable and a max
      that keeps the canvas usable (owner, 2026-10-28). Each viewer's widths stay in localStorage */
   const SIDE_W = {
-    side: { min: 180, max: 480, prop: '--swo', key: ext.sizeKeys?.side || 'kradan:side-w' },
-    panel: { min: 260, max: 640, prop: '--pwo', key: ext.sizeKeys?.panel || 'kradan:panel-w' },
+    side: { min: 180, max: 480, prop: '--swo', key: ext.localKeys?.side || 'kradan:side-w' },
+    panel: { min: 260, max: 640, prop: '--pwo', key: ext.localKeys?.panel || 'kradan:panel-w' },
   };
   Object.values(SIDE_W).forEach(x => { const w = +getLocal(x.key); if (w) { $('#app').style.setProperty(x.prop, clamp(w, x.min, x.max) + 'px'); } });
 
@@ -462,6 +462,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   /* the open boards sit on top, like Figma's Pages over Layers, all of them (owner, 2026-10-28): a board leaves the list
      when it is filed into history, from the title menu or a right-click here. Then the steps of this board */
   let BOARDS = null;
+  const BOARDS_OPEN = ext.localKeys?.boardsFold || 'kradan:boards-open';
+  let boardsOpen = !!getLocal(BOARDS_OPEN);
   async function loadBoards() {
     try { BOARDS = (await api.boards())?.boards || []; } catch { BOARDS = []; }
     renderSide();
@@ -474,8 +476,13 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (!BOARDS?.length) { return ''; }
     const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug)
       .sort((a, b) => String(b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.round?.pushed_at || a.updated_at || '')));
+    /* a store may mark the rows that stay in view (the workbench: this page and the pages Claude waits on); the rest
+       fold under อื่น N, which remembers whether it was open. Kradan marks none, so it lists them all */
+    const marked = open.some(b => 'pinned' in b);
+    const top = marked ? open.filter(b => b.pinned || b.slug === B.slug) : open, rest = marked ? open.filter(b => !top.includes(b)) : [];
+    const fold = rest.length ? `<button class="k-fold k-bfold" data-boardfold aria-expanded="${boardsOpen}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg>${esc(t('boards_more', { n: rest.length }))}</button>${boardsOpen ? rest.map(boardRow).join('') : ''}` : '';
     return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span>${ext.boardsTool ? ext.boardsTool(host) : `<a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a>`}</div>
-      ${open.map(boardRow).join('')}</div><div class="divide"></div>`;
+      ${top.map(boardRow).join('')}${fold}</div><div class="divide"></div>`;
   }
   function renderSide() {
     const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
@@ -524,7 +531,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       <div class="k-lab">${entries.length ? esc(t('comments_n', { n: entries.length })) : esc(t('no_comments'))}</div>
       <div class="k-thread">${entries.map(x => x.html).join('')}</div>
       ${CAN_WRITE() ? composer('') : ''}
-      ${extra}`;
+      ${extra}${ext.panelEnd ? ext.panelEnd(host) : ''}`;
     $('#panel').scrollTop = scroll;
     renderThread();
   }
@@ -1035,7 +1042,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     closeCtx();
     const el = document.createElement('div');
     el.className = 'k-ctx k-rmenu';
-    el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
+    el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), r.text_only ? t('text_only') : t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
       + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
       + (caps.decide && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
     document.body.appendChild(el);
@@ -1050,26 +1057,33 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       if (x.dataset.allrounds !== undefined) { openAllRounds(); return; }
       if (x.dataset.archive !== undefined) { openArchive(); return; }
       const r = B.rounds.find(y => y.number === +x.dataset.round);
+      /* a round kept only as its review text (the workbench's textOnly) opens as text in ดูทุกรอบ */
+      if (r?.text_only) { openAllRounds(r.number); return; }
       if (r && r.number !== R.number) { location.href = roundUrl(r); }
     });
   }
-  async function openAllRounds() {
+  async function openAllRounds(focus) {
     const m = modal(`<div class="box wide"><h2>${t('all_rounds')}</h2><div class="k-rounds">${esc(t('loading'))}</div><div class="row"><button class="k-btn" data-x>${t('close')}</button></div></div>`);
     const parts = await Promise.all(B.rounds.map(async r => {
+      if (r.text_only) {
+        let text = '';
+        try { text = await api.roundText?.(B.slug, r.number) || ''; } catch { /* none kept */ }
+        return `<section id="round-${r.number}"><div class="rh"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('text_only_sub')].filter(Boolean).join(' · '))}</span></div><pre>${esc(text.trim())}</pre></section>`;
+      }
       let p;
       try { p = r.number === R.number ? { picks: PICKS, comments: COMMENTS } : await api.board(B.slug, r.number); } catch { p = { picks: [], comments: [] }; }
       const people = new Set([...(p.picks || []).map(x => x.user.id), ...(p.comments || []).map(x => x.user.id)]);
       const body = (r.steps || []).map((s, i) => {
         const ps = (p.picks || []).filter(x => x.step === s.key);
-        const ans = (s.options || []).map(o => [o.key, ps.filter(x => x.options.includes(o.key)).map(x => x.user.name)]).filter(([, n]) => n.length).map(([k, n]) => `${k}: ${n.join(', ')}`).join(' · ');
+        const ans = (s.options || []).map(o => [o.key, ps.filter(x => x.options.includes(o.key)).map(x => x.user.name)]).filter(([, n]) => n.length).map(([k, n]) => (caps.multiUser ? `${k}: ${n.join(', ')}` : k)).join(caps.multiUser ? ' · ' : ' + ');
         const cms = (p.comments || []).filter(c => c.step === s.key);
         const head = s.group && s.group !== r.steps[i - 1]?.group ? `<div class="grp">${esc(s.group)}</div>` : '';
-        return `${head}<a class="q" href="${roundUrl(r, i + 1)}"><span class="tnum">${i + 1}.</span><span class="t">${esc(s.title)}</span>${ans ? `<span class="a">→ ${esc(ans)}</span>` : ''}</a>${cms.length ? `<div class="d">${cms.map(c => `${esc(c.user.name)}: ${esc(c.edit ? `“${c.edit.from}” → “${c.edit.to}”` : c.body)}`).join('<br>')}</div>` : ''}`;
+        return `${head}<a class="q" href="${roundUrl(r, i + 1)}"><span class="tnum">${i + 1}.</span><span class="t">${esc(s.title)}</span>${ans ? `<span class="a">→ ${esc(ans)}</span>` : ''}</a>${cms.length ? `<div class="d">${cms.map(c => `${caps.multiUser ? `${esc(c.user.name)}: ` : ''}${esc(c.edit ? `“${c.edit.from}” → “${c.edit.to}”` : c.body)}`).join('<br>')}</div>` : ''}`;
       }).join('');
-      return `<section class="${r.number === R.number ? 'cur' : ''}"><div class="rh"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('answered_people', { n: people.size })].join(' · '))}</span><a href="${roundUrl(r)}">${t('open_round')}</a></div>${body}</section>`;
+      return `<section id="round-${r.number}" class="${r.number === R.number ? 'cur' : ''}"><div class="rh"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), t('answered_people', { n: people.size })].join(' · '))}</span><a href="${roundUrl(r)}">${t('open_round')}</a></div>${body}</section>`;
     }));
     $('.k-rounds', m).innerHTML = parts.join('');
-    $('.k-rounds', m).lastElementChild?.scrollIntoView({ block: 'start' });
+    (focus ? $(`#round-${focus}`, m) : $('.k-rounds', m).lastElementChild)?.scrollIntoView({ block: 'start' });
   }
 
   /* ---------- tools, minimap, zoom-to ---------- */
@@ -1160,6 +1174,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     }
     if (t0.closest('.k-pop:not(.k-tpop), .k-modal, .k-ctx')) { return; }
     if (items.click(e)) { return; }
+    if (t0.dataset.boardfold !== undefined) { boardsOpen = !boardsOpen; setLocal(BOARDS_OPEN, boardsOpen); renderSide(); return; }
     if (t0.dataset.addedfold !== undefined) { addedOpen = !addedOpen; setLocal('kradan:added-open', addedOpen); renderPanel(); return; }
     const d = t0.dataset;
     if (d.step) { e.preventDefault(); go(+d.step); return; }

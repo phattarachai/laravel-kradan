@@ -35,16 +35,16 @@ test('the board payload has the shapes of 2-board-payload.md, read from the page
   const b = await store.board(store.slug);
   assert.equal(b.slug, '2610-90-wb-demo');
   assert.equal(b.title, 'Workbench demo รอบ 2');
-  assert.deepEqual(b.rounds.map(r => [r.number, r.title, r.readonly]), [[1, 'Workbench demo รอบ 1', true], [2, 'Workbench demo รอบ 2', false]]);
-  assert.equal(b.current, 2);
-  const [one, two, three] = b.rounds[1].steps;
+  assert.deepEqual(b.rounds.map(r => [r.number, r.title, r.readonly, !!r.text_only]), [[1, 'Workbench demo รอบ 0', true, true], [2, 'Workbench demo รอบ 1', true, false], [3, 'Workbench demo รอบ 2', false, false]]);
+  assert.equal(b.current, 3);
+  const [one, two, three] = b.rounds[2].steps;
   assert.deepEqual([one.key, two.key, three.key], ['ตะกร้า|ปุ่มยืนยัน', 'ตะกร้า|ยอดรวม', 'หน้าจอ|หน้ายืนยัน']);
   assert.deepEqual(one.options.map(o => [o.key, o.title, o.trade]), [['A', 'ปุ่มเดียว', 'ง่าย แต่กดพลาดได้'], ['B', 'สองขั้น', 'ช้ากว่าหนึ่งคลิก']]);
   assert.equal(three.kind, 'screen');
   assert.equal(three.frames[0].src, 'screen.html#s=confirm');
-  assert.deepEqual(Object.keys(b.rounds[1].prints), [one.key, two.key, three.key]);
-  assert.equal(b.rounds[1].page_url, PAGE);
-  assert.equal(b.rounds[0].page_url, `${BASE}2610-90-wb-demo/rounds/01/index.html`);
+  assert.deepEqual(Object.keys(b.rounds[2].prints), [one.key, two.key, three.key]);
+  assert.equal(b.rounds[2].page_url, PAGE);
+  assert.equal(b.rounds[1].page_url, `${BASE}2610-90-wb-demo/rounds/01/index.html`);
   assert.deepEqual([b.picks, b.comments, b.items, b.viewers, b.seen_prints], [[], [], [], [], null]);
   assert.equal(store.caps.multiUser, false);
 });
@@ -72,32 +72,35 @@ test('the old workbench keys carry over: picks, ข้าม, notes, pins, boxes
 test('writes land in the old shape, so review.json and the old workbench read them', async () => {
   const { store, read } = env();
   const b = await store.board(store.slug);
-  const step = b.rounds[1].steps[0].key;
-  assert.deepEqual((await store.pick(store.slug, 2, step, { options: ['A'], seen: false })).picks.map(p => p.options), [['A']]);
-  await store.comment(store.slug, 2, { step, body: 'ข้อแรก' });
-  await store.comment(store.slug, 2, { step, body: 'ข้อสอง' });
-  const pin = await store.comment(store.slug, 2, { step, body: 'แดงกว่านี้', pin: { option: 'A', device: 'desktop', src: 'crop', x: 5, y: 6, text: 'ส่งคำสั่งซื้อ', box: null } });
+  const step = b.rounds[2].steps[0].key;
+  assert.deepEqual((await store.pick(store.slug, 3, step, { options: ['A'], seen: false })).picks.map(p => p.options), [['A']]);
+  await store.comment(store.slug, 3, { step, body: 'ข้อแรก' });
+  await store.comment(store.slug, 3, { step, body: 'ข้อสอง' });
+  const pin = await store.comment(store.slug, 3, { step, body: 'แดงกว่านี้', pin: { option: 'A', device: 'desktop', src: 'crop', x: 5, y: 6, text: 'ส่งคำสั่งซื้อ', box: null } });
   assert.equal(pin.pin.src, 'crop');
   const s = read(KEY);
   assert.deepEqual(s.picks, { 1: ['A'] });
   assert.equal(s.notes[1], 'ข้อแรก\n\nข้อสอง');
   assert.deepEqual([s.pins[0].src, s.pins[0].crop, s.pins[0].no, s.pins[0].note], ['crop:0:A', true, 1, 'แดงกว่านี้']);
   assert.deepEqual(read('wb:sum:/design/2610-90-wb-demo/index.html'), { title: 'Workbench demo รอบ 2', done: 1, total: 3, sentAt: '' });
-  await store.pick(store.slug, 2, b.rounds[1].steps[1].key, { options: [], seen: true });
+  await store.pick(store.slug, 3, b.rounds[2].steps[1].key, { options: [], seen: true });
   assert.deepEqual(read(KEY).seen, { 2: true });
   await assert.rejects(store.pick(store.slug, 1, step, { options: ['A'] }), { status: 409 });
   const md = await store.exportMd();
-  assert.match(md, /^Workbench demo รอบ 2 · รอบ 2 · http:\/\/localhost\/design\/2610-90-wb-demo\/index.html\n/);
-  assert.match(md, /1\. ปุ่มยืนยัน → A: คุณ\n {3}💬 คุณ: ข้อแรก\n {3}💬 คุณ: ข้อสอง\n {3}📍1 คุณ \(A, desktop\) “ส่งคำสั่งซื้อ”: แดงกว่านี้\n2\. ยอดรวม → ข้าม: คุณ/);
+  await store.setOverall('ภาพรวมดี');
+  assert.equal(store.overall(), 'ภาพรวมดี');
+  assert.equal(read(KEY).overall, 'ภาพรวมดี');
+  assert.equal(await store.exportMd(), 'Workbench demo รอบ 2\n\nตะกร้า\n1. ปุ่มยืนยัน → A\n   ↳ ข้อแรก\n   ↳ ข้อสอง\n   📍1 A “ส่งคำสั่งซื้อ”: แดงกว่านี้\n2. ยอดรวม → ข้าม\n\nหน้าจอ\n3. หน้ายืนยัน\n\nOverall\n   ↳ ภาพรวมดี\n\nQ1:A  Q2:ข้าม\n');
   const review = await store.review(true, [3]);
-  assert.deepEqual([review.slug, review.sent, review.missing, review.steps[0].picks, review.steps[0].note], ['2610-90-wb-demo', true, [3], ['A'], 'ข้อแรก\n\nข้อสอง']);
+  assert.deepEqual([review.slug, review.sent, review.missing, review.steps[0].picks, review.steps[0].note, review.overall], ['2610-90-wb-demo', true, [3], ['A'], 'ข้อแรก\n\nข้อสอง', 'ภาพรวมดี']);
+  assert.match(review.text, /^Workbench demo รอบ 2\n/);
 });
 
 test('an older round reads its answers from the review.json filed with it', async () => {
   const { store } = env();
-  const b = await store.board(store.slug, 1);
-  assert.equal(b.current, 1);
-  assert.deepEqual(b.rounds[0].steps.map(s => s.title), ['ปุ่มยืนยัน', 'ยอดรวมเดิม', 'หน้ายืนยัน']);
+  const b = await store.board(store.slug, 2);
+  assert.equal(b.current, 2);
+  assert.deepEqual(b.rounds[1].steps.map(s => s.title), ['ปุ่มยืนยัน', 'ยอดรวมเดิม', 'หน้ายืนยัน']);
   assert.deepEqual(b.picks.map(p => [p.step, p.options, p.seen]), [['ตะกร้า|ปุ่มยืนยัน', ['B'], false], ['ตะกร้า|ยอดรวมเดิม', [], true], ['หน้าจอ|หน้ายืนยัน', [], true]]);
   assert.equal(b.comments[0].body, 'สองขั้นดีกว่า');
 });
@@ -140,4 +143,25 @@ test('src_hash of the board source at 8c37484 is the value harness.sh got', asyn
   try { execFileSync('sh', ['-c', `git -C "${ROOT}" archive 8c37484 resources/board/src | tar -x -C "${root}"`], { stdio: 'ignore' }); } catch { fs.rmSync(root, { recursive: true }); return; }
   assert.equal(srcHash(root), '0b221b849784556c2dc1da7e55e5d15f0e05ab6eacb567582b2578d08ee9aaeb');
   fs.rmSync(root, { recursive: true });
+});
+
+test('a round kept only as text lists, opens as its review.md, and never becomes the shown round', async () => {
+  const rounds = JSON.parse(fs.readFileSync(path.join(DESIGN, '2610-90-wb-demo/rounds/rounds.json'), 'utf8'));
+  assert.ok(rounds.some(r => r.textOnly), 'the fixture has a textOnly round');
+  const { store } = env();
+  const b = await store.board(store.slug);
+  const t0 = b.rounds.find(r => r.text_only);
+  assert.deepEqual([t0.number, t0.steps], [1, []]);
+  assert.match(await store.roundText(store.slug, t0.number), /ข้อเดียว/);
+  assert.equal((await store.board(store.slug, t0.number)).current, b.latest);
+});
+
+test('the page list marks this page and the pages Claude waits on; the rest fold', async () => {
+  const { store } = env();
+  await store.board(store.slug);
+  store.waiting.add('2610-91-wb-plain');
+  const rows = (await store.boards()).boards;
+  assert.deepEqual(rows.map(r => [r.slug, r.pinned]), [['2610-90-wb-demo', true], ['2610-91-wb-plain', true], ['2610-80-old', false]]);
+  store.waiting.clear();
+  assert.equal((await store.boards()).boards.find(r => r.slug === '2610-91-wb-plain').pinned, false);
 });

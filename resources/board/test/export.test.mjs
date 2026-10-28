@@ -22,3 +22,13 @@ test('labels and attachment paths match the PHP helpers', () => {
   assert.equal(localPath(3, '..แผน (ก).pdf'), 'attachments/3-แผน-ก-.pdf');
   assert.equal(localPath(4, '???'), 'attachments/4-file');
 });
+
+test('one person\'s review prints the workbench shape: no names, A + B, ↳ notes, numbered pins, the compact line', async () => {
+  const { reviewLocal } = await import('../src/board/export.js');
+  const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
+  const input = JSON.parse(fs.readFileSync(path.join(dir, 'local-review.json'), 'utf8'));
+  const want = fs.readFileSync(path.join(dir, 'local-review.md'), 'utf8').split('\n');
+  const got = reviewLocal(input).split('\n');
+  got.forEach((line, i) => assert.equal(line, want[i], `line ${i + 1}`));
+  assert.equal(got.length, want.length);
+});

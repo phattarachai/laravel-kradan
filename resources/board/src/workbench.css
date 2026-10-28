@@ -42,3 +42,6 @@
 .wb-danger, .wb-danger:hover { border-color: #c92a2a; background: #c92a2a; color: #fff; }
 .wb-danger:disabled { background: #fff; color: var(--faint); border-color: var(--line); }
 .wb-core { font-size: 11px; color: var(--faint); padding: 16px 12px 10px; }
+.wb-overall { width: 100%; min-height: 56px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 14px; line-height: 1.5; }
+.wb-overall:focus { outline: 2px solid var(--k-accent-bg); border-color: var(--k-accent); }
+.k-side .k-bfold { margin: 2px 2px; width: calc(100% - 4px); font-weight: 500; }

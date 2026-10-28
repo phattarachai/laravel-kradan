@@ -1,0 +1,31 @@
+{
+  "about": "One person's review in the design workbench (caps.multiUser false), in board-payload shapes. local-review.md is what reviewLocal() prints: the shape workbench.md documents under \"What comes back\".",
+  "title": "Money V2 รอบ 5",
+  "overall": "ภาพรวมโอเค\nเหลือเรื่องสี",
+  "steps": [
+    {"key": "เมนู|ปุ่มเมนู", "group": "เมนู", "title": "ปุ่มเมนู", "kind": "question", "options": [{"key": "A", "title": "ไอคอน"}, {"key": "B", "title": "ข้อความ"}, {"key": "C", "title": "ทั้งคู่"}]},
+    {"key": "เมนู|ที่วางเมนู", "group": "เมนู", "title": "ที่วางเมนู", "kind": "question", "options": [{"key": "A", "title": "ซ้าย"}, {"key": "B", "title": "บน"}]},
+    {"key": "เมนู|สีเมนู", "group": "เมนู", "title": "สีเมนู", "kind": "question", "options": [{"key": "A", "title": "เทา"}, {"key": "B", "title": "ขาว"}]},
+    {"key": "หน้าจอ|หน้ายอด", "group": "หน้าจอ", "title": "หน้ายอด", "kind": "screen", "options": []},
+    {"key": "|ข้อสุดท้าย", "group": "", "title": "ข้อสุดท้าย", "kind": "screen", "options": []}
+  ],
+  "picks": [
+    {"step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "options": ["A", "B"], "seen": false},
+    {"step": "เมนู|ที่วางเมนู", "user": {"id": "me", "name": "คุณ"}, "options": ["A", "B"], "seen": false},
+    {"step": "หน้าจอ|หน้ายอด", "user": {"id": "me", "name": "คุณ"}, "options": [], "seen": true}
+  ],
+  "comments": [
+    {"id": 1, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "ไอคอนเล็กไป\nลองใหญ่ขึ้น", "pin": null, "edit": null, "created_at": "2026-10-28T09:00:00Z"},
+    {"id": 1761000001000, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "ตัวเล็กไป",
+     "pin": {"option": "B", "device": "phone", "src": "screen.html#s=today", "x": 10, "y": 20, "text": "วันนี้", "box": null}, "edit": null, "created_at": "2026-10-28T09:01:00Z"},
+    {"id": 1761000002000, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "ตัวเลขเล็กไป",
+     "pin": {"option": "A", "device": "desktop", "src": "crop", "x": 0, "y": 0, "text": "", "box": {"w": 90, "h": 40, "texts": ["11,651 / 10,000", "เกิน 1,651"]}}, "edit": null, "created_at": "2026-10-28T09:02:00Z"},
+    {"id": 1761000003000, "step": "เมนู|ปุ่มเมนู", "user": {"id": "me", "name": "คุณ"}, "body": "",
+     "pin": {"option": "A", "device": "phone", "src": "screen.html#s=today", "x": 0, "y": 0, "text": "", "box": null}, "edit": {"from": "คาดว่าเหลือสิ้นเดือน", "to": "สิ้นเดือนน่าจะเหลือ"}, "created_at": "2026-10-28T09:03:00Z"}
+  ],
+  "items": [
+    {"id": 1761000004000, "step": "หน้าจอ|หน้ายอด", "kind": "rect", "anchor": {"option": null, "device": "phone", "src": "screen.html", "on": true}, "texts": ["ยอดวันนี้", "11,651"], "created_at": "2026-10-28T09:04:00Z"},
+    {"id": 1761000005000, "step": "หน้าจอ|หน้ายอด", "kind": "image", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "file": {"name": "จอ.png", "path": "attachments/mvr1-จอ.png"}, "created_at": "2026-10-28T09:05:00Z"},
+    {"id": 1761000006000, "step": "หน้าจอ|หน้ายอด", "kind": "note", "anchor": {"option": null, "device": "desktop", "src": "crop", "on": false}, "text": "เพิ่มกราฟ", "created_at": "2026-10-28T09:06:00Z"}
+  ]
+}
