@@ -9,7 +9,7 @@ function fakeWin() {
   const posted = [];
   const listeners = {};
   const parent = { postMessage: (msg, origin) => posted.push({ msg, origin }) };
-  const scroller = { scrollTop: 0, scrollHeight: 3000, scrollWidth: 1440 };
+  const scroller = { scrollTop: 0, scrollHeight: 3000, scrollWidth: 1440, scrollTo({ top }) { this.scrollTop = top; } };
   const doc = {
     scrollingElement: scroller, documentElement: scroller, body: { scrollHeight: 3000 },
     querySelectorAll: () => [],
@@ -81,7 +81,21 @@ test('scroll sets the page position by ratio or y', () => {
   assert.equal(w.scroller.scrollTop, (3000 - 900) / 2);
   a.onMessage(msg(w, { kradan: 1, type: 'scroll', y: 120, id: 2 }));
   assert.equal(w.scroller.scrollTop, 120);
-  assert.equal(a.state.mirroring, false, 'the guard clears after the frame');
+});
+
+test('a scroll the board asked for reports as mirrored however late it lands, a scroll by hand does not', () => {
+  const w = fakeWin();
+  w.win.getComputedStyle = () => ({});
+  const a = createAgent({ win: w.win, doc: w.doc, parentOrigin: APP });
+  a.listen();
+  a.onMessage(msg(w, { kradan: 1, type: 'scroll', y: 500, id: 1 }));
+  w.posted.length = 0;
+  w.listeners.scroll.forEach(fn => fn());
+  w.scroller.scrollTop = 900;
+  w.listeners.scroll.forEach(fn => fn());
+  w.scroller.scrollTop = 500;
+  w.listeners.scroll.forEach(fn => fn());
+  assert.deepEqual(w.posted.map(p => [p.msg.type, p.msg.y, p.msg.mirrored]), [['scrolled', 500, true], ['scrolled', 900, false], ['scrolled', 500, false]]);
 });
 
 test('hash follows a sibling frame and ignores non-strings', () => {

@@ -76,7 +76,7 @@ export function readSteps(doc) {
 
 export function createAgent({ win, doc, parentOrigin }) {
   const parent = win.parent;
-  const state = { target: null, editing: null, mirroring: false, observer: null, overlay: null };
+  const state = { target: null, editing: null, mirrorY: null, observer: null, overlay: null };
 
   const post = msg => parent.postMessage({ kradan: 1, ...msg }, parentOrigin);
   const emit = (type, data = {}) => post({ type, ...data });
@@ -194,9 +194,10 @@ export function createAgent({ win, doc, parentOrigin }) {
     scroll({ y, ratio }) {
       const el = scroller();
       const max = el.scrollHeight - win.innerHeight;
-      state.mirroring = true;
-      el.scrollTop = typeof ratio === 'number' ? ratio * max : +y || 0;
-      win.requestAnimationFrame(() => { state.mirroring = false; });
+      /* instant, or a page with scroll-behavior: smooth glides there and every step on the way reads as a scroll by
+         hand */
+      el.scrollTo({ top: typeof ratio === 'number' ? ratio * max : +y || 0, behavior: 'instant' });
+      state.mirrorY = el.scrollTop;
       return { y: el.scrollTop };
     },
 
@@ -297,10 +298,13 @@ export function createAgent({ win, doc, parentOrigin }) {
     win.addEventListener('scroll', () => {
       if (ticking) { return; }
       ticking = true;
-      const mirrored = state.mirroring;
       win.requestAnimationFrame(() => {
         ticking = false;
         const el = scroller(), max = el.scrollHeight - win.innerHeight;
+        /* still where the board put it: an echo of a sibling's scroll. A time-based guard let late scroll events
+           echo back and yank the scrolled frame to the top (owner, 2026-10-30) */
+        const mirrored = state.mirrorY !== null && Math.abs(el.scrollTop - state.mirrorY) < 2;
+        if (!mirrored) { state.mirrorY = null; }
         emit('scrolled', { y: el.scrollTop, ratio: max > 0 ? el.scrollTop / max : 0, mirrored });
       });
     }, { passive: true });
