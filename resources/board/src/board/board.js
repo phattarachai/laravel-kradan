@@ -361,8 +361,11 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       const dev = devsFor(st)[0];
       return st.options.map(o => ({ opt: o, cells: o.shots.map(sh => ({ shot: sh, dev })) }));
     }
+    /* every option at every size, one row per screen, so B is there to compare too (owner, 2026-10-30) */
+    if (ui.mode === 'sizes') {
+      return st.options.flatMap(o => o.shots.map((sh, si) => ({ opt: o, head: si === 0, shotCap: sh.cap, cells: devsFor(st).map(dev => ({ shot: sh, dev })) })));
+    }
     const o = currentOpt(st);
-    if (ui.mode === 'sizes') { return o.shots.map(sh => ({ opt: o, shotCap: sh.cap, cells: devsFor(st).map(dev => ({ shot: sh, dev })) })); }
     return [{ opt: o, cells: [{ shot: o.shots[0], dev: ui.w ? 'custom' : devsFor(st)[0] }] }];
   }
 
@@ -695,17 +698,20 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
 
   /* the question sits on the canvas above its screens, at one size on screen, so the eye reads top to bottom instead
-     of across to the panel (owner, 2026-10-28). Outside เทียบแบบ it also names the option on show and its trade-off */
+     of across to the panel (owner, 2026-10-28). At 1:1 it also names the option on show and its trade-off, with a key
+     per option to switch */
   function questionHtml(st) {
-    const n = ui.step, o = st.pickable && ui.mode !== 'options' ? currentOpt(st) : null;
+    const n = ui.step, o = st.pickable && ui.mode === 'real' ? currentOpt(st) : null;
+    const keys = o && st.options.length > 1
+      ? `<span class="k-optsw">${st.options.map(x => `<button class="key ${x === o ? 'on' : ''}" data-showopt="${esc(x.key)}">${esc(x.key)}</button>`).join('')}</span>` : '';
     return `<header class="qhead"><div class="qin">${st.group && st.group !== st.title ? `<div class="kick">${esc(st.group)}</div>` : ''}<h1>${esc(st.title)}</h1>
       ${looked.upd.has(n) ? `<div class="upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
       ${st.sub ? `<p class="qsub">${esc(st.sub)}</p>` : ''}
-      ${o ? `<div class="qopt"><b>${esc(o.key)} ${esc(o.label)}</b>${o.trade ? `<br><span>${esc(o.trade)}</span>` : ''}</div>` : ''}</div></header>`;
+      ${o ? `<div class="qopt">${keys}<b>${esc(o.key)} ${esc(o.label)}</b>${o.trade ? `<br><span>${esc(o.trade)}</span>` : ''}</div>` : ''}</div></header>`;
   }
   function groupHtml(st, g, gi) {
     const picked = st.pickable && myKeys(st.key).includes(g.opt.key);
-    const head = (ui.mode === 'options' && st.pickable)
+    const head = st.pickable && (ui.mode === 'options' || g.head)
       ? `<div class="grp-h"><span class="key">${esc(g.opt.key)}</span><span class="lbl">${esc(g.opt.label)}</span>
          <span class="k-headwho">${pickers(st.key, g.opt.key, '')}</span>
          ${CAN_PICK() ? `<button class="pick" data-pick="${esc(g.opt.key)}">${picked ? t('picked') : t('pick')}</button>` : ''}</div>${g.opt.trade ? `<div class="grp-t">${esc(g.opt.trade)}</div>` : ''}`
@@ -1265,6 +1271,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (d.step) { e.preventDefault(); go(+d.step); return; }
     if (d.tool) { setTool(d.tool); writeUrl(); return; }
     if (d.pick) { togglePick(d.pick); return; }
+    if (d.showopt) { ui.opt = d.showopt; render(); return; }
     if (d.pickall !== undefined) { setPicks(step().options.map(o => o.key)); return; }
     if (d.pickclear !== undefined) { setPicks([]); return; }
     if (d.reply) { openReply(d.reply); return; }

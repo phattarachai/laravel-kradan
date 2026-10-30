@@ -137,6 +137,9 @@ img.k-logo { background: none; }
 .qhead .qopt { margin-top: calc(10px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); line-height: 1.5; }
 .qhead .qopt b { font-weight: 600; }
 .qhead .qopt span { color: var(--mute); }
+.qhead .qopt .k-optsw { display: inline-flex; gap: .3em; margin-right: .6em; vertical-align: middle; }
+.qhead .qopt .k-optsw .key { min-width: 1.8em; height: 1.6em; padding: 0 .35em; border-radius: .4em; background: #fff; border: 1px solid var(--line); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.qhead .qopt .k-optsw .key.on { background: var(--k-accent); border-color: var(--k-accent); color: #fff; }
 .grp-t { width: 0; min-width: 100%; font-size: calc(13px / var(--z, 1)); line-height: 1.5; color: var(--mute); }
 .grp { display: flex; flex-direction: column; gap: calc(8px / var(--z, 1)); }
 .grp-h { display: flex; align-items: center; gap: calc(8px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); min-height: calc(28px / var(--z, 1)); white-space: nowrap; overflow: hidden; }
