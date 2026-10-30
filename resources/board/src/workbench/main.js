@@ -31,8 +31,10 @@ async function start() {
     try { const list = await (await fetch('../index.json', { cache: 'no-store' })).json(); page = (list.find(p => !p.archived) || list[0])?.path; } catch { /* no index.json */ }
   }
   const pageUrl = new URL(page || '../', location.href);
+  /* agent.js carries the stamp: a hard reload does not reach the frames the board adds later, so an unversioned
+     agent stayed stale in them after a sync (owner, 2026-10-30) */
   const store = LocalStore({
-    page: pageUrl.href, agentUrl: new URL('agent.js', HERE).href, pagesUrl: new URL('pages.php', HERE).href,
+    page: pageUrl.href, agentUrl: new URL(`agent.js${STAMP.src_hash ? `?v=${STAMP.src_hash.slice(0, 12)}` : ''}`, HERE).href, pagesUrl: new URL('pages.php', HERE).href,
     parse: html => new DOMParser().parseFromString(html, 'text/html'),
   });
   try {
