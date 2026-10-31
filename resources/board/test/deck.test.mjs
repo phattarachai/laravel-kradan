@@ -8,6 +8,7 @@ import { parseHTML } from 'linkedom';
 import { fitScale, buildSteps, shownAt, step, clampAt, linkSpec, edgePoint, connector, morphName, modeOf } from '../src/deck/core.js';
 import { createDeck } from '../src/deck/runtime.js';
 import { keyAction, presentUrl, printDeck, createPresenter } from '../src/present.js';
+import { shareItems } from '../src/board/shares.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const APP = 'https://app.example.com';
@@ -154,7 +155,14 @@ test('print CSS: one 1920×1080 page per slide, no margins, backgrounds kept, bu
   }
 });
 
-test('PDF opens the print view in a tab of its own, from the board and the share page', () => {
+test('the แชร์ menu: public links for people with share and PDF on a deck, nothing on a decision board', () => {
+  assert.deepEqual(shareItems({ deck: true, share: true }), ['links', 'pdf']);
+  assert.deepEqual(shareItems({ deck: true, share: false }), ['pdf'], 'saving a PDF needs only view');
+  assert.deepEqual(shareItems({ deck: false, share: true }), [], 'the button stays greyed out');
+  assert.deepEqual(shareItems({ deck: false, share: false }), []);
+});
+
+test('PDF opens the print view in a tab of its own, from the board\'s แชร์ menu and the share page', () => {
   const opened = [];
   const win = { open: (...a) => opened.push(a) };
   printDeck('https://c.example/kradan/f/1/2/ab/index.html', win);
