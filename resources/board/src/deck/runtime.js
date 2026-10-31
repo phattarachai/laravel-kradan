@@ -75,8 +75,12 @@ export function createDeck({ win, doc, mode, parentOrigin = null }) {
         label.toggleAttribute('data-k-off', off);
         if (off) { return; }
         const c = connector(rect(a), rect(z), { route: spec.route });
-        label.style.left = `${c.label.x}px`;
-        label.style.top = `${c.label.y}px`;
+        /* a label nested in a zone is placed against the zone (its offset parent), not the diagram */
+        const op = label.offsetParent;
+        const o = op && op !== box && box.contains(op) ? rect(op) : { x: 0, y: 0 };
+        const ob = op && op !== box && box.contains(op) ? { x: op.clientLeft || 0, y: op.clientTop || 0 } : { x: 0, y: 0 };
+        label.style.left = `${c.label.x - o.x - ob.x}px`;
+        label.style.top = `${c.label.y - o.y - ob.y}px`;
         paths.push(`<path class="k-${spec.style}" d="${c.d}"${spec.end ? ' marker-end="url(#k-ah)"' : ''}${spec.start ? ' marker-start="url(#k-ah)"' : ''}/>`);
       });
       svg.querySelector('.k-paths').innerHTML = paths.join('');

@@ -208,3 +208,37 @@ test('no deck text box clips: no hidden overflow, no ellipsis, Thai-safe line he
     if (lh) { assert.ok(+lh[1] >= 1.15, `${r.sel} line-height ${lh[1]}`); }
   }
 });
+
+test('a deck\'s own CSS wins over deck.css, which loads after it: the defaults and the kit\'s look sit in :where()', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'resources/board/src/deck.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(m => ({ sel: m[1].trim(), body: m[2] })).filter(r => !r.sel.startsWith('@') && !/^(from|to)$/.test(r.sel));
+  const tokens = rules.filter(r => /--k-(slide|link|stage)[\w-]*\s*:/.test(r.body));
+  assert.deepEqual(tokens.map(r => r.sel), [':where(:root)']);
+  /* a kit class may appear outside :where() only to set what the runtime needs: position, layers, visibility */
+  const MECHANICS = /^(position|z-index|left|top|inset|transform|width|height|overflow|box-sizing|visibility|display|margin|pointer-events|opacity|transition|animation(-[\w-]+)?|content|background)$/;
+  for (const r of rules.filter(x => /\.k-(box|chip|zone|kicker|muted|cover|cols|big|timeline|shot)\b|\[data-k-(link|diagram)\]/.test(x.sel) && !x.sel.startsWith(':where('))) {
+    for (const decl of r.body.split(';').map(d => d.trim()).filter(Boolean)) {
+      assert.match(decl.split(':')[0].trim(), MECHANICS, `${r.sel} sets ${decl} outside :where()`);
+    }
+  }
+});
+
+test('a link whose label sits inside a zone is placed against the zone, not the diagram', () => {
+  const { document } = parseHTML(`<html><body data-k-deck><section data-dp-step data-title="x"><div data-k-diagram>
+    <div class="k-zone" data-k-node="z"><div data-k-node="a">A</div><div data-k-node="b">B</div><span data-k-link="a b">x</span></div>
+  </div></section></body></html>`);
+  const rects = { z: [100, 50, 800, 400], a: [150, 100, 200, 100], b: [550, 100, 200, 100] };
+  for (const el of document.querySelectorAll('[data-k-diagram], [data-k-node]')) {
+    const [x, y, w, h] = rects[el.getAttribute('data-k-node')] || [0, 0, 1000, 600];
+    el.getBoundingClientRect = () => ({ left: x, top: y, width: w, height: h, right: x + w, bottom: y + h });
+    Object.defineProperty(el, 'offsetWidth', { value: w });
+  }
+  const label = document.querySelector('[data-k-link]');
+  Object.defineProperty(label, 'offsetParent', { value: document.querySelector('.k-zone') });
+  const win = { document, innerWidth: 1920, innerHeight: 1080, location: { hash: '' }, parent: {}, addEventListener() {}, matchMedia: () => ({ matches: false }) };
+  createDeck({ win, doc: document, mode: 'review' }).start();
+  assert.equal(document.querySelector('.k-paths path').getAttribute('d'), 'M356 150L544 150');
+  /* the midpoint (450, 150) in diagram space is (350, 100) inside the zone */
+  assert.equal(label.style.left, '350px');
+  assert.equal(label.style.top, '100px');
+});
