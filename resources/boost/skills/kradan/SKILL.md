@@ -1,7 +1,7 @@
 ---
 name: kradan
 description: "Share a finished public/design/<slug> page that needs a decision with this app's signed-in users on the Kradan board, then pull their picks and comments back. Triggers on \"push to kradan\", \"ให้ user เลือก\", \"ส่งให้ทีมดู\", \"pull the answers\", a /kradan/ board link, or kradan:push / kradan:pull."
-version: 2026.10.28.3
+version: 2026.10.31.1
 ---
 
 # Kradan: design review with the app's own users
@@ -21,7 +21,8 @@ The commands run in this checkout and talk to the server in `KRADAN_REMOTE_URL` 
    php artisan kradan:push public/design/<slug> --task=T188
    ```
    - The folder needs an `index.html`. A board asks for a decision; an explanation with nothing to decide
-     belongs in the project's docs, not on Kradan.
+     belongs in the project's docs, not on Kradan. The exception is a slide deck (`<body data-k-deck>`): to make
+     one, follow the `kradan-slide` skill.
    - `--dry-run` prints the round title, file count and step count without sending.
    - `rounds/`, `review*` and `workbench.json` stay local.
 3. Give the user the printed board URL. Users answer whenever they get to it. Don't wait or poll.
@@ -64,6 +65,7 @@ T188 Manual SO ก่อนยืนยัน · รอบ 2 · https://…/krad
 ## Other commands
 
 - `php artisan kradan:list`: every board, its status and latest round.
+- `php artisan kradan:share <slug>`: a deck's public, present-only link (see `kradan-slide`).
 - `php artisan kradan:decide <slug>`: file a board as decided. Picks lock and
   comments stay open. Do it once the decision is made and recorded, and only when the user agrees.
 - `php artisan kradan:doctor`: checks the install on the server side (enabled, tables, disk, assets, theme).

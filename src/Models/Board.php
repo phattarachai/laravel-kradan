@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Override;
+use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Enums\BoardStatus;
 
 /**
@@ -15,6 +16,7 @@ use Phattarachai\Kradan\Enums\BoardStatus;
  * @property string $slug
  * @property string $title
  * @property string|null $task_ref
+ * @property BoardKind $kind
  * @property BoardStatus $status
  * @property Carbon|null $decided_at
  * @property string|null $decided_by
@@ -26,8 +28,11 @@ final class Board extends KradanModel
 {
     protected $table = 'kradan_boards';
 
+    /** @var array<string, string> */
+    protected $attributes = ['kind' => 'decision'];
+
     /** @var list<string> */
-    protected $fillable = ['slug', 'title', 'task_ref', 'status', 'decided_at', 'decided_by'];
+    protected $fillable = ['slug', 'title', 'task_ref', 'kind', 'status', 'decided_at', 'decided_by'];
 
     /** @return HasMany<Round, $this> */
     public function rounds(): HasMany
@@ -39,6 +44,12 @@ final class Board extends KradanModel
     public function latestRound(): HasOne
     {
         return $this->hasOne(Round::class)->ofMany('number', 'max');
+    }
+
+    /** @return HasMany<Share, $this> */
+    public function shares(): HasMany
+    {
+        return $this->hasMany(Share::class);
     }
 
     /** @return HasMany<Viewer, $this> */
@@ -73,6 +84,11 @@ final class Board extends KradanModel
         return "{$ref} ".trim($title);
     }
 
+    public function isDeck(): bool
+    {
+        return $this->kind === BoardKind::Deck;
+    }
+
     public function isOpen(): bool
     {
         return $this->status === BoardStatus::Open;
@@ -88,6 +104,7 @@ final class Board extends KradanModel
     protected function casts(): array
     {
         return [
+            'kind' => BoardKind::class,
             'status' => BoardStatus::class,
             'decided_at' => 'datetime',
         ];

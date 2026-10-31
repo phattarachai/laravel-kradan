@@ -1,4 +1,5 @@
 /* Kradan board and index. --k-accent comes from config('kradan.brand.accent'); main.js sets it. */
+@import './present.css';
 :root {
   --ink: #1d2127; --mute: #6b7280; --faint: #9aa1ab; --line: #e5e7eb; --panel: #ffffff; --soft: #f5f6f8; --hover: #f1f3f5;
   --canvas: #eceef1; --dot: #d5d9df; --k-accent: #2563eb; --k-accent-bg: #e8efff; --upd: #c2410c; --upd-bg: #fff1e8; --pin: #e8590c;
@@ -499,3 +500,28 @@ svg.k-item .hd { fill: #fff; stroke: #1c7ed6; stroke-width: 1.5; pointer-events:
 .kradan .k-side .dot { background: #ffb27a; }
 .kradan .k-bar .k-viewb { color: var(--chrome-mute); }
 .kradan .k-bar .k-viewb:hover { background: var(--chrome-hover); color: var(--chrome-ink); }
+
+/* ---------- decks: ▶, the slide filmstrip, public links ---------- */
+.k-presentb { display: inline-flex; align-items: center; gap: 6px; background: var(--k-accent); border-color: var(--k-accent); color: #fff; font-weight: 600; }
+.k-presentb:hover { background: var(--k-accent); filter: brightness(1.08); }
+.k-presentb svg { width: 14px; height: 14px; fill: currentColor; }
+.k-strip { display: grid; gap: 4px; }
+.k-side a.k-thumb { display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto; gap: 4px 6px; align-items: start; padding: 6px 8px 8px 4px; }
+.k-thumb .n { grid-row: 1 / 3; font-size: 12px; color: var(--faint); text-align: right; padding-top: 2px; }
+.k-thumb .pv { display: block; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--line); position: relative; }
+.k-thumb[aria-current="true"] .pv { box-shadow: 0 0 0 2px var(--k-accent); }
+.k-thumb .pv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.k-thumb .tt { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; line-height: 18px; }
+.k-thumb .meta { display: inline-flex; gap: 6px; align-items: center; flex: none; }
+.k-thumb .cm { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--mute); }
+.k-thumb .cm svg { width: 13px; height: 13px; }
+.k-sharenew { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 12px 0; }
+.k-sharenew label { display: grid; gap: 4px; font-size: 12px; color: var(--mute); }
+.k-sharenew select { border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; background: #fff; }
+.k-shareurl { display: flex; gap: 8px; margin: 6px 0 12px; }
+.k-shareurl input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font: inherit; font-size: 13px; }
+.k-share { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); font-size: 13px; line-height: 20px; }
+.k-share .id { color: var(--faint); }
+.k-share .w { flex: 1; }
+.k-share .u { color: var(--mute); font-size: 12px; }
+.k-share.off { color: var(--faint); }

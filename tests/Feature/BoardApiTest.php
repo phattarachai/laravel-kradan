@@ -28,11 +28,12 @@ it('renders the board shell with the boot payload', function (): void {
 
     expect($boot)->toHaveKeys(['version', 'page', 'brand', 'locale', 'user', 'csrf', 'routes', 'presence', 'board'])
         ->and($boot['page'])->toBe('board')
-        ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true]])
+        ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true, 'edit' => true]])
         ->and($boot['routes'])->toBe(['api' => 'http://localhost/kradan/api', 'index' => 'http://localhost/kradan'])
         ->and($boot['presence']['mode'])->toBe('polling')
         ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'status' => 'open', 'task_ref' => 'T188', 'url' => 'http://localhost/kradan/t188-manual-so', 'current' => 1, 'seen_prints' => null])
-        ->and($boot['board'])->not->toHaveKeys(['kind', 'panel'])
+        ->and($boot['board']['kind'])->toBe('decision')
+        ->and($boot['board'])->not->toHaveKey('panel')
         ->and($boot['board']['rounds'][0])->toHaveKeys(['number', 'title', 'pushed_at', 'steps', 'prints', 'base_url'])
         ->and(array_keys($boot['board']['rounds'][0]['prints']))->toBe([QUESTION, SCREEN])
         ->and($boot['board']['rounds'][0]['base_url'])->toStartWith('http://localhost/kradan/f/')
@@ -41,7 +42,7 @@ it('renders the board shell with the boot payload', function (): void {
 
 it('versions the board assets by the content of dist/, not only the package version', function (): void {
     $dist = dirname(__DIR__, 2).'/dist';
-    $hash = substr(md5(md5_file("{$dist}/board.js").md5_file("{$dist}/board.css")), 0, 10);
+    $hash = substr(md5(implode('', array_map(fn (string $file): string => (string) md5_file("{$dist}/{$file}"), ['board.js', 'board.css', 'present.js', 'present.css']))), 0, 10);
 
     expect(AssetController::version())->toBe(Kradan::VERSION."-{$hash}");
 });
@@ -59,7 +60,8 @@ it('renders the index shell with a row per board', function (): void {
             'url' => 'http://localhost/kradan/t188-manual-so', 'steps' => ['Block หรือเก็บไว้', 'หน้ายืนยัน'],
             'answered' => 0, 'viewers' => [], 'updated' => false, 'decided_at' => null,
         ])
-        ->and($boot['index']['boards'][0])->not->toHaveKeys(['kind', 'panel'])
+        ->and($boot['index']['boards'][0]['kind'])->toBe('decision')
+        ->and($boot['index']['boards'][0])->not->toHaveKey('panel')
         ->and($boot['index']['boards'][0]['round'])->toMatchArray(['number' => 1, 'title' => 'Manual SO ก่อนยืนยัน รอบ 1']);
 });
 

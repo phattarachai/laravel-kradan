@@ -1,5 +1,6 @@
 /*
- * Builds dist/: board.js + board.css (Kradan), agent.js (both), and workbench.js + workbench.css + workbench.json
+ * Builds dist/: board.js + board.css (Kradan), agent.js (both), deck.js + deck.css (the deck runtime, injected into
+ * deck pages), present.js + present.css (a deck's public share page), and workbench.js + workbench.css + workbench.json
  * (the design workbench, 3-shared-core.md). `--watch` rebuilds on change. Every build also says when the design
  * skill's vendored copy of the workbench is older than this source.
  */
@@ -17,6 +18,10 @@ const STAMP = stamp(root);
 
 const builds = [
   { ...common, entryPoints: [src('agent-entry.js')], outfile: out('agent.js'), format: 'iife' },
+  { ...common, entryPoints: [src('deck-entry.js')], outfile: out('deck.js'), format: 'iife' },
+  { ...common, entryPoints: [src('deck.css')], outfile: out('deck.css') },
+  { ...common, entryPoints: [src('present-entry.js')], outfile: out('present.js'), format: 'iife' },
+  { ...common, entryPoints: [src('present.css')], outfile: out('present.css') },
   { ...common, entryPoints: [src('board/main.js')], outfile: out('board.js'), format: 'iife' },
   { ...common, entryPoints: [src('board.css')], outfile: out('board.css') },
   { ...common, entryPoints: [src('workbench/main.js')], outfile: out('workbench.js'), format: 'iife', define: { __WB_STAMP__: JSON.stringify(STAMP) },

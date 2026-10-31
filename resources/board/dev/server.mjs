@@ -50,7 +50,8 @@ const minsAgo = m => new Date(Date.now() - m * 60000).toISOString();
 /* ---------- rounds from fixtures ---------- */
 const FIX = path.join(HERE, 'fixtures');
 const exists = p => fs.existsSync(p);
-const stripHarness = html => html.replace(/<!-- dp:harness:start -->[\s\S]*?<!-- dp:harness:end -->/, '');
+const stripHarness = html => html.replace(/<!-- (dp:harness|kradan:deck):start -->[\s\S]*?<!-- \1:end -->/g, '');
+const isDeck = html => /<body\b[^>]*\sdata-k-deck\b/i.test(html);
 const attr = (tag, name) => { const m = tag.match(new RegExp(`\\s${name}="([^"]*)"`)); return m ? m[1].replace(/&amp;/g, '&').replace(/&quot;/g, '"') : ''; };
 const sha = s => crypto.createHash('sha256').update(s).digest('hex').slice(0, 16);
 
@@ -84,7 +85,7 @@ function parse(html) {
     steps.push({ key, group: '', title, sub: '', kind: 'screen', options: [] });
     prints[key] = sha(html);
   }
-  return { title, steps, prints };
+  return { title, steps, prints, kind: isDeck(html) ? 'deck' : 'decision' };
 }
 
 let roundSeq = 0;
@@ -94,7 +95,7 @@ function round(dir, number, pushedMinsAgo, retitle) {
   const p = parse(html);
   const id = ++roundSeq;
   ROUNDS[id] = { dir };
-  return { id, number, title: retitle || p.title, pushed_at: minsAgo(pushedMinsAgo), steps: p.steps, prints: p.prints };
+  return { id, number, title: retitle || p.title, pushed_at: minsAgo(pushedMinsAgo), steps: p.steps, prints: p.prints, kind: p.kind };
 }
 function baseUrl(r) {
   const expires = Math.floor(Date.now() / 1000) + TTL;
@@ -107,7 +108,7 @@ const BOARDS = [];
 /* every board is a decision board (owner, 2026-10-28: flows moved to laravel-ai-docs) */
 function board(slug, title, taskRef, rounds, extra = {}) {
   if (!rounds.length) { return; }
-  BOARDS.push({ id: BOARDS.length + 1, slug, title, task_ref: taskRef, status: 'open', decided_at: null, decided_by: null,
+  BOARDS.push({ id: BOARDS.length + 1, slug, title, task_ref: taskRef, kind: rounds.at(-1).kind, status: 'open', decided_at: null, decided_by: null,
     rounds, picks: {}, comments: [], items: [], viewers: {}, changedAt: new Date().toISOString(), ...extra });
 }
 const demo = path.join(FIX, 'demo-frames');
@@ -127,6 +128,8 @@ if (exists(path.join(LOCAL, 'leave-cover/1'))) {
 }
 board('demo-decided', 'Demo ปุ่มยืนยัน', 'T001', [round(demo, 1, 60 * 24 * 9)],
   { status: 'decided', decided_at: minsAgo(60 * 24 * 7), decided_by: userOf(1) });
+/* a deck: slides with a diagram, builds and a morph; /kradan/p/demo-deck is its public link */
+board('demo-deck', 'Demo deck: ย้ายระบบ v1 ไป v2', null, [round(path.join(FIX, 'demo-deck'), 1, 20)]);
 board('isolation-probe', 'Isolation probe', 'T192', [round(path.join(FIX, 'security'), 1, 5)]);
 
 /* seed answers from other people on the newest round of the first boards */
@@ -235,7 +238,7 @@ function boardPayload(b, me, number) {
   const items = b.items.filter(it => !it.deleted).map(it => itemOut(it, b, me));
   const people = new Map([...picks.map(p => [p.user.id, p.user]), ...live.map(c => [c.user.id, c.user])]);
   return {
-    slug: b.slug, title: b.title, label: labelOf(b), status: b.status, task_ref: b.task_ref,
+    slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, status: b.status, task_ref: b.task_ref,
     decided_at: b.decided_at, decided_by: b.decided_by, updated_at: b.rounds.at(-1).pushed_at, url: boardUrl(b),
     rounds: b.rounds.map(r => ({ number: r.number, title: r.title, pushed_at: r.pushed_at, steps: r.steps, prints: r.prints, base_url: baseUrl(r), readonly: r.number !== latest })),
     current: cur.number, latest, picks_locked: b.status !== 'open' || cur.number !== latest,
@@ -250,7 +253,7 @@ function indexRows(me) {
   return BOARDS.map(b => {
     const r = b.rounds.at(-1), seen = b.viewers[me]?.seen_prints;
     return {
-      slug: b.slug, title: b.title, label: labelOf(b), status: b.status, task_ref: b.task_ref,
+      slug: b.slug, title: b.title, label: labelOf(b), kind: b.kind, status: b.status, task_ref: b.task_ref,
       decided_at: b.decided_at, decided_by: b.decided_by, updated_at: r.pushed_at, url: boardUrl(b),
       round: { number: r.number, title: r.title, pushed_at: r.pushed_at }, steps: r.steps.map(s => s.title),
       answered: answeredIn(b, r).size, viewers: viewersOf(b).filter(v => v.recent),
@@ -263,7 +266,7 @@ function boot(me, page, extra) {
   return {
     version: mtime('board.js'), page, locale: process.env.KRADAN_LOCALE || 'th',
     brand: { name: 'RR Admin', logo: null, accent: '#ba1a1a' },
-    user: { id: u.id, name: u.name, avatar: u.avatar, can: { manage: u.manage } },
+    user: { id: u.id, name: u.name, avatar: u.avatar, can: { manage: u.manage, edit: u.manage } },
     csrf: CSRF, routes: { api: '/kradan/api', index: '/kradan' },
     presence: { mode: 'polling', heartbeat: 30, reverb: null, channel: null, authEndpoint: '/broadcasting/auth' },
     ...extra,
@@ -301,15 +304,19 @@ function serveContent(req, res, url) {
   const [, id, expires, sig, rel] = m;
   const r = ROUNDS[id];
   const ok = r && sig === sign(+id, +expires) && +expires > Date.now() / 1000;
-  const ours = { '__kradan/agent.js': path.join(ROOT, 'dist/agent.js') };
+  const ours = { '__kradan/agent.js': path.join(ROOT, 'dist/agent.js'), '__kradan/deck.js': path.join(ROOT, 'dist/deck.js'), '__kradan/deck.css': path.join(ROOT, 'dist/deck.css') };
   const agent = !!ours[rel];
   const file = ours[rel] || path.resolve(r?.dir || '/', decodeURIComponent(rel || 'index.html'));
   if (!ok || (!agent && !file.startsWith(r.dir + path.sep)) || !exists(file) || fs.statSync(file).isDirectory()) { send(res, ok ? 404 : 403, ok ? 'not found' : 'bad signature'); return true; }
   const ext = path.extname(file);
   const headers = { 'Content-Type': TYPES[ext] || 'application/octet-stream', 'Content-Security-Policy': 'sandbox allow-scripts', 'X-Content-Type-Options': 'nosniff' };
   if (ext === '.html') {
-    const tag = `<script src="${CONTENT}/kradan/f/${id}/${expires}/${sig}/__kradan/agent.js" data-parent="${APP}"></script>`;
+    const prefix = `${CONTENT}/kradan/f/${id}/${expires}/${sig}/__kradan`;
     let html = stripHarness(fs.readFileSync(file, 'utf8'));
+    /* a deck also gets the deck runtime, as ContentController does */
+    const deck = isDeck(html);
+    const tag = `${deck ? `<script src="${prefix}/deck.js" data-parent="${APP}"></script>` : ''}<script src="${prefix}/agent.js" data-parent="${APP}"></script>`;
+    if (deck) { html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `<link rel="stylesheet" href="${prefix}/deck.css"></head>`) : `<link rel="stylesheet" href="${prefix}/deck.css">${html}`; }
     html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
     send(res, 200, html, headers);
   } else {
@@ -318,6 +325,11 @@ function serveContent(req, res, url) {
   return true;
 }
 
+/* a deck's public links, in memory: the token is shown once, like the backend's */
+const SHARES = [];
+const shareOut = x => ({ id: x.id, round: x.round, expires_at: x.expires_at, revoked_at: x.revoked_at, created_by: userOf(x.by), created_at: x.created_at, last_used_at: null,
+  active: !x.revoked_at && (!x.expires_at || Date.parse(x.expires_at) > Date.now()) });
+
 async function api(req, res, url, me) {
   const p = url.pathname.replace(/^\/kradan\/api\//, '');
   const write = req.method !== 'GET';
@@ -325,6 +337,24 @@ async function api(req, res, url, me) {
   if (write && req.headers['x-csrf-token'] !== CSRF) { return sendJson(res, 419, { message: 'CSRF token mismatch.' }); }
   let m;
   const find = slug => BOARDS.find(b => b.slug === slug);
+  if ((m = p.match(/^boards\/([^/]+)\/shares$/))) {
+    const b = find(m[1]);
+    if (!b || b.kind !== 'deck') { return sendJson(res, b ? 422 : 404, {}); }
+    if (!USERS[me].manage) { return sendJson(res, 403, {}); }
+    if (req.method === 'GET') { return sendJson(res, 200, { shares: SHARES.filter(x => x.slug === b.slug).reverse().map(shareOut) }); }
+    const body = await readBody(req) || {};
+    const days = body.days ?? 14;
+    const x = { id: SHARES.length + 1, slug: b.slug, token: crypto.randomBytes(24).toString('hex'), round: body.round || null, by: me, created_at: new Date().toISOString(),
+      expires_at: days ? new Date(Date.now() + days * 864e5).toISOString() : null, revoked_at: null };
+    SHARES.push(x);
+    return sendJson(res, 201, { share: { ...shareOut(x), url: `${APP}/kradan/p/${x.token}` } });
+  }
+  if ((m = p.match(/^shares\/(\d+)$/)) && req.method === 'DELETE') {
+    const x = SHARES.find(y => y.id === +m[1]);
+    if (!x || !USERS[me].manage) { return sendJson(res, x ? 403 : 404, {}); }
+    x.revoked_at ||= new Date().toISOString();
+    return sendJson(res, 200, { share: shareOut(x) });
+  }
   if (p === 'boards' && req.method === 'GET') {
     return sendJson(res, 200, { boards: indexRows(me) });
   }
@@ -538,6 +568,17 @@ async function app(req, res) {
     return exists(file) ? send(res, 200, fs.readFileSync(file), { 'Content-Type': TYPES[path.extname(file)] || 'text/plain' }) : send(res, 404, 'run npm run build');
   }
   if (url.pathname.startsWith('/kradan/api/')) { return api(req, res, url, USERS[me] ? me : 0); }
+  /* a deck's public link: /kradan/p/<any made token, or the board's slug>, no session, present only */
+  const pm = url.pathname.match(/^\/kradan\/p\/([^/]+)$/);
+  if (pm) {
+    const share = SHARES.find(x => x.token === pm[1] && !x.revoked_at) || { slug: pm[1] };
+    const sb = BOARDS.find(x => x.slug === share.slug && x.kind === 'deck');
+    if (!sb) { return send(res, 404, 'ลิงก์นี้ใช้ไม่ได้'); }
+    const r = sb.rounds.find(x => x.number === share.round) || sb.rounds.at(-1);
+    const data = { title: r.title, locale: 'th', assets: `${APP}/kradan/assets`, version: mtime('present.js'),
+      boot: { title: sb.title, page_url: `${baseUrl(r)}index.html`, origin: CONTENT, slides: r.steps.length, start: +url.searchParams.get('present') || 1 } };
+    return send(res, 200, blade('share', data), { 'Content-Type': TYPES['.html'], 'Referrer-Policy': 'no-referrer' });
+  }
   if (url.pathname === '/' ) { return send(res, 302, '', { Location: '/kradan' }); }
   const assets = `${APP}/kradan/assets`;
   if (url.pathname === '/kradan' || url.pathname === '/kradan/') {

@@ -7,6 +7,7 @@ use Phattarachai\Kradan\Http\Controllers\Api\BoardController;
 use Phattarachai\Kradan\Http\Controllers\Api\CommentController;
 use Phattarachai\Kradan\Http\Controllers\Api\ItemController;
 use Phattarachai\Kradan\Http\Controllers\Api\PickController;
+use Phattarachai\Kradan\Http\Controllers\Api\ShareController;
 use Phattarachai\Kradan\Http\Controllers\PageController;
 
 Route::get('/', [PageController::class, 'index'])->name('index');
@@ -24,6 +25,9 @@ Route::prefix('api')->name('api.')->group(function (): void {
     Route::post('boards/{slug}/items', [ItemController::class, 'store'])->name('items.store');
     Route::patch('items/{item}', [ItemController::class, 'update'])->whereNumber('item')->name('items.update');
     Route::delete('items/{item}', [ItemController::class, 'destroy'])->whereNumber('item')->name('items.destroy');
+    Route::get('boards/{slug}/shares', [ShareController::class, 'index'])->name('shares.index');
+    Route::post('boards/{slug}/shares', [ShareController::class, 'store'])->name('shares.store');
+    Route::delete('shares/{share}', [ShareController::class, 'destroy'])->whereNumber('share')->name('shares.destroy');
     Route::patch('comments/{comment}', [CommentController::class, 'update'])->whereNumber('comment')->name('comments.update');
     Route::delete('comments/{comment}', [CommentController::class, 'destroy'])->whereNumber('comment')->name('comments.destroy');
 });

@@ -7,15 +7,18 @@ namespace Phattarachai\Kradan\Support;
 use Closure;
 use Dom\Element;
 use Dom\HTMLDocument;
+use Phattarachai\Kradan\Enums\BoardKind;
 
 /**
  * Reads a design page the way the design skill's workbench does: every
  * `[data-dp-step]` is a step, its `[data-dp-option]`s are the options, and a
  * step's print is its markup plus the screens its `[data-dp-frames]` load.
+ * `<body data-k-deck>` makes the board a deck: one step per slide.
  */
 final class StepParser
 {
-    private const string HARNESS = '/<!-- dp:harness:start -->.*?<!-- dp:harness:end -->/s';
+    /** the design skill's harness, and the deck runtime `kradan:deck` puts in for a local preview */
+    private const string HARNESS = '/<!-- (dp:harness|kradan:deck):start -->.*?<!-- \1:end -->/s';
 
     public static function stripHarness(string $html): string
     {
@@ -24,7 +27,7 @@ final class StepParser
 
     /**
      * @param  Closure(string): ?string  $read  a sibling file's contents by its path relative to index.html
-     * @return array{title: string, steps: list<array{key: string, group: string, title: string, sub: string, kind: string, options: list<array{key: string, title: string}>}>, prints: array<string, string>}
+     * @return array{title: string, kind: BoardKind, steps: list<array{key: string, group: string, title: string, sub: string, kind: string, options: list<array{key: string, title: string}>}>, prints: array<string, string>}
      */
     public function parse(string $html, Closure $read): array
     {
@@ -43,7 +46,9 @@ final class StepParser
             $prints[$steps[0]['key']] = $this->print($document, $document->body, $read);
         }
 
-        return ['title' => $this->title($document), 'steps' => $steps, 'prints' => $prints];
+        $kind = $document->body?->hasAttribute('data-k-deck') ? BoardKind::Deck : BoardKind::Decision;
+
+        return ['title' => $this->title($document), 'kind' => $kind, 'steps' => $steps, 'prints' => $prints];
     }
 
     /**

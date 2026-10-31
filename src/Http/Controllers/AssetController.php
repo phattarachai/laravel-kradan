@@ -19,6 +19,8 @@ final class AssetController
     private const array FILES = [
         'board.js' => 'application/javascript; charset=utf-8',
         'board.css' => 'text/css; charset=utf-8',
+        'present.js' => 'application/javascript; charset=utf-8',
+        'present.css' => 'text/css; charset=utf-8',
     ];
 
     public function __invoke(string $file): BinaryFileResponse
@@ -35,7 +37,7 @@ final class AssetController
     }
 
     /**
-     * The folder URL the Blade shells append `/board.js` and `/board.css` to.
+     * The folder URL the Blade shells append `/board.js`, `/board.css` and the share page's `/present.*` to.
      */
     public static function base(): string
     {

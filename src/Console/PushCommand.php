@@ -79,7 +79,7 @@ final class PushCommand extends Command
     {
         $top = explode('/', $relative)[0];
 
-        return $top === 'rounds'
+        return $top === 'rounds' || $top === DeckCommand::FOLDER
             || ($top === $relative && (str_starts_with($relative, 'review') || $relative === 'workbench.json'));
     }
 }
