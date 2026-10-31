@@ -1,7 +1,7 @@
 ---
 name: kradan-slide
 description: "Make a slide deck for customers or the team as a Kradan deck: outline, HTML slides with diagrams, local preview, push to the board for review, present full screen, share a public link, revise from comments. Triggers on \"make slides\", \"ทำสไลด์\", \"deck\", \"presentation\", \"นำเสนอลูกค้า\", or /kradan-slide."
-version: 2026.10.31.1
+version: 2026.10.31.2
 ---
 
 # Kradan Slide: decks reviewed and presented on the board
@@ -84,6 +84,8 @@ Follow it in order. Stop where it says to wait.
 | `data-k-style="dashed\|dotted"`, `data-k-dir="both\|none"`, `data-k-route="elbow"` | Options on a link |
 
 Every section already has the slide box: padding, a flex column with a 32px gap, 34px/1.6 text, h1 80px, h2 56px.
+The kit's look has zero specificity, so the deck's own CSS always wins: plain `:root { --k-slide-accent: … }`
+and plain class rules are enough, no `!important` or doubled selectors.
 
 ## Layout kit
 
@@ -129,7 +131,8 @@ Each block is a whole `<section>`. Copy, then change the words.
 ```
 
 `.k-box` is a machine or system (a `<b>` first line is its name), `.k-chip` a service on it, `.k-zone` a network
-or group with a `.k-zone-title`. A link hides until both of its ends are built.
+or group with a `.k-zone-title`. A link hides until both of its ends are built. Links and their labels may sit
+inside a zone; the lines draw above zone backgrounds and below the boxes.
 
 **Two-column compare**
 
