@@ -114,7 +114,7 @@ final class DoctorCommand extends Command
 
     private function assets(): ?string
     {
-        $missing = array_values(array_filter(['board.js', 'board.css', 'agent.js'], fn (string $file): bool => ! is_file(AssetController::path($file))));
+        $missing = array_values(array_filter(['board.js', 'board.css', 'agent.js', 'deck.js', 'deck.css', 'present.js', 'present.css'], fn (string $file): bool => ! is_file(AssetController::path($file))));
 
         return $missing === [] ? null : 'dist/ is missing '.implode(', ', $missing).'; reinstall the package.';
     }

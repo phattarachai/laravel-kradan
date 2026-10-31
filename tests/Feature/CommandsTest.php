@@ -181,3 +181,55 @@ it('runs the doctor and names what is missing', function (): void {
         ->expectsOutputToContain('KRADAN_ENABLED is false')
         ->assertFailed();
 });
+
+it('makes a deck\'s public link and prints it once', function (): void {
+    Http::fake(['staging.example.com/kradan/api/v1/boards/arch-deck/shares' => Http::response(['share' => [
+        'id' => 3, 'round' => null, 'expires_at' => '2026-11-14T00:00:00+00:00', 'url' => 'https://staging.example.com/kradan/p/abc',
+    ]], 201)]);
+
+    $this->artisan('kradan:share', ['slug' => 'https://staging.example.com/kradan/arch-deck', '--days' => '14'])
+        ->expectsOutputToContain('https://staging.example.com/kradan/p/abc')
+        ->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && $request->data() === ['days' => 14]);
+});
+
+it('pins a round, lists links and revokes one', function (): void {
+    Http::fake([
+        'staging.example.com/kradan/api/v1/boards/arch-deck/shares' => Http::sequence()
+            ->push(['share' => ['id' => 4, 'round' => 2, 'expires_at' => null, 'url' => 'https://staging.example.com/kradan/p/xyz']], 201)
+            ->push(['shares' => [['id' => 4, 'round' => 2, 'expires_at' => null, 'revoked_at' => null, 'active' => true, 'last_used_at' => null]]]),
+        'staging.example.com/kradan/api/v1/shares/4' => Http::response(['share' => ['id' => 4, 'active' => false]]),
+    ]);
+
+    $this->artisan('kradan:share', ['slug' => 'arch-deck', '--round' => '2', '--days' => '0'])->expectsOutputToContain('never')->assertSuccessful();
+    $this->artisan('kradan:share', ['slug' => 'arch-deck', '--list' => true])->expectsOutputToContain('active')->assertSuccessful();
+    $this->artisan('kradan:share', ['slug' => 'arch-deck', '--revoke' => '4'])->expectsOutputToContain('Link 4 revoked')->assertSuccessful();
+
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST' && $request->data() === ['days' => 0, 'round' => 2]);
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'DELETE' && str_ends_with($request->url(), '/shares/4'));
+});
+
+it('puts the deck runtime into a deck folder for a local preview, once, and push leaves it out', function (): void {
+    File::put("{$this->dir}/index.html", '<html><head><title>x</title></head><body data-dp="Deck" data-k-deck><section data-dp-step data-title="ปก"></section></body></html>');
+
+    $this->artisan('kradan:deck', ['dir' => $this->dir])->expectsOutputToContain('kradan-deck')->assertSuccessful();
+    $this->artisan('kradan:deck', ['dir' => $this->dir])->assertSuccessful();
+
+    $html = File::get("{$this->dir}/index.html");
+
+    expect(substr_count($html, 'kradan:deck:start'))->toBe(1)
+        ->and($html)->toContain('<link rel="stylesheet" href="kradan-deck/deck.css"><script src="kradan-deck/deck.js" defer></script><!-- kradan:deck:end -->')
+        ->and(File::isFile("{$this->dir}/kradan-deck/deck.js"))->toBeTrue()
+        ->and(File::isFile("{$this->dir}/kradan-deck/deck.css"))->toBeTrue();
+
+    $this->artisan('kradan:push', ['dir' => $this->dir, '--dry-run' => true])
+        ->expectsOutputToContain('1 · 1')
+        ->assertSuccessful();
+});
+
+it('refuses to put the deck runtime into a page that is not a deck', function (): void {
+    File::put("{$this->dir}/index.html", designHtml());
+
+    $this->artisan('kradan:deck', ['dir' => $this->dir])->expectsOutputToContain('not a deck')->assertFailed();
+});

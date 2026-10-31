@@ -10,10 +10,12 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Override;
 use Phattarachai\Kradan\Console\DecideCommand;
+use Phattarachai\Kradan\Console\DeckCommand;
 use Phattarachai\Kradan\Console\DoctorCommand;
 use Phattarachai\Kradan\Console\ListCommand;
 use Phattarachai\Kradan\Console\PullCommand;
 use Phattarachai\Kradan\Console\PushCommand;
+use Phattarachai\Kradan\Console\ShareCommand;
 use Phattarachai\Kradan\Console\TokenCommand;
 use Phattarachai\Kradan\Enums\Ability;
 use Phattarachai\Kradan\Http\Middleware\ApplyLocale;
@@ -49,6 +51,8 @@ final class KradanServiceProvider extends ServiceProvider
                 PullCommand::class,
                 ListCommand::class,
                 DecideCommand::class,
+                ShareCommand::class,
+                DeckCommand::class,
             ]);
         }
     }
@@ -61,6 +65,13 @@ final class KradanServiceProvider extends ServiceProvider
             'prefix' => $path,
             'as' => 'kradan.',
         ], fn () => $this->loadRoutesFrom(__DIR__.'/../routes/content.php'));
+
+        Route::group([
+            'domain' => config('kradan.domain'),
+            'prefix' => $path,
+            'middleware' => [ApplyLocale::class, 'throttle:'.config('kradan.throttle', '60,1')],
+            'as' => 'kradan.',
+        ], fn () => $this->loadRoutesFrom(__DIR__.'/../routes/share.php'));
 
         Route::group([
             'prefix' => "{$path}/api/v1",

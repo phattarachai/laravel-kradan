@@ -7,13 +7,16 @@ namespace Phattarachai\Kradan\Http\Controllers\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 use Phattarachai\Kradan\Http\Requests\PushRequest;
+use Phattarachai\Kradan\Http\Requests\ShareRequest;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
+use Phattarachai\Kradan\Models\Share;
 use Phattarachai\Kradan\Support\BoardPresenter;
 use Phattarachai\Kradan\Support\Bundle;
 use Phattarachai\Kradan\Support\DecideBoard;
 use Phattarachai\Kradan\Support\ReviewBuilder;
 use Phattarachai\Kradan\Support\RoundPublisher;
+use Phattarachai\Kradan\Support\ShareLinks;
 
 /**
  * The bearer-token API the kradan:* commands call from a developer's checkout.
@@ -75,5 +78,22 @@ final readonly class TokenController
         $board = $decide(Board::query()->where('slug', $slug)->firstOrFail(), null);
 
         return response()->json(['board' => [...$this->presenter->summary($board), 'url' => $board->url()]]);
+    }
+
+    public function shares(string $slug, ShareLinks $links): JsonResponse
+    {
+        return response()->json(['shares' => $links->list(Board::query()->where('slug', $slug)->firstOrFail())]);
+    }
+
+    public function share(ShareRequest $request, string $slug, ShareLinks $links): JsonResponse
+    {
+        $made = $links->create(Board::query()->where('slug', $slug)->firstOrFail(), $request->roundNumber(), $request->days());
+
+        return response()->json(['share' => $links->present($made['share'], $made['token'])], 201);
+    }
+
+    public function revoke(int $share, ShareLinks $links): JsonResponse
+    {
+        return response()->json(['share' => $links->present($links->revoke(Share::query()->findOrFail($share)))]);
     }
 }

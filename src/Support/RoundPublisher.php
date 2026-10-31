@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Phattarachai\Kradan\Enums\ActivityAction;
+use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Enums\BoardStatus;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
@@ -30,7 +31,7 @@ final readonly class RoundPublisher
         $title = $parsed['title'] !== '' ? $parsed['title'] : $slug;
 
         [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $taskRef, $title, $parsed): array {
-            $board = $this->board($slug, $title, $taskRef);
+            $board = $this->board($slug, $title, $taskRef, $parsed['kind']);
             $latest = $board->latestRound()->first();
             $created = $latest === null || $latest->title !== $title;
 
@@ -48,11 +49,12 @@ final readonly class RoundPublisher
         return ['board' => $board, 'round' => $round, 'created' => $created];
     }
 
-    private function board(string $slug, string $title, ?string $taskRef): Board
+    private function board(string $slug, string $title, ?string $taskRef, BoardKind $kind): Board
     {
         $board = Board::query()->firstOrNew(['slug' => $slug]);
         $board->title = self::boardTitle($title);
         $board->task_ref = $taskRef ?? $board->task_ref;
+        $board->kind = $kind;
         $board->status ??= BoardStatus::Open;
         $board->save();
 

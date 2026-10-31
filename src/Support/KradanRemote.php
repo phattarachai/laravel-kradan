@@ -57,6 +57,30 @@ final class KradanRemote
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    public function shares(string $slug): array
+    {
+        return $this->request()->get('boards/'.rawurlencode($slug).'/shares')->throw()->json('shares');
+    }
+
+    /**
+     * @return array<string, mixed> the new share, with its `url` (the only time the token is shown)
+     */
+    public function share(string $slug, ?int $days, ?int $round): array
+    {
+        return $this->request()->post('boards/'.rawurlencode($slug).'/shares', array_filter(['days' => $days, 'round' => $round], fn (?int $value): bool => $value !== null))->throw()->json('share');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function revoke(int $share): array
+    {
+        return $this->request()->delete("shares/{$share}")->throw()->json('share');
+    }
+
+    /**
      * An upload from a signed URL in a review; the signature is the credential.
      */
     public function download(string $url): string

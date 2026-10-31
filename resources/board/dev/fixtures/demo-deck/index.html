@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Demo deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --k-slide-accent: #0f766e; --k-slide-accent-bg: #ccfbf1; }
+  .stack { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 80px 260px; align-items: center; height: 100%; }
+  .stack .low { grid-column: 2; grid-row: 2; justify-self: start; }
+  .row { display: flex; gap: 24px; justify-content: center; }
+  .move { display: grid; grid-template-columns: 1fr 1fr; gap: 300px; height: 100%; align-items: center; }
+  .move .k-zone { display: grid; gap: 28px; justify-items: center; }
+</style>
+</head>
+<body data-dp="Demo deck: ย้ายระบบ v1 ไป v2 รอบ 1" data-k-deck>
+
+<section data-dp-step data-title="ปก" class="k-cover">
+  <div class="k-kicker">Kradan Slide · ตัวอย่าง</div>
+  <h1 data-k-id="title">ย้ายระบบร้านค้าจาก v1 ไป v2</h1>
+  <p class="k-muted">ภาพรวมสถาปัตยกรรม เครื่อง และวันย้ายระบบ</p>
+  <aside data-k-notes>ทักทาย บอกว่าวันนี้จะเล่าสามเรื่อง: ระบบ เครื่อง และวันย้าย</aside>
+</section>
+
+<section data-dp-step data-title="ภาพรวม 3 ระบบ" data-k-transition="slide">
+  <h2 data-k-id="title">ภาพรวม 3 ระบบ</h2>
+  <div data-k-diagram class="stack">
+    <div class="k-zone" data-k-node="web">
+      <span class="k-zone-title">หน้าร้าน</span>
+      <div class="k-box" data-k-node="store" data-k-id="store"><b>Storefront</b>Next.js ลูกค้าสั่งซื้อ</div>
+    </div>
+    <div class="k-box" data-k-node="api" data-k-id="api" data-k-build="1"><b>Backoffice</b>Laravel จัดการคำสั่งซื้อ<br><span class="k-chip">Horizon</span><span class="k-chip">Scheduler</span></div>
+    <div class="k-box" data-k-node="db" data-k-id="db" data-k-build="3"><b>PostgreSQL</b>ฐานข้อมูลหลัก แยกตามระบบ</div>
+    <span data-k-link="store api" data-k-build="2">เรียก API ด้วย token</span>
+    <span data-k-link="api db" data-k-style="dashed" data-k-build="3">อ่านและเขียน</span>
+    <div class="k-box low" data-k-node="redis" data-k-build="4"><b>Redis</b>คิวและแคช</div>
+    <span data-k-link="api redis" data-k-style="dotted" data-k-dir="both" data-k-build="4"></span>
+    <span data-k-link="store redis" data-k-route="elbow" data-k-build="4">session</span>
+  </div>
+  <aside data-k-notes>กด → ทีละครั้ง: Backoffice โผล่ แล้วเส้นเรียก API แล้วฐานข้อมูลกับเส้นอ่านเขียน</aside>
+</section>
+
+<section data-dp-step data-title="หลังย้าย: เครื่องเดียว" data-k-transition="morph">
+  <h2 data-k-id="title">หลังย้าย: ทุกระบบอยู่บนเครื่องเดียว</h2>
+  <div data-k-diagram class="move">
+    <div class="k-zone" data-k-node="old">
+      <span class="k-zone-title">เครื่องเดิม (v1)</span>
+      <div class="k-box"><b>Legacy shop</b>ปิดหลังย้าย 30 วัน</div>
+    </div>
+    <div class="k-zone" data-k-node="new">
+      <span class="k-zone-title">เครื่องใหม่ (v2) 4 vCPU · 16 GB</span>
+      <div class="k-box" data-k-id="store"><b>Storefront</b>PM2</div>
+      <div class="k-box" data-k-id="api"><b>Backoffice</b>PHP-FPM</div>
+      <div class="k-box" data-k-id="db"><b>PostgreSQL</b>เปิดเฉพาะภายในเครื่อง</div>
+    </div>
+    <span data-k-link="old new" data-k-dir="both">ย้ายข้อมูลคืนวันย้าย</span>
+  </div>
+  <aside data-k-notes>กล่องสามกล่องเลื่อนจากภาพก่อนหน้ามาอยู่ในเครื่องใหม่</aside>
+</section>
+
+<section data-dp-step data-title="เทียบก่อนและหลัง">
+  <h2>เทียบก่อนและหลัง</h2>
+  <div class="k-cols">
+    <div><h3>v1</h3><ul><li>สามระบบบนสามเครื่อง</li><li>deploy ด้วยมือ</li><li>ไม่มี health check</li></ul></div>
+    <div><h3>v2</h3><ul><li data-k-build>เครื่องเดียว ขยายได้</li><li data-k-build>push แล้ว deploy ผ่าน CI</li><li data-k-build>health check และ rollback</li></ul></div>
+  </div>
+</section>
+
+<section data-dp-step data-title="วันย้าย">
+  <h2>วันย้าย</h2>
+  <ol class="k-timeline">
+    <li><time>D-7</time>ขยายเครื่อง ซ้อมย้าย</li>
+    <li><time>D 02:00</time>ปิดรับคำสั่งซื้อ ย้ายข้อมูล</li>
+    <li><time>D 06:00</time>เปิดระบบ v2</li>
+    <li><time>D+30</time>ปิดเครื่อง v1</li>
+  </ol>
+  <div class="k-big" data-k-build>4 ชั่วโมง</div>
+  <p class="k-muted" data-k-build="1">ช่วงที่ร้านปิดรับคำสั่งซื้อ</p>
+</section>
+
+</body>
+</html>

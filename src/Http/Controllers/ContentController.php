@@ -57,8 +57,10 @@ final readonly class ContentController
             return $this->respond('Forbidden', 403, 'txt');
         }
 
-        if ($path === ContentSigner::AGENT) {
-            return $this->script(AssetController::path('agent.js'));
+        $ours = [ContentSigner::AGENT => ['agent.js', 'js'], ContentSigner::DECK_JS => ['deck.js', 'js'], ContentSigner::DECK_CSS => ['deck.css', 'css']];
+
+        if (isset($ours[$path])) {
+            return $this->asset(...$ours[$path]);
         }
 
         $file = $this->file($round, $path);
@@ -92,23 +94,51 @@ final readonly class ContentController
         return RoundPublisher::disk()->exists($file) ? $file : null;
     }
 
+    /**
+     * The agent goes last in the body. A deck page also gets the deck runtime: its stylesheet at the end of the
+     * head, its script before the agent.
+     */
     private function prepareHtml(string $html, Request $request, int $round, int $expires, string $signature): string
     {
-        $tag = sprintf(
-            '<script src="%s" data-parent="%s"></script>',
-            e($this->signer->agentUrl($round, $expires, $signature)),
-            e(self::parentOrigin($request)),
-        );
+        $url = fn (string $file): string => e($this->signer->agentUrl($round, $expires, $signature, $file));
+        $parent = e(self::parentOrigin($request));
         $html = StepParser::stripHarness($html);
-        $at = strripos($html, '</body>');
+        $tags = sprintf('<script src="%s" data-parent="%s"></script>', $url(ContentSigner::AGENT), $parent);
 
-        return $at === false ? $html.$tag : substr_replace($html, $tag, $at, 0);
+        if (self::isDeck($html)) {
+            $tags = sprintf('<script src="%s" data-parent="%s"></script>', $url(ContentSigner::DECK_JS), $parent).$tags;
+            $html = self::insertBefore($html, '</head>', sprintf('<link rel="stylesheet" href="%s">', $url(ContentSigner::DECK_CSS)), prepend: true);
+        }
+
+        return self::insertBefore($html, '</body>', $tags);
     }
 
-    private function script(string $path): Response
+    public static function isDeck(string $html): bool
     {
+        return preg_match('/<body\b[^>]*\sdata-k-deck\b/i', $html) === 1;
+    }
+
+    /**
+     * Before the last `$tag` (the first with `$prepend`); when there is none, at the end, or at the start with
+     * `$prepend`.
+     */
+    private static function insertBefore(string $html, string $tag, string $insert, bool $prepend = false): string
+    {
+        $at = $prepend ? stripos($html, $tag) : strripos($html, $tag);
+
+        if ($at === false) {
+            return $prepend ? $insert.$html : $html.$insert;
+        }
+
+        return substr_replace($html, $insert, $at, 0);
+    }
+
+    private function asset(string $file, string $extension): Response
+    {
+        $path = AssetController::path($file);
+
         return is_file($path)
-            ? $this->respond((string) file_get_contents($path), 200, 'js')
+            ? $this->respond((string) file_get_contents($path), 200, $extension)
             : $this->respond('Not found', 404, 'txt');
     }
 

@@ -14,12 +14,16 @@ import { corner } from './icon.js';
 import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
 import { createKeep, answersKey } from './keep.js';
+import { createPresenter } from '../present.js';
+import { openShares } from './shares.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
   laptop: { w: 1280, h: 800, icon: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>' },
   tablet: { w: 820, h: 1180, icon: '<rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/>' },
   phone: { w: 390, h: 844, icon: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>' },
+  /* a deck's slide: the 1920×1080 canvas of the deck runtime, fitted to the canvas */
+  slide: { w: 1920, h: 1080, icon: '<rect x="2" y="5" width="20" height="12" rx="1.5"/><path d="M12 17v3M8 21h8"/>' },
 };
 const DEV_ORDER = ['desktop', 'laptop', 'tablet', 'phone'];
 /* toolbar A (owner's pick, item 11): look, then mark the screens, then add to the board */
@@ -59,6 +63,7 @@ const IC = {
   ellipse: '<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>',
   edit: '<path d="M4 7V5h11v2M9.5 5v14M7 19h5"/><path d="M15 15l4-4 2 2-4 4h-2z"/>',
   pin: '<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
+  present: '<path d="M8 5.5v13l11-6.5z"/>',
 };
 const svg = (k, inner = IC[k]) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 const ib = (attrs, k, tip, end = false) => `<button class="k-ib" ${attrs} data-tip="${esc(tip)}" ${end ? 'data-tip-end' : ''}>${svg(k)}</button>`;
@@ -83,13 +88,16 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const OLD = () => R.number !== LATEST();
   const CAN_PICK = () => !OLD() && B.status === 'open' && !B.picks_locked;
   const CAN_WRITE = () => !OLD();
+  /* a deck (<body data-k-deck>): one slide per step, no picks to decide, a ▶ to present. The workbench learns it
+     from the probe */
+  let DECK = B.kind === 'deck';
 
   const ui = {
     step: Math.max(1, +Q.get('step') || 1),
     mode: ['options', 'sizes', 'real'].includes(Q.get('mode')) ? Q.get('mode') : 'options',
     dev: (Q.get('dev') || '').split(',').filter(d => DEV[d]),
     /* a board opens at 100% with the options stacked (owner, 2026-10-28) */
-    zoom: Q.get('zoom') || DEF.zoom,
+    zoom: Q.get('zoom') || (DECK ? 'fit' : DEF.zoom),
     arr: ['row', 'col', 'auto'].includes(Q.get('arr')) ? Q.get('arr') : DEF.arr,
     opt: Q.get('opt') || '',
     w: +Q.get('w') || 0,
@@ -195,6 +203,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       if (!ui.mini) { p.set('mini', 'off'); }
       if (!ui.side) { p.set('side', 'off'); }
       if (!ui.panel) { p.set('panel', 'off'); }
+      if (presenting) { p.set('present', presenter.state.n); }
       history.replaceState(null, '', '?' + p.toString());
     }, 150);
   }
@@ -212,6 +221,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       <span class="k-pager tnum">${ib('data-act="prev"', 'prev', t('prev'))}<span id="pos"></span>${ib('data-act="next"', 'next', t('next'))}</span>
       <span class="k-sep"></span>
       <button class="k-viewb" id="viewb" data-act="view" data-tip="${esc(t('view_menu'))}"></button>
+      <button class="k-btn k-presentb" id="presentb" data-act="present" data-tip="${esc(t('present_tip'))}" hidden>${svg('present')}${esc(t('present'))}</button>
       <span class="k-sp"></span>
       <button class="k-ib k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh'))}">${svg('reload')}</button>
       <span class="k-avs" id="avs"></span>
@@ -260,9 +270,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       const ifr = newFrame();
       ifr.className = 'k-probe';
       document.body.appendChild(ifr);
-      const done = steps => { clearTimeout(timer); bridge.remove(ifr.contentWindow); ifr.remove(); resolve(steps); };
+      const done = (steps, deck = false) => { clearTimeout(timer); bridge.remove(ifr.contentWindow); ifr.remove(); resolve({ steps, deck }); };
       const timer = setTimeout(() => done(null), 8000);
-      bridge.add(ifr.contentWindow, { origins: ORIGINS, on: (type, d) => { if (type === 'ready') { done(Array.isArray(d.steps) ? d.steps : null); } } });
+      bridge.add(ifr.contentWindow, { origins: ORIGINS, on: (type, d) => { if (type === 'ready') { done(Array.isArray(d.steps) ? d.steps : null, !!d.deck); } } });
       loadFrame(ifr, pageUrl());
     });
   }
@@ -282,6 +292,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (type === 'pointerdown') { closeCtx(); return; }
     if (type === 'key') {
       if (d.code === 'Space') { spacePan(!d.up); return; }
+      if (d.code === 'KeyF' && DECK) { present(); return; }
       if (d.code === 'Escape') { closeCtx(); closePop(false); return; }
       toolKey(d.code);
       return;
@@ -347,11 +358,13 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
   const currentOpt = st => st.options.find(o => o.key === ui.opt) || st.options[0];
   function devsFor(st) {
+    if (DECK) { return ['slide']; }
     if (ui.mode === 'sizes') { return ui.dev.length ? ui.dev : ['desktop', 'tablet', 'phone']; }
     return [ui.dev[0] || stepDevs(st)[0] || 'desktop'];
   }
   function frameSize(dev, shot) {
     if (dev === 'custom') { return { w: ui.w || 1024, h: 900 }; }
+    if (dev === 'slide') { return { w: DEV.slide.w, h: DEV.slide.h }; }
     const d = DEV[dev];
     return { w: d.w, h: (dev === 'desktop' || dev === 'laptop') && shot.height ? shot.height : d.h };
   }
@@ -380,7 +393,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     renderBar();
     $('#sync').setAttribute('aria-pressed', ui.sync);
     $('#minib').setAttribute('aria-pressed', ui.mini);
-    $('#arr').style.display = ui.mode === 'real' ? 'none' : '';
+    $('#arr').style.display = ui.mode === 'real' || DECK ? 'none' : '';
+    $('#sync').style.display = $('#viewb').style.display = DECK ? 'none' : '';
+    $('#presentb').hidden = !DECK;
     renderView(st);
     renderSide();
     renderPanel();
@@ -495,7 +510,41 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     return `<div class="pages"><div class="hd"><span>${t('boards')}</span><span class="sp"></span>${ext.boardsTool ? ext.boardsTool(host) : `<a class="k-ib" href="${esc(boot.routes?.index || '/kradan')}" data-tip="${esc(t('all_boards'))}" aria-label="${esc(t('all_boards'))}">${GRID}</a>`}</div>
       ${top.map(boardRow).join('')}${fold}</div><div class="divide"></div>`;
   }
+  /* a deck lists its slides as thumbnails (Google Slides' filmstrip): each a still frame of the slide (?k=thumb),
+     loaded when it scrolls into view, with its comment count and มีอัปเดต. The frames are built once per round and
+     only their marks repaint, since moving or rebuilding a frame reloads it */
+  let strip = null;
+  function renderStrip() {
+    const side = $('#side'), sig = `${R.number}|${STEPS.length}`;
+    if (!strip || strip.sig !== sig || !side.contains(strip.list)) {
+      strip?.io?.disconnect();
+      side.innerHTML = '<div id="sidetop"></div><div class="k-strip"></div>';
+      const list = $('.k-strip', side);
+      list.innerHTML = STEPS.map((s, i) => `<a href="#" class="k-thumb" data-step="${i + 1}"><span class="n tnum">${i + 1}</span><span class="pv"></span><span class="tt"><span class="t">${esc(s.title)}</span><span class="meta"></span></span></a>`).join('');
+      const load = pv => {
+        if (pv.firstChild) { return; }
+        const ifr = newFrame({ tabIndex: -1, title: '' });
+        ifr.setAttribute('loading', 'lazy');
+        pv.appendChild(ifr);
+        loadFrame(ifr, thumbUrl(+pv.parentElement.dataset.step));
+      };
+      const io = window.IntersectionObserver ? new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { load(e.target); io.unobserve(e.target); } }), { root: side, rootMargin: '200px' }) : null;
+      $$('.pv', list).forEach(pv => (io ? io.observe(pv) : load(pv)));
+      strip = { sig, list, io };
+    }
+    $('#sidetop').innerHTML = boardsHtml() + `<div class="hd"><span>${t('slides')}</span><span class="sp"></span><span class="num tnum">${STEPS.length}</span></div>`;
+    $$('.k-thumb', strip.list).forEach(a => {
+      const n = +a.dataset.step, s = STEPS[n - 1], cm = threads(s.key).length + noteCount(s.key), upd = looked.upd.has(n);
+      a.setAttribute('aria-current', n === ui.step);
+      a.title = [s.title, cm ? t('comments_n', { n: cm }) : ''].filter(Boolean).join(' · ');
+      $('.meta', a).innerHTML = `${cm ? `<span class="cm tnum">${svg('comments')}${cm}</span>` : ''}${upd ? `<span class="key upd">${isNew(s) ? t('new_step') : t('updated')}</span>` : ''}`;
+    });
+    $('.k-thumb[aria-current="true"]', strip.list)?.scrollIntoView?.({ block: 'nearest' });
+  }
+  const thumbUrl = n => { const u = new URL(pageUrl()); u.searchParams.set('k', 'thumb'); u.searchParams.set('n', n); return u.href; };
+
   function renderSide() {
+    if (DECK) { renderStrip(); return; }
     const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
     $('#side').innerHTML = boardsHtml()
       + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
@@ -753,7 +802,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       f.scr.style.height = h + 'px';
       const bezel = f.crop ? 2 : (f.cell.dev === 'phone' || f.cell.dev === 'tablet') ? 24 : 2;
       f.fig.style.width = (w + bezel) + 'px';
-      $('.dim', f.fig).textContent = f.crop ? t('page_width', { w: f.size.w }) : `${devName(f.cell.dev)} ${f.size.w}`;
+      $('.dim', f.fig).textContent = DECK ? `${DEV.slide.w}×${DEV.slide.h}` : f.crop ? t('page_width', { w: f.size.w }) : `${devName(f.cell.dev)} ${f.size.w}`;
     });
   }
   let repaintTimer;
@@ -1113,7 +1162,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     el.className = 'k-ctx';
     const b = BOARDS?.find(z => z.slug === slug);
     el.innerHTML = `<button data-bopen><span class="ck"></span>${esc(t('open_new_tab'))}</button>`
-      + (caps.decide && ME.can?.manage && b?.status === 'open' ? `<hr><button data-barchive><span class="ck"></span>${esc(t('archive'))}</button>` : '');
+      + (caps.decide && ME.can?.manage && b?.status === 'open' && b?.kind !== 'deck' ? `<hr><button data-barchive><span class="ck"></span>${esc(t('archive'))}</button>` : '');
     document.body.appendChild(el);
     el.style.left = Math.min(x, innerWidth - el.offsetWidth - 8) + 'px';
     el.style.top = Math.min(y, innerHeight - el.offsetHeight - 8) + 'px';
@@ -1135,7 +1184,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     el.className = 'k-ctx k-rmenu';
     el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), r.text_only ? t('text_only') : t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
       + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
-      + (caps.decide && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
+      + (DECK && caps.share && ME.can?.manage ? `<button data-shares><span class="ck"></span>${t('share_links')}</button>` : '')
+      + (caps.decide && !DECK && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
     document.body.appendChild(el);
     const b = anchor.getBoundingClientRect();
     el.style.left = Math.min(b.left, innerWidth - el.offsetWidth - 8) + 'px';
@@ -1147,6 +1197,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       closeCtx();
       if (x.dataset.allrounds !== undefined) { openAllRounds(); return; }
       if (x.dataset.archive !== undefined) { openArchive(); return; }
+      if (x.dataset.shares !== undefined) { openShares({ api, slug: B.slug, rounds: B.rounds, current: R.number, t }); return; }
       const r = B.rounds.find(y => y.number === +x.dataset.round);
       /* a round kept only as its review text (the workbench's textOnly) opens as text in ดูทุกรอบ */
       if (r?.text_only) { openAllRounds(r.number); return; }
@@ -1175,6 +1226,22 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     }));
     $('.k-rounds', m).innerHTML = parts.join('');
     (focus ? $(`#round-${focus}`, m) : $('.k-rounds', m).lastElementChild)?.scrollIntoView({ block: 'start' });
+  }
+
+  /* ---------- present: the deck full screen, driven over its own bridge (present.js) ---------- */
+  let presenting = false;
+  const presenter = createPresenter({
+    pageUrl: pageUrl(), origins: ORIGINS, load: hosting.load, sandbox: hosting.sandbox === null ? null : (hosting.sandbox || 'allow-scripts'),
+    labels: { prev: t('prev'), next: t('next'), full: t('fullscreen'), close: t('present_end'), title: B.title },
+    onMove: () => writeUrl(),
+    onClose: n => { presenting = false; if (n !== ui.step && STEPS[n - 1]) { go(n); } else { writeUrl(); } },
+  });
+  function present(n = ui.step, full = true) {
+    if (!DECK) { return; }
+    closeCtx(); closePop(true); closeThread();
+    presenting = true;
+    presenter.open(n, { full });
+    writeUrl();
   }
 
   /* ---------- tools, minimap, zoom-to ---------- */
@@ -1298,6 +1365,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (act === 'rounds') { openRounds(t0); }
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
+    if (act === 'present') { present(); }
   });
   document.addEventListener('submit', async e => {
     const form = e.target.closest('.k-compose');
@@ -1320,6 +1388,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (tk) { e.preventDefault(); setTab(tk, true); return; }
     if (items.keyDown(e)) { return; }
     if (e.code === 'Space') { e.preventDefault(); spacePan(true); return; }
+    if (DECK && e.code === 'KeyF' && !e.metaKey && !e.ctrlKey && !e.altKey) { present(); return; }
     if (!e.metaKey && !e.ctrlKey && !e.altKey && toolKey(e.code)) { return; }
     if (e.key === 'ArrowRight') { go(ui.step + 1); }
     if (e.key === 'ArrowLeft') { go(ui.step - 1); }
@@ -1480,7 +1549,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   renderBar();
   renderSide();
   $('#canvas').innerHTML = `<div class="k-empty">${esc(t('loading'))}</div>`;
-  probeSteps().then(detail => {
+  probeSteps().then(({ steps: detail, deck }) => {
+    if (deck && !DECK) { DECK = true; if (!Q.get('zoom')) { ui.zoom = 'fit'; } }
     STEPS = stepsFrom(R.steps || [], detail);
     ui.step = Math.min(ui.step, STEPS.length || 1);
     loadLooked();
@@ -1500,6 +1570,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     presence.start(B.viewers || []);
     loadBoards();
     if (ext.bar) { $('#extbar').innerHTML = ext.bar(host); }
+    /* ?present=N opens the show where it was; fullscreen needs a key or a click, so it starts in the window */
+    if (DECK && Q.has('present')) { present(clamp(+Q.get('present') || 1, 1, STEPS.length), false); }
     ext.start?.(host);
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { refresh(); } });
   });

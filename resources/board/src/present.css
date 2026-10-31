@@ -1,0 +1,17 @@
+/* Present mode (present.js): the deck's frame over the whole window, a black screen, and a control bar that
+   shows while the pointer moves. Used by the board (through board.css) and the share page (dist/present.css). */
+.k-present { position: fixed; inset: 0; z-index: 2147483000; background: #000; outline: none; }
+.k-present > iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #000; }
+.k-pblack { position: absolute; inset: 0; background: #000; display: none; z-index: 1; }
+.k-present.black .k-pblack { display: block; }
+.k-pbar { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 4px; max-width: calc(100% - 32px);
+  padding: 6px 8px; border-radius: 12px; background: rgba(17, 24, 39, .82); color: #f9fafb; font: 500 14px/20px system-ui, sans-serif;
+  opacity: 0; transition: opacity .3s; pointer-events: none; }
+.k-present.awake .k-pbar, .k-pbar:hover, .k-pbar:focus-within { opacity: 1; pointer-events: auto; }
+.k-pbar button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: inherit; cursor: pointer; padding: 0; }
+.k-pbar button:hover { background: rgba(255, 255, 255, .14); }
+.k-pbar svg { width: 18px; height: 18px; }
+.k-pnum { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.k-ptitle { padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; color: #d1d5db; }
+.k-ptitle:empty { display: none; }
+body.kradan-share { margin: 0; background: #000; }

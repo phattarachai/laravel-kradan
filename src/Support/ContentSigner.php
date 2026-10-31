@@ -16,6 +16,11 @@ final class ContentSigner
 {
     public const string AGENT = '__kradan/agent.js';
 
+    /** the deck runtime, injected into pages with `<body data-k-deck>` */
+    public const string DECK_JS = '__kradan/deck.js';
+
+    public const string DECK_CSS = '__kradan/deck.css';
+
     public function baseUrl(Round $round): string
     {
         $expires = $this->expires();
@@ -23,9 +28,9 @@ final class ContentSigner
         return $this->prefix($round->id, $expires, $this->sign($round->id, $expires));
     }
 
-    public function agentUrl(int $round, int $expires, string $signature): string
+    public function agentUrl(int $round, int $expires, string $signature, string $file = self::AGENT): string
     {
-        return $this->prefix($round, $expires, $signature).self::AGENT;
+        return $this->prefix($round, $expires, $signature).$file;
     }
 
     /**

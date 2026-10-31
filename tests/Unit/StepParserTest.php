@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Support\StepParser;
 
 it('reads steps, groups, options and the round title the way the workbench does', function (): void {
@@ -60,4 +61,15 @@ it('reads a page without steps as one screen step titled after the page', functi
     expect($parsed['steps'])->toBe([['key' => '|Cover flow', 'group' => '', 'title' => 'Cover flow', 'sub' => '', 'kind' => 'screen', 'options' => []]])
         ->and(array_keys($parsed['prints']))->toBe(['|Cover flow'])
         ->and($parse([...$files, 'screen.html' => '<p>v2</p>'])['prints']['|Cover flow'])->not->toBe($parsed['prints']['|Cover flow']);
+});
+
+it('reads <body data-k-deck> as a deck and strips the local deck runtime like the harness', function (): void {
+    $html = '<html><head><!-- kradan:deck:start --><script src="kradan-deck/deck.js"></script><!-- kradan:deck:end --></head>'
+        .'<body data-dp="Deck" data-k-deck><section data-dp-step data-title="ปก"></section></body></html>';
+
+    $parsed = new StepParser()->parse($html, fn (): ?string => null);
+
+    expect($parsed['kind'])->toBe(BoardKind::Deck)
+        ->and(StepParser::stripHarness($html))->not->toContain('kradan-deck')
+        ->and(new StepParser()->parse(designHtml(), fn (): ?string => null)['kind'])->toBe(BoardKind::Decision);
 });

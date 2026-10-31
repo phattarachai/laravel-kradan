@@ -7,8 +7,9 @@
 ![Laravel Version](https://img.shields.io/badge/laravel-12%20%7C%2013-FF2D20?style=flat-square&logo=laravel&logoColor=white)
 [![Total Downloads](https://img.shields.io/packagist/dt/phattarachai/laravel-kradan.svg?style=flat-square)](https://packagist.org/packages/phattarachai/laravel-kradan)
 
-A review board inside your Laravel app. Claude pushes designed pages that ask for a decision; your signed-in users
-pick options, comment, reply and drop pins; Claude pulls the answers back as `review.md`.
+A review board inside your Laravel app. Claude pushes designed pages that ask for a decision, or a slide deck;
+your signed-in users pick options, comment, reply and drop pins; Claude pulls the answers back as `review.md`. A deck
+also presents full screen, and can go to a customer as a public, present-only link.
 
 Kradan (กระดาน, "board") is for the moment a design or a business rule needs answers from the people who use
 the app, not only from the developer. Nothing is committed or deployed to show them a page: one command puts it
@@ -44,8 +45,9 @@ check `git status` afterwards and restore them.
 
 ## Access
 
-Register who may open Kradan in a service provider. `$ability` is `view` or `manage`; `manage` may mark a
-decision board decided.
+Register who may open Kradan in a service provider. `$ability` is `view`, `manage` or `edit`. `manage` may mark a
+decision board decided and make or revoke a deck's public links. `edit` is reserved for editing a deck's text in
+place (not built yet); give it to the same people as `manage`.
 
 ```php
 use Phattarachai\Kradan\Kradan;
@@ -73,7 +75,11 @@ KRADAN_LOGIN_ROUTE=filament.admin.auth.login
 
 - **Decision boards.** Each board, at `/kradan/<slug>`, holds options to pick from. Once marked decided it moves
   to history: picks lock and comments stay open. `/kradan` lists every board with search over titles, task
-  references and step titles. A page that only explains something belongs in your docs, not on a board.
+  references and step titles. A page that only explains something belongs in your docs, not on a board, unless
+  it is a deck.
+- **Decks.** A page with `<body data-k-deck>` is a slide deck: one slide per step, reviewed on the board like any
+  other step (pins, ✎ text edits, notes, drawings), listed under its own tab, with no decided flow. ▶ or `F`
+  presents it full screen. See [Decks](#decks).
 - **Open answering.** Anyone allowed in may pick, comment or pin on any step, and everyone sees who picked what.
   The board shows how far each person got.
 - **Rounds.** A push with the same `data-dp` title replaces the latest round; a new title opens the next round.
@@ -102,6 +108,10 @@ viewer's session. Kradan prevents that:
   injects. It never reads the frame's DOM.
 - Paths are normalised and anything climbing out of the round folder is refused, both in uploaded zips and in
   content URLs.
+- A deck's public link (`/kradan/p/{token}`) needs no login and starts no session. The token is random, shown once,
+  and stored only as a sha256. The page holds the deck's signed content URL and nothing else: no user, no comments,
+  no API, a `default-src 'none'` CSP and `Referrer-Policy: no-referrer`. An unknown, expired or revoked token, or
+  Kradan switched off, is a 404.
 
 For a stricter split, serve content from a separate host that points at the same app:
 
@@ -133,7 +143,9 @@ KRADAN_REMOTE_TOKEN=…written by kradan:token --write
 | `kradan:push <dir> [--slug=] [--task=] [--dry-run]` | Zips a design folder (`index.html`) and pushes it as a round; prints the board URL |
 | `kradan:pull <slug\|board url> [--to=]` | Writes `rounds/NN/review.json` and `review.md` per round, the latest as `review.md`, and every uploaded image and file into `attachments/` |
 | `kradan:list` | Every board, its status and latest round |
-| `kradan:decide <slug>` | Marks a board decided |
+| `kradan:decide <slug>` | Marks a board decided (not a deck) |
+| `kradan:share <slug> [--days=14] [--round=] [--revoke=id] [--list]` | A deck's public, present-only link. `--days=0` never expires; without `--round` it follows the latest round. The URL is printed once |
+| `kradan:deck <dir>` | Copies the deck runtime into a deck folder so it previews locally before a push |
 | `kradan:doctor` | Checks the install |
 
 The package ships a [Laravel Boost](https://github.com/laravel/boost) skill, so `php artisan boost:install`
@@ -142,6 +154,52 @@ teaches Claude this workflow in your project.
 A pushed folder needs an `index.html`. Pages use the markup of the design workbench: `data-dp` on `<body>` for the round title, `data-dp-step` with
 `data-title` for each step, `data-dp-option` with `data-key` and `data-label` for options, `data-dp-group` for
 sections and `data-dp-frames` with `data-src` for live screens.
+
+## Decks
+
+A deck is a page whose `<body>` has `data-k-deck`. Each `<section data-dp-step data-title="…">` is one slide on a
+1920×1080 canvas that the package's deck runtime scales to fit. The runtime (`deck.js` + `deck.css`, about 6 KB
+gzipped, no reveal.js and no mermaid) is injected into deck pages the way the frame agent is.
+
+```html
+<body data-dp="v2 architecture รอบ 1" data-k-deck>
+  <section data-dp-step data-title="Overview" data-k-transition="slide">
+    <h2 data-k-id="title">Overview</h2>
+    <div data-k-diagram class="my-grid">
+      <div class="k-box" data-k-node="web" data-k-id="web"><b>Storefront</b>Next.js</div>
+      <div class="k-box" data-k-node="api" data-k-build><b>Backoffice</b>Laravel</div>
+      <span data-k-link="web api" data-k-style="dashed">REST</span>
+    </div>
+    <aside data-k-notes>Speaker notes, never on the slide.</aside>
+  </section>
+</body>
+```
+
+| Markup | |
+|---|---|
+| `data-k-transition` | `fade` (default), `slide`, `zoom` or `morph`, on the slide coming in |
+| `data-k-build` / `data-k-build="n"` | Revealed one step at a time in present mode; equal numbers show together |
+| `data-k-id` | The element with the same id on the next slide morphs into it (View Transitions) |
+| `[data-k-diagram]` | A diagram: `[data-k-node]` boxes laid out with your CSS grid or flex |
+| `<span data-k-link="a b">label</span>` | An SVG connector from node `a` to `b`, redrawn on resize and on every build. `data-k-style="dashed\|dotted"`, `data-k-dir="both\|none"`, `data-k-route="elbow"` |
+| `aside[data-k-notes]` | Speaker notes |
+
+Base classes: `.k-box` (a machine), `.k-chip` (a service), `.k-zone` with a `.k-zone-title` (a group), and
+`.k-cover`, `.k-cols`, `.k-big`, `.k-timeline`, `.k-shot` for layouts. Restyle with the `--k-slide-*` tokens
+(`bg`, `fg`, `muted`, `accent`, `accent-bg`, `line`, `pad`, `font`) or your own CSS. Text boxes never clip, so Thai
+marks above and below the line stay whole.
+
+**Preview locally** before pushing: `php artisan kradan:deck public/design/<slug>` copies the runtime into
+`public/design/<slug>/kradan-deck/` and links it from a `<!-- kradan:deck:start -->` block in the head. Open the
+page directly: one slide at a time, ← → Space, Home, End, `F` fullscreen, `B` black, `#N` in the URL. `kradan:push`
+leaves that folder out, and the server strips the block and injects its own runtime.
+
+**Present** from the board with ▶ or `F`: full screen, ← → Space PageUp PageDown, Home, End, `B` for a black screen,
+Esc to leave. `?present=N` on the board URL opens the show at slide N.
+
+**Share.** On the board, the title menu's ลิงก์สาธารณะ (for `manage`) makes, lists and revokes public links;
+`kradan:share` does the same from a checkout. A link opens the deck in present mode with no login and none of the
+board. It follows the latest round unless it pins one, and expires after 14 days unless told otherwise.
 
 ## Configuration
 

@@ -3,7 +3,7 @@
  * A store is the board's only way out (3-shared-core.md): every method returns the shapes in 2-board-payload.md,
  * and `caps` says what this store offers. The workbench's LocalStore is the other one.
  */
-export const KRADAN_CAPS = { multiUser: true, presence: true, decide: true, send: false, pages: false, uploads: true };
+export const KRADAN_CAPS = { multiUser: true, presence: true, decide: true, send: false, pages: false, uploads: true, share: true };
 
 export function KradanStore(boot) {
   const base = String(boot.routes?.api || '/kradan/api').replace(/\/$/, '');
@@ -57,6 +57,10 @@ export function KradanStore(boot) {
       xhr.onerror = () => reject(new Error('network'));
       xhr.send(form);
     }),
+    /* a deck's public links (manage only); a new one carries its url, the only time the token is shown */
+    shares: slug => call('GET', `boards/${seg(slug)}/shares`),
+    createShare: (slug, body) => call('POST', `boards/${seg(slug)}/shares`, body),
+    revokeShare: id => call('DELETE', `shares/${id}`),
     exportMd: slug => call('GET', `boards/${seg(slug)}/export.md`, undefined, { text: true }),
   };
 }

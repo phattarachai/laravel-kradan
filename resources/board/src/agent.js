@@ -20,7 +20,8 @@
  *     hash {hash}                follow a sibling frame's hash (tap sync)
  *
  *   frame → board (events, no `re`)
- *     ready {steps, height, url}   on load: the page's steps as the workbench reads them
+ *     ready {steps, height, url, deck}   on load: the page's steps as the workbench reads them; deck when
+ *                                  <body data-k-deck> (a slide deck, one step per slide)
  *     cropped {rect, height}       the cropped target moved or resized
  *     scrolled {y, ratio}          the page scrolled (mirrored: true when a scroll request caused it)
  *     edit-end {from, to, keep}    an edit finished (Enter, Esc, blur, or edit-end from the board)
@@ -272,7 +273,7 @@ export function createAgent({ win, doc, parentOrigin }) {
     return false;
   }
   const inField = t => !!t?.closest?.('input, textarea, select, [contenteditable="true"]');
-  const TOOL_KEYS = ['Space', 'KeyH', 'KeyV', 'KeyE', 'KeyC', 'KeyN', 'KeyT', 'KeyP', 'KeyA', 'KeyR', 'KeyO', 'KeyM', 'Escape'];
+  const TOOL_KEYS = ['Space', 'KeyH', 'KeyV', 'KeyE', 'KeyC', 'KeyN', 'KeyT', 'KeyP', 'KeyA', 'KeyR', 'KeyO', 'KeyM', 'KeyF', 'Escape'];
 
   function listen() {
     win.addEventListener('message', onMessage);
@@ -324,7 +325,7 @@ export function createAgent({ win, doc, parentOrigin }) {
   }
 
   function ready() {
-    emit('ready', { steps: readSteps(doc), height: docHeight(), url: String(win.location.href) });
+    emit('ready', { steps: readSteps(doc), height: docHeight(), url: String(win.location.href), deck: !!doc.body?.hasAttribute?.('data-k-deck') });
   }
 
   return { accepts, onMessage, handlers, listen, ready, state };

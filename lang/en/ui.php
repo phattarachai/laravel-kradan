@@ -25,4 +25,7 @@ return [
     'bundle_no_index' => 'The zip needs an index.html at its top level: Kradan takes designed pages only.',
     'bundle_bad_path' => 'The file :path is outside the page folder.',
     'bundle_too_large' => 'The zip is too large.',
+    'deck_no_decide' => 'A deck has nothing to decide, so it cannot be filed as decided',
+    'share_not_deck' => 'Only a deck can be shared by link',
+    'share_unavailable' => 'This link does not work: it may have expired or been revoked',
 ];
