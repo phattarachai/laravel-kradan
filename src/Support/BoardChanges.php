@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Phattarachai\Kradan\Support;
 
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Date;
 use Phattarachai\Kradan\Enums\ActivityAction;
 use Phattarachai\Kradan\Models\Activity;
@@ -17,6 +17,7 @@ use Phattarachai\Kradan\Models\Pick;
  * When anything people answer on a board last changed, so an open board
  * re-fetches without Reverb. Soft-deleted rows count (their updated_at moves
  * on delete); a cleared pick is hard-deleted, so its activity entry counts.
+ * Dates are CarbonInterface: a host may Date::use(CarbonImmutable::class).
  */
 final class BoardChanges
 {
@@ -31,7 +32,7 @@ final class BoardChanges
             Activity::query()->where('board_id', $board->id)->where('action', ActivityAction::Pick)->max('created_at'),
         ])
             ->filter()
-            ->map(fn (mixed $at): Carbon => Date::parse((string) $at))
+            ->map(fn (mixed $at): CarbonInterface => Date::parse((string) $at))
             ->max();
 
         return $latest?->toIso8601String();

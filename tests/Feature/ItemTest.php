@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
@@ -295,3 +296,13 @@ it('moves changed_at when someone else picks, comments, adds or deletes an item'
 
     actingAs($me)->getJson('/kradan/api/boards/t188-manual-so')->assertJsonPath('changed_at', $last);
 });
+
+it('reports changed_at when the host uses immutable dates', function (): void {
+    Date::use(CarbonImmutable::class);
+    $me = kradanUser();
+
+    actingAs($me)->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => STEP, 'body' => 'x'])->assertCreated();
+
+    actingAs($me)->getJson('/kradan/api/boards/t188-manual-so')->assertOk()->assertJsonPath('changed_at', fn (?string $at): bool => $at !== null);
+    actingAs($me)->postJson('/kradan/api/boards/t188-manual-so/heartbeat')->assertOk()->assertJsonPath('changed_at', fn (?string $at): bool => $at !== null);
+})->after(fn () => Date::useDefault());

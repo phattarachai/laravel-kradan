@@ -13,10 +13,14 @@ use Phattarachai\Kradan\Enums\BoardKind;
 use Phattarachai\Kradan\Enums\BoardStatus;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
+use RuntimeException;
+use Throwable;
 
 /**
  * A push with the latest round's `data-dp` title replaces that round; a new
- * title opens the next round. Older rounds are never touched.
+ * title opens the next round. Older rounds are never touched. The files are
+ * written inside the transaction, so a disk that refuses them leaves no round
+ * behind: the rows roll back, and a new round's half-written folder goes.
  */
 final readonly class RoundPublisher
 {
@@ -30,7 +34,7 @@ final readonly class RoundPublisher
         $parsed = $this->parser->parse((string) $bundle->get('index.html'), $bundle->get(...));
         $title = $parsed['title'] !== '' ? $parsed['title'] : $slug;
 
-        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $taskRef, $title, $parsed): array {
+        [$board, $round, $created] = DB::connection(config('kradan.connection'))->transaction(function () use ($slug, $taskRef, $title, $parsed, $bundle): array {
             $board = $this->board($slug, $title, $taskRef, $parsed['kind']);
             $latest = $board->latestRound()->first();
             $created = $latest === null || $latest->title !== $title;
@@ -40,11 +44,10 @@ final readonly class RoundPublisher
                 : $this->replace($latest->setRelation('board', $board), $parsed);
 
             $this->activity->record($board, ActivityAction::Push, null, $round, ['title' => $title, 'created' => $created]);
+            $this->store($round, $bundle, $created);
 
             return [$board, $round, $created];
         });
-
-        $this->store($round, $bundle);
 
         return ['board' => $board, 'round' => $round, 'created' => $created];
     }
@@ -88,14 +91,29 @@ final readonly class RoundPublisher
         return $round;
     }
 
-    private function store(Round $round, Bundle $bundle): void
+    /**
+     * Writes the bundle over the round's folder, then drops the files it no longer has. A replaced round keeps
+     * its old files until every new one is written.
+     */
+    private function store(Round $round, Bundle $bundle, bool $fresh): void
     {
         $disk = self::disk();
-        $disk->deleteDirectory($round->directory());
+        $dir = $round->directory();
 
-        foreach ($bundle->files as $path => $contents) {
-            $disk->put("{$round->directory()}/{$path}", $contents);
+        try {
+            foreach ($bundle->files as $path => $contents) {
+                throw_unless($disk->put("{$dir}/{$path}", $contents), RuntimeException::class, "could not write {$dir}/{$path}");
+            }
+        } catch (Throwable $e) {
+            if ($fresh) {
+                $disk->deleteDirectory($dir);
+            }
+
+            throw new RuntimeException("Kradan could not write the round's files to the [".config('kradan.disk', 'local').'] disk; the web server\'s user must be able to write its kradan/ folder: '.$e->getMessage(), 0, $e);
         }
+
+        $stale = array_diff($disk->allFiles($dir), array_map(fn (string $path): string => "{$dir}/{$path}", array_keys($bundle->files)));
+        $disk->delete(array_values($stale));
     }
 
     /**
