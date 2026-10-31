@@ -7,6 +7,12 @@ import { $, esc, shortDate, modal, copyText, toast } from './util.js';
 
 export const SHARE_DAYS = [7, 14, 30, 90, 0];
 
+/* the แชร์ menu: a deck's public links (for people with `share`) and its PDF. A decision board has neither, so
+   its button stays greyed out */
+export function shareItems({ deck, share }) {
+  return deck ? [...(share ? ['links'] : []), 'pdf'] : [];
+}
+
 /* one line per link: its round, when it expires, whether it still works */
 export function shareRow(s, t) {
   const state = s.revoked_at ? t('share_revoked') : s.active ? (s.expires_at ? t('share_until', { date: shortDate(s.expires_at) }) : t('share_forever')) : t('share_expired');

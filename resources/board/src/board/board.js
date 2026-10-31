@@ -15,7 +15,7 @@ import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
 import { createKeep, answersKey } from './keep.js';
 import { createPresenter, printDeck } from '../present.js';
-import { openShares } from './shares.js';
+import { openShares, shareItems } from './shares.js';
 
 const DEV = {
   desktop: { w: 1440, h: 900, icon: '<rect x="2" y="4" width="20" height="13" rx="1.5"/><path d="M8 21h8M12 17v4"/>' },
@@ -223,12 +223,11 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       <span class="k-pager tnum">${ib('data-act="prev"', 'prev', t('prev'))}<span id="pos"></span>${ib('data-act="next"', 'next', t('next'))}</span>
       <span class="k-sep"></span>
       <button class="k-viewb" id="viewb" data-act="view" data-tip="${esc(t('view_menu'))}"></button>
-      <button class="k-btn k-presentb" id="presentb" data-act="present" data-tip="${esc(t('present_tip'))}" hidden>${svg('present')}${esc(t('present'))}</button>
-      <button class="k-btn k-pdfb" id="pdfb" data-act="pdf" data-tip="${esc(t('pdf_tip'))}" hidden>${svg('pdf')}PDF</button>
+      <button class="k-btn k-presentb" id="presentb" data-act="present" data-tip="${esc(t('present_tip'))}" aria-label="${esc(t('present'))}" hidden>${svg('present')}</button>
       <span class="k-sp"></span>
       <button class="k-ib k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh'))}">${svg('reload')}</button>
       <span class="k-avs" id="avs"></span>
-      <button class="k-btn k-shareb" id="shareb" data-act="share" hidden>${svg('share')}${esc(t('share'))}</button>
+      <button class="k-btn k-shareb" id="shareb" data-act="share" aria-haspopup="menu" aria-expanded="false" hidden>${svg('share')}${esc(t('share'))}<span class="k-caret">▾</span></button>
       <span class="k-sep"></span>
       <span class="k-zoom tnum">${ib('data-act="zout"', 'zout', t('zoom_out'))}<button class="k-pct" id="zpct" data-act="z100" data-tip="${esc(t('zoom_100'))}"></button>${ib('data-act="zin"', 'zin', t('zoom_in'))}${ib('data-act="fit" id="fitb"', 'fit', t('fit'))}</span>
       ${ib('data-act="arr" id="arr"', 'arr', t('arrange'))}${ib('data-act="sync" id="sync"', 'sync', t('sync'))}${ib('data-act="mini" id="minib"', 'mini', t('mini'), true)}
@@ -399,11 +398,14 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     $('#minib').setAttribute('aria-pressed', ui.mini);
     $('#arr').style.display = ui.mode === 'real' || DECK ? 'none' : '';
     $('#sync').style.display = $('#viewb').style.display = DECK ? 'none' : '';
-    $('#presentb').hidden = $('#pdfb').hidden = !DECK;
-    /* public links are present-only, so only a deck has them; elsewhere the button stays, greyed, to say why */
-    $('#shareb').hidden = !(caps.share && ME.can?.share);
-    $('#shareb').setAttribute('aria-disabled', String(!DECK));
-    $('#shareb').dataset.tip = t(DECK ? 'share_tip' : 'share_deck_only');
+    $('#presentb').hidden = !DECK;
+    /* แชร์ holds a deck's public links and its PDF; a decision board has neither, so the button stays greyed out
+       there (for people who could share) to say why */
+    const canShare = !!(caps.share && ME.can?.share);
+    $('#shareb').hidden = !DECK && !canShare;
+    $('#shareb').setAttribute('aria-disabled', String(!shareItems({ deck: DECK, share: canShare }).length));
+    /* on a deck the menu says what it holds; the tooltip only says why a greyed-out button does nothing */
+    if (DECK) { delete $('#shareb').dataset.tip; } else { $('#shareb').dataset.tip = t('share_deck_only'); }
     renderView(st);
     renderSide();
     renderPanel();
@@ -1250,6 +1252,42 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (!DECK) { toast(t('share_deck_only')); return; }
     openShares({ api, slug: B.slug, rounds: B.rounds, current: R.number, t });
   }
+  /* the แชร์ menu, built like the title menu: a click outside, Esc or a choice closes it */
+  function openShare(anchor) {
+    const open = ctx?.classList.contains('k-smenu');
+    closeCtx();
+    const list = shareItems({ deck: DECK, share: !!(caps.share && ME.can?.share) });
+    if (open) { return; }
+    if (!list.length) { toast(t('share_deck_only')); return; }
+    const item = (k, ic, label) => `<button data-s="${k}" role="menuitem"><span class="ic">${svg(ic)}</span>${esc(label)}</button>`;
+    const el = document.createElement('div');
+    el.className = 'k-ctx k-smenu';
+    el.setAttribute('role', 'menu');
+    el.innerHTML = list.map(k => (k === 'links' ? item('links', 'share', t('share_links')) : item('pdf', 'pdf', t('pdf_save')))).join('');
+    document.body.appendChild(el);
+    const b = anchor.getBoundingClientRect();
+    el.style.left = Math.max(8, Math.min(b.right - el.offsetWidth, innerWidth - el.offsetWidth - 8)) + 'px';
+    el.style.top = b.bottom + 4 + 'px';
+    ctx = el;
+    anchor.setAttribute('aria-expanded', 'true');
+    const gone = new MutationObserver(() => { if (!el.isConnected) { anchor.setAttribute('aria-expanded', 'false'); gone.disconnect(); } });
+    gone.observe(document.body, { childList: true });
+    $('button', el).focus();
+    el.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') { return; }
+      e.preventDefault();
+      const bs = [...el.querySelectorAll('button')], i = bs.indexOf(document.activeElement);
+      bs[(i + (e.key === 'ArrowDown' ? 1 : -1) + bs.length) % bs.length].focus();
+    });
+    el.addEventListener('click', e => {
+      const x = e.target.closest('button');
+      if (!x) { return; }
+      closeCtx();
+      anchor.focus();
+      if (x.dataset.s === 'links') { share(); }
+      if (x.dataset.s === 'pdf') { printDeck(pageUrl()); }
+    });
+  }
   function present(n = ui.step, full = true) {
     if (!DECK) { return; }
     closeCtx(); closePop(true); closeThread();
@@ -1380,8 +1418,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
     if (act === 'present') { present(); }
-    if (act === 'pdf' && DECK) { printDeck(pageUrl()); }
-    if (act === 'share') { share(); }
+    if (act === 'share') { openShare(t0); }
   });
   document.addEventListener('submit', async e => {
     const form = e.target.closest('.k-compose');
@@ -1433,7 +1470,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     e.preventDefault();
     openCtx(e.clientX, e.clientY, frames.find(f => f.fig.contains(e.target)));
   });
-  document.addEventListener('pointerdown', e => { if (ctx && !e.target.closest('.k-ctx')) { closeCtx(); } }, true);
+  /* a press on แชร์ while its menu is open is left to the button, which closes it: the button toggles */
+  document.addEventListener('pointerdown', e => { if (ctx && !e.target.closest('.k-ctx') && !(ctx.classList.contains('k-smenu') && e.target.closest('#shareb'))) { closeCtx(); } }, true);
   addEventListener('blur', () => closeCtx());
   document.addEventListener('wheel', e => {
     closeCtx();

@@ -51,7 +51,7 @@ Register who may open Kradan in a service provider. `$ability` is one of:
 |---|---|---|
 | `view` | Open boards, pick, comment, draw, present, save a deck as PDF | No |
 | `manage` | Mark a decision board decided | No |
-| `share` | Make, list and revoke a deck's public links (the board's แชร์ button) | As `view` |
+| `share` | Make, list and revoke a deck's public links (ลิงก์สาธารณะ in the board's แชร์ menu) | As `view` |
 | `edit` | Reserved for editing a deck's text in place (not built yet) | As `manage` |
 
 A callback that answers every ability alike, like the one below, gives all four to the same people. One that
@@ -203,19 +203,21 @@ marks above and below the line stay whole.
 page directly: one slide at a time, ← → Space, Home, End, `F` fullscreen, `B` black, `#N` in the URL. `kradan:push`
 leaves that folder out, and the server strips the block and injects its own runtime.
 
-**Present** from the board with ▶ or `F`: full screen, ← → Space PageUp PageDown, Home, End, `B` for a black screen,
+**Present** from the board with the green ▶ button or `F`: full screen, ← → Space PageUp PageDown, Home, End, `B` for a black screen,
 Esc to leave. `?present=N` on the board URL opens the show at slide N.
 
-**PDF.** The board's PDF button (and the one on a public link's control bar) opens the deck's print view in a new tab:
-every slide on its own 1920×1080 page, every build shown, no speaker notes. The browser's print dialog opens by
-itself once the fonts and images have loaded; choose **Save as PDF**. The result is a vector PDF with selectable Thai
-text. Chrome and Edge honour the slide-sized page; in other browsers set the paper size by hand. Nothing runs on the
-server and no dependency is added.
+**Share and PDF** sit in one แชร์ menu at the top right of a deck's board:
 
-**Share.** The board's แชร์ button (for `share`) makes, lists and revokes public links; `kradan:share` does the same
-from a checkout. A link opens the deck in present mode with no login and none of the board. It follows the latest
-round unless it pins one, and expires after 14 days unless told otherwise. Public links are for decks only: on a
-decision board the button is greyed out.
+- **ลิงก์สาธารณะ** (for `share`) makes, lists and revokes public links; `kradan:share` does the same from a checkout.
+  A link opens the deck in present mode with no login and none of the board. It follows the latest round unless it
+  pins one, and expires after 14 days unless told otherwise.
+- **บันทึกเป็น PDF** (anyone who can view) opens the deck's print view in a new tab: every slide on its own 1920×1080
+  page, every build shown, no speaker notes. The browser's print dialog opens by itself once the fonts and images
+  have loaded; choose **Save as PDF**. The result is a vector PDF with selectable Thai text. Chrome and Edge honour
+  the slide-sized page; in other browsers set the paper size by hand. Nothing runs on the server and no dependency
+  is added. A public link's control bar has the same PDF button.
+
+Both are for decks only: on a decision board the แชร์ button is greyed out.
 
 ## Configuration
 
