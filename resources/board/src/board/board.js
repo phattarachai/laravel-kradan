@@ -14,7 +14,7 @@ import { corner } from './icon.js';
 import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
 import { createKeep, answersKey } from './keep.js';
-import { createPresenter } from '../present.js';
+import { createPresenter, printDeck } from '../present.js';
 import { openShares } from './shares.js';
 
 const DEV = {
@@ -64,6 +64,8 @@ const IC = {
   edit: '<path d="M4 7V5h11v2M9.5 5v14M7 19h5"/><path d="M15 15l4-4 2 2-4 4h-2z"/>',
   pin: '<path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/>',
   present: '<path d="M8 5.5v13l11-6.5z"/>',
+  pdf: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+  share: '<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>',
 };
 const svg = (k, inner = IC[k]) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
 const ib = (attrs, k, tip, end = false) => `<button class="k-ib" ${attrs} data-tip="${esc(tip)}" ${end ? 'data-tip-end' : ''}>${svg(k)}</button>`;
@@ -222,9 +224,11 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       <span class="k-sep"></span>
       <button class="k-viewb" id="viewb" data-act="view" data-tip="${esc(t('view_menu'))}"></button>
       <button class="k-btn k-presentb" id="presentb" data-act="present" data-tip="${esc(t('present_tip'))}" hidden>${svg('present')}${esc(t('present'))}</button>
+      <button class="k-btn k-pdfb" id="pdfb" data-act="pdf" data-tip="${esc(t('pdf_tip'))}" hidden>${svg('pdf')}PDF</button>
       <span class="k-sp"></span>
       <button class="k-ib k-fresh" data-act="reload" id="freshb" hidden data-tip="${esc(t('fresh'))}">${svg('reload')}</button>
       <span class="k-avs" id="avs"></span>
+      <button class="k-btn k-shareb" id="shareb" data-act="share" hidden>${svg('share')}${esc(t('share'))}</button>
       <span class="k-sep"></span>
       <span class="k-zoom tnum">${ib('data-act="zout"', 'zout', t('zoom_out'))}<button class="k-pct" id="zpct" data-act="z100" data-tip="${esc(t('zoom_100'))}"></button>${ib('data-act="zin"', 'zin', t('zoom_in'))}${ib('data-act="fit" id="fitb"', 'fit', t('fit'))}</span>
       ${ib('data-act="arr" id="arr"', 'arr', t('arrange'))}${ib('data-act="sync" id="sync"', 'sync', t('sync'))}${ib('data-act="mini" id="minib"', 'mini', t('mini'), true)}
@@ -395,7 +399,11 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     $('#minib').setAttribute('aria-pressed', ui.mini);
     $('#arr').style.display = ui.mode === 'real' || DECK ? 'none' : '';
     $('#sync').style.display = $('#viewb').style.display = DECK ? 'none' : '';
-    $('#presentb').hidden = !DECK;
+    $('#presentb').hidden = $('#pdfb').hidden = !DECK;
+    /* public links are present-only, so only a deck has them; elsewhere the button stays, greyed, to say why */
+    $('#shareb').hidden = !(caps.share && ME.can?.share);
+    $('#shareb').setAttribute('aria-disabled', String(!DECK));
+    $('#shareb').dataset.tip = t(DECK ? 'share_tip' : 'share_deck_only');
     renderView(st);
     renderSide();
     renderPanel();
@@ -1184,7 +1192,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     el.className = 'k-ctx k-rmenu';
     el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), r.text_only ? t('text_only') : t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
       + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
-      + (DECK && caps.share && ME.can?.manage ? `<button data-shares><span class="ck"></span>${t('share_links')}</button>` : '')
+      + (DECK && caps.share && ME.can?.share ? `<button data-shares><span class="ck"></span>${t('share_links')}</button>` : '')
       + (caps.decide && !DECK && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
     document.body.appendChild(el);
     const b = anchor.getBoundingClientRect();
@@ -1197,7 +1205,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       closeCtx();
       if (x.dataset.allrounds !== undefined) { openAllRounds(); return; }
       if (x.dataset.archive !== undefined) { openArchive(); return; }
-      if (x.dataset.shares !== undefined) { openShares({ api, slug: B.slug, rounds: B.rounds, current: R.number, t }); return; }
+      if (x.dataset.shares !== undefined) { share(); return; }
       const r = B.rounds.find(y => y.number === +x.dataset.round);
       /* a round kept only as its review text (the workbench's textOnly) opens as text in ดูทุกรอบ */
       if (r?.text_only) { openAllRounds(r.number); return; }
@@ -1232,10 +1240,16 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   let presenting = false;
   const presenter = createPresenter({
     pageUrl: pageUrl(), origins: ORIGINS, load: hosting.load, sandbox: hosting.sandbox === null ? null : (hosting.sandbox || 'allow-scripts'),
-    labels: { prev: t('prev'), next: t('next'), full: t('fullscreen'), close: t('present_end'), title: B.title },
+    printable: true,
+    labels: { prev: t('prev'), next: t('next'), full: t('fullscreen'), close: t('present_end'), pdf: t('pdf_tip'), title: B.title },
     onMove: () => writeUrl(),
     onClose: n => { presenting = false; if (n !== ui.step && STEPS[n - 1]) { go(n); } else { writeUrl(); } },
   });
+  function share() {
+    closeCtx();
+    if (!DECK) { toast(t('share_deck_only')); return; }
+    openShares({ api, slug: B.slug, rounds: B.rounds, current: R.number, t });
+  }
   function present(n = ui.step, full = true) {
     if (!DECK) { return; }
     closeCtx(); closePop(true); closeThread();
@@ -1366,6 +1380,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     if (act === 'latest') { location.href = roundUrl(B.rounds.at(-1), 1); }
     if (act === 'reload') { location.reload(); }
     if (act === 'present') { present(); }
+    if (act === 'pdf' && DECK) { printDeck(pageUrl()); }
+    if (act === 'share') { share(); }
   });
   document.addEventListener('submit', async e => {
     const form = e.target.closest('.k-compose');

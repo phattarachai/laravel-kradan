@@ -266,7 +266,7 @@ function boot(me, page, extra) {
   return {
     version: mtime('board.js'), page, locale: process.env.KRADAN_LOCALE || 'th',
     brand: { name: 'RR Admin', logo: null, accent: '#ba1a1a' },
-    user: { id: u.id, name: u.name, avatar: u.avatar, can: { manage: u.manage, edit: u.manage } },
+    user: { id: u.id, name: u.name, avatar: u.avatar, can: { manage: u.manage, share: true, edit: u.manage } },
     csrf: CSRF, routes: { api: '/kradan/api', index: '/kradan' },
     presence: { mode: 'polling', heartbeat: 30, reverb: null, channel: null, authEndpoint: '/broadcasting/auth' },
     ...extra,
@@ -315,6 +315,8 @@ function serveContent(req, res, url) {
     let html = stripHarness(fs.readFileSync(file, 'utf8'));
     /* a deck also gets the deck runtime, as ContentController does */
     const deck = isDeck(html);
+    /* a deck's print view opens the print dialog itself, which the sandbox allows only with allow-modals */
+    if (deck && url.searchParams.get('k') === 'print') { headers['Content-Security-Policy'] = 'sandbox allow-scripts allow-modals'; }
     const tag = `${deck ? `<script src="${prefix}/deck.js" data-parent="${APP}"></script>` : ''}<script src="${prefix}/agent.js" data-parent="${APP}"></script>`;
     if (deck) { html = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, `<link rel="stylesheet" href="${prefix}/deck.css"></head>`) : `<link rel="stylesheet" href="${prefix}/deck.css">${html}`; }
     html = /<\/body>/i.test(html) ? html.replace(/<\/body>(?![\s\S]*<\/body>)/i, `${tag}</body>`) : html + tag;
@@ -340,7 +342,7 @@ async function api(req, res, url, me) {
   if ((m = p.match(/^boards\/([^/]+)\/shares$/))) {
     const b = find(m[1]);
     if (!b || b.kind !== 'deck') { return sendJson(res, b ? 422 : 404, {}); }
-    if (!USERS[me].manage) { return sendJson(res, 403, {}); }
+    /* `share` falls back to `view`: every signed-in dev user has it */
     if (req.method === 'GET') { return sendJson(res, 200, { shares: SHARES.filter(x => x.slug === b.slug).reverse().map(shareOut) }); }
     const body = await readBody(req) || {};
     const days = body.days ?? 14;
@@ -351,7 +353,7 @@ async function api(req, res, url, me) {
   }
   if ((m = p.match(/^shares\/(\d+)$/)) && req.method === 'DELETE') {
     const x = SHARES.find(y => y.id === +m[1]);
-    if (!x || !USERS[me].manage) { return sendJson(res, x ? 403 : 404, {}); }
+    if (!x) { return sendJson(res, 404, {}); }
     x.revoked_at ||= new Date().toISOString();
     return sendJson(res, 200, { share: shareOut(x) });
   }

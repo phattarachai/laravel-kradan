@@ -1,7 +1,7 @@
 ---
 name: kradan-slide
 description: "Make a slide deck for customers or the team as a Kradan deck: outline, HTML slides with diagrams, local preview, push to the board for review, present full screen, share a public link, revise from comments. Triggers on \"make slides\", \"ทำสไลด์\", \"deck\", \"presentation\", \"นำเสนอลูกค้า\", or /kradan-slide."
-version: 2026.10.31.2
+version: 2026.10.31.3
 ---
 
 # Kradan Slide: decks reviewed and presented on the board
@@ -43,7 +43,8 @@ Follow it in order. Stop where it says to wait.
    The dry run prints the title and the slide count: check both. `kradan-deck/`, `rounds/` and `review*` stay
    local, and the server injects its own runtime.
 7. **Hand over** the printed board URL for review. When the owner wants it shown to someone without an account,
-   make a public link (see [Sharing](#sharing)) and give that instead.
+   make a public link (see [Sharing](#sharing)) and give that instead. When they want a file, point them to the
+   board's PDF button (see [PDF](#pdf)); don't render one yourself.
 8. **Revise.** When the user says there are comments, `php artisan kradan:pull <slug>` and read `review.md` (the
    `kradan` skill explains its lines). `✎ “from” → “to”` is an exact string to replace. Apply, preview, push again.
    - Same `data-dp` title → the round is replaced, viewers see มีอัปเดต on the changed slides.
@@ -204,8 +205,18 @@ Two modes, like Google Drive:
   php artisan kradan:share <slug> --revoke=<id>
   ```
   The URL is printed once (the server keeps only a hash): give it to the user and don't write it into files.
-  `--days=0` never expires; ask before making one. People with `manage` can do the same from the board's title
-  menu (ลิงก์สาธารณะ). A link works only where Kradan is enabled.
+  `--days=0` never expires; ask before making one. On the board, the แชร์ button in the top bar does the same for
+  anyone the host gives `share` (by default everyone who can view the board). Public links are for decks only:
+  the button is greyed out on a decision board. A link works only where Kradan is enabled.
+
+## PDF
+
+The board's PDF button (and the one on a public link's control bar) opens the deck's print view in a new tab: one
+1920×1080 page per slide, every build shown, no notes. The print dialog opens once fonts and images have loaded;
+**Save as PDF** gives a vector PDF with selectable Thai text. Chrome or Edge keeps the slide-sized page.
+
+So a deck prints well, keep every slide inside its 1920×1080 box (it already clips there) and don't rely on a
+build or transition to show something: in the PDF everything is on at once.
 
 ## When something is off
 
@@ -218,3 +229,5 @@ Two modes, like Google Drive:
 | `kradan:deck`: not a deck | Add `data-k-deck` to `<body>` |
 | `kradan:share` HTTP 422 | The board isn't a deck (pushed without `data-k-deck`) |
 | A public link shows 404 | Expired, revoked, or Kradan is off on that server: make a new link |
+| PDF pages are A4 or Letter, not slide-sized | Print from Chrome or Edge, or set the paper size by hand |
+| The แชร์ button is greyed out | The board isn't a deck |

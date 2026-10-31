@@ -105,9 +105,11 @@ export function connector(a, b, { route = 'straight', gap = 6 } = {}) {
 export const morphName = id => `k-${String(id).replace(/[^\w-]/g, '_')}`;
 
 /* which runtime a page gets: one slide at a time on its own (solo), driven by the board (present), a still
-   thumbnail (thumb), or every slide stacked for the board to crop (review) */
+   thumbnail (thumb), every slide stacked for the board to crop (review), or one slide per page for a PDF (print,
+   in a tab of its own) */
 export function modeOf(search, framed) {
   const k = new URLSearchParams(search).get('k');
+  if (k === 'print') { return 'print'; }
   if (!framed) { return 'solo'; }
   return k === 'present' || k === 'thumb' ? k : 'review';
 }

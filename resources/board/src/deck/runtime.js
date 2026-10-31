@@ -11,7 +11,9 @@
  *                              drawn as an SVG connector, redrawn on resize and on every build
  *
  * Modes (core.js modeOf): review stacks every slide for the board to crop, all builds shown; present and
- * thumb show one slide scaled to the frame; solo is the page opened on its own, with its own keys.
+ * thumb show one slide scaled to the frame; solo is the page opened on its own, with its own keys; print lays
+ * every slide out as one 1920×1080 page with every build shown, waits for fonts and images, and opens the
+ * browser's print dialog (Save as PDF gives a vector PDF with selectable text).
  *
  * In present mode the parent page drives it over postMessage, `{kradan: 1, type, …}` like agent.js:
  *   parent → deck   goto {n, build}   nav {dir}   (a request with `id` gets `re: id` and {n, build})
@@ -35,7 +37,7 @@ export function createDeck({ win, doc, mode, parentOrigin = null }) {
     return { els, steps };
   });
   const counts = builds.map(b => b.steps.length);
-  const one = mode !== 'review';
+  const one = mode !== 'review' && mode !== 'print';
   const at = { n: 1, build: 0 };
   const reduced = () => !!win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -178,7 +180,27 @@ export function createDeck({ win, doc, mode, parentOrigin = null }) {
     if (mode === 'present') { post({ type: 'deck-key', code: e.code }); } else { soloKey(e.code); }
   }
 
+  /* everything a page needs before it prints: its stylesheets and images, then the fonts they asked for */
+  async function ready(timeout = 15000) {
+    doc.querySelectorAll('img[loading="lazy"]').forEach(img => { img.loading = 'eager'; });
+    const loaded = doc.readyState === 'complete' ? null : new Promise(r => win.addEventListener('load', r, { once: true }));
+    const all = (async () => {
+      await loaded;
+      void doc.body?.offsetHeight;
+      await doc.fonts?.ready;
+      await Promise.all([...doc.querySelectorAll('img')].map(img => img.decode?.().catch(() => {})));
+    })();
+    let timer;
+    await Promise.race([all, new Promise(r => { timer = win.setTimeout(r, timeout); })]);
+    win.clearTimeout?.(timer);
+  }
+  const frames = () => new Promise(r => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
+
   function listen() {
+    if (mode === 'print') {
+      ready().then(() => { redraw(); return frames(); }).then(() => win.print?.());
+      return;
+    }
     if (mode === 'review') {
       if (win.ResizeObserver) { new win.ResizeObserver(() => redraw()).observe(doc.body); }
       doc.fonts?.ready?.then(redraw);
@@ -198,6 +220,7 @@ export function createDeck({ win, doc, mode, parentOrigin = null }) {
 
   function start(n = 1, build = 0) {
     slides.forEach((_, i) => paintBuilds(i, 0));
+    slides[0]?.classList.add('k-first');
     if (!one) { slides.forEach(s => s.classList.add('k-on')); redraw(); return; }
     const to = clampAt(n, build, counts);
     show(to.n, to.build);
@@ -206,7 +229,7 @@ export function createDeck({ win, doc, mode, parentOrigin = null }) {
     moved();
   }
 
-  return { slides, counts, at, go, nav, start, listen, redraw, onMessage, info, W, H };
+  return { slides, counts, at, go, nav, start, listen, redraw, onMessage, info, ready, W, H };
 }
 
 /* a real origin only: never "*" and never "null" (agent.js validParent) */

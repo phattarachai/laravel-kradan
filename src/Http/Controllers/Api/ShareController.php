@@ -13,7 +13,8 @@ use Phattarachai\Kradan\Models\Share;
 use Phattarachai\Kradan\Support\ShareLinks;
 
 /**
- * The board's ลิงก์สาธารณะ menu: people with `manage` list, make and revoke a deck's public links.
+ * The board's แชร์ panel: people with `share` (by default whoever has `view`) list, make and revoke a deck's
+ * public links.
  */
 final readonly class ShareController
 {
@@ -23,19 +24,19 @@ final readonly class ShareController
 
     public function index(string $slug): JsonResponse
     {
-        return response()->json(['shares' => $this->links->list($this->findBoard($slug, Ability::Manage))]);
+        return response()->json(['shares' => $this->links->list($this->findBoard($slug, Ability::Share))]);
     }
 
     public function store(ShareRequest $request, string $slug): JsonResponse
     {
-        $made = $this->links->create($this->findBoard($slug, Ability::Manage), $request->roundNumber(), $request->days(), $this->userId());
+        $made = $this->links->create($this->findBoard($slug, Ability::Share), $request->roundNumber(), $request->days(), $this->userId());
 
         return response()->json(['share' => $this->links->present($made['share'], $made['token'])], 201);
     }
 
     public function destroy(int $share): JsonResponse
     {
-        abort_unless(Kradan::allows($this->user(), Ability::Manage), 403);
+        abort_unless(Kradan::allows($this->user(), Ability::Share), 403);
 
         return response()->json(['share' => $this->links->present($this->links->revoke(Share::query()->findOrFail($share)))]);
     }

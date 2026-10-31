@@ -28,7 +28,7 @@ it('renders the board shell with the boot payload', function (): void {
 
     expect($boot)->toHaveKeys(['version', 'page', 'brand', 'locale', 'user', 'csrf', 'routes', 'presence', 'board'])
         ->and($boot['page'])->toBe('board')
-        ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true, 'edit' => true]])
+        ->and($boot['user'])->toMatchArray(['name' => 'สมชาย', 'avatar' => null, 'can' => ['manage' => true, 'share' => true, 'edit' => true]])
         ->and($boot['routes'])->toBe(['api' => 'http://localhost/kradan/api', 'index' => 'http://localhost/kradan'])
         ->and($boot['presence']['mode'])->toBe('polling')
         ->and($boot['board'])->toMatchArray(['slug' => 't188-manual-so', 'status' => 'open', 'task_ref' => 'T188', 'url' => 'http://localhost/kradan/t188-manual-so', 'current' => 1, 'seen_prints' => null])

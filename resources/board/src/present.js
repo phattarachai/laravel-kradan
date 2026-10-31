@@ -15,6 +15,7 @@ const BACK = ['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'];
 const ICON = {
   prev: '<path d="M15 6l-6 6 6 6"/>', next: '<path d="M9 6l6 6-6 6"/>',
   full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>', close: '<path d="M6 6l12 12M18 6L6 18"/>',
+  pdf: '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
 };
 const svg = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>`;
 
@@ -38,12 +39,20 @@ export function presentUrl(pageUrl, n = 1, mode = 'present') {
   return u.href;
 }
 
+/* the deck's print view in a tab of its own: every slide one page, and the print dialog opens by itself */
+export function printDeck(pageUrl, win = window) {
+  const u = new URL(pageUrl);
+  u.searchParams.set('k', 'print');
+  return win.open(u.href, '_blank', 'noopener');
+}
+
 /*
  * pageUrl: the deck's index.html (signed). origins: what the frame may post from. load: how a frame loads a URL
  * (the workbench serves frames its own way). sandbox: the frame's sandbox, null for none. closable: Esc and ✕
- * leave. labels: the controls' tooltips. onMove(n) after every slide change; onClose(n) when it closes.
+ * leave. printable: a PDF button that opens the print view. labels: the controls' tooltips. onMove(n) after
+ * every slide change; onClose(n) when it closes.
  */
-export function createPresenter({ win = window, doc = document, pageUrl, origins, load, sandbox = 'allow-scripts', closable = true, labels = {}, onMove, onClose }) {
+export function createPresenter({ win = window, doc = document, pageUrl, origins, load, sandbox = 'allow-scripts', closable = true, printable = false, labels = {}, onMove, onClose }) {
   const bridge = createBridge({ win });
   const state = { open: false, n: 1, build: 0, total: 0, slides: [], el: null, ifr: null, fullByKey: false };
 
@@ -114,7 +123,7 @@ export function createPresenter({ win = window, doc = document, pageUrl, origins
     el.innerHTML = `<div class="k-pblack"></div><div class="k-pbar">
       <button data-p="prev" title="${labels.prev || ''}">${svg('prev')}</button><span class="k-pnum"></span><button data-p="next" title="${labels.next || ''}">${svg('next')}</button>
       <span class="k-ptitle"></span>
-      <button data-p="full" title="${labels.full || ''}">${svg('full')}</button>${closable ? `<button data-p="close" title="${labels.close || ''}">${svg('close')}</button>` : ''}</div>`;
+      ${printable ? `<button data-p="pdf" title="${labels.pdf || ''}">${svg('pdf')}</button>` : ''}<button data-p="full" title="${labels.full || ''}">${svg('full')}</button>${closable ? `<button data-p="close" title="${labels.close || ''}">${svg('close')}</button>` : ''}</div>`;
     const ifr = doc.createElement('iframe');
     if (sandbox !== null) { ifr.setAttribute('sandbox', sandbox); }
     ifr.setAttribute('referrerpolicy', 'no-referrer');
@@ -133,6 +142,7 @@ export function createPresenter({ win = window, doc = document, pageUrl, origins
       if (b.dataset.p === 'prev') { tell('nav', { dir: -1 }); }
       if (b.dataset.p === 'next') { tell('nav', { dir: 1 }); }
       if (b.dataset.p === 'full') { toggleFull(); }
+      if (b.dataset.p === 'pdf') { if (isFull()) { state.fullByKey = true; doc.exitFullscreen?.(); } printDeck(pageUrl, win); }
       if (b.dataset.p === 'close') { close(); }
       el.focus();
     });

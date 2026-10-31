@@ -35,6 +35,15 @@
 html.k-review, html.k-review body { margin: 0; background: #d9dde3; }
 html.k-review [data-dp-step] { margin: 0 0 48px; }
 
+/* print (?k=print, the board's PDF button): one slide per 1920×1080 page, nothing between them, backgrounds kept */
+@page { size: 1920px 1080px; margin: 0; }
+html.k-print { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+html.k-print, html.k-print body { margin: 0; padding: 0; background: #fff; }
+html.k-print body { display: block; width: 1920px; }
+html.k-print [data-dp-step] { margin: 0; break-inside: avoid; }
+html.k-print [data-dp-step]:not(.k-first) { break-before: page; }
+@media screen { html.k-print, html.k-print body { background: #d9dde3; } html.k-print [data-dp-step] { margin-bottom: 48px; } }
+
 /* present, thumb, solo: one slide on a dark stage, scaled to fit */
 html.k-one, html.k-one body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: var(--k-stage); }
 html.k-one [data-dp-step] { position: fixed; left: 50%; top: 50%; margin: -540px 0 0 -960px; transform: scale(var(--k-scale, 1)); }

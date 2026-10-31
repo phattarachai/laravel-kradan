@@ -45,9 +45,17 @@ check `git status` afterwards and restore them.
 
 ## Access
 
-Register who may open Kradan in a service provider. `$ability` is `view`, `manage` or `edit`. `manage` may mark a
-decision board decided and make or revoke a deck's public links. `edit` is reserved for editing a deck's text in
-place (not built yet); give it to the same people as `manage`.
+Register who may open Kradan in a service provider. `$ability` is one of:
+
+| Ability | Lets a person | When the callback returns `null` |
+|---|---|---|
+| `view` | Open boards, pick, comment, draw, present, save a deck as PDF | No |
+| `manage` | Mark a decision board decided | No |
+| `share` | Make, list and revoke a deck's public links (the board's แชร์ button) | As `view` |
+| `edit` | Reserved for editing a deck's text in place (not built yet) | As `manage` |
+
+A callback that answers every ability alike, like the one below, gives all four to the same people. One that
+returns `null` for `share`, or uses a `match` with no `share` arm, lets everyone who can view a board share it.
 
 ```php
 use Phattarachai\Kradan\Kradan;
@@ -103,7 +111,8 @@ viewer's session. Kradan prevents that:
   signature covers the round and the expiry, so relative links inside a page keep working. No session or cookie
   is involved.
 - Every content response carries `Content-Security-Policy: sandbox allow-scripts` and
-  `X-Content-Type-Options: nosniff`, so the page runs in an opaque origin even when opened directly.
+  `X-Content-Type-Options: nosniff`, so the page runs in an opaque origin even when opened directly. A deck's
+  print view (`index.html?k=print`) adds only `allow-modals`, so it can open the print dialog.
 - The board talks to each sandboxed frame only over `postMessage`, through a small agent script the package
   injects. It never reads the frame's DOM.
 - Paths are normalised and anything climbing out of the round folder is refused, both in uploaded zips and in
@@ -197,9 +206,16 @@ leaves that folder out, and the server strips the block and injects its own runt
 **Present** from the board with ▶ or `F`: full screen, ← → Space PageUp PageDown, Home, End, `B` for a black screen,
 Esc to leave. `?present=N` on the board URL opens the show at slide N.
 
-**Share.** On the board, the title menu's ลิงก์สาธารณะ (for `manage`) makes, lists and revokes public links;
-`kradan:share` does the same from a checkout. A link opens the deck in present mode with no login and none of the
-board. It follows the latest round unless it pins one, and expires after 14 days unless told otherwise.
+**PDF.** The board's PDF button (and the one on a public link's control bar) opens the deck's print view in a new tab:
+every slide on its own 1920×1080 page, every build shown, no speaker notes. The browser's print dialog opens by
+itself once the fonts and images have loaded; choose **Save as PDF**. The result is a vector PDF with selectable Thai
+text. Chrome and Edge honour the slide-sized page; in other browsers set the paper size by hand. Nothing runs on the
+server and no dependency is added.
+
+**Share.** The board's แชร์ button (for `share`) makes, lists and revokes public links; `kradan:share` does the same
+from a checkout. A link opens the deck in present mode with no login and none of the board. It follows the latest
+round unless it pins one, and expires after 14 days unless told otherwise. Public links are for decks only: on a
+decision board the button is greyed out.
 
 ## Configuration
 
