@@ -1,6 +1,7 @@
 /*
- * ลิงก์สาธารณะ: a deck's public, present-only links, for people with `manage`. A new link shows its URL once (the
- * server keeps only a hash); the list shows every link with its round, expiry and last use, and revokes one.
+ * ลิงก์สาธารณะ (the แชร์ button): a deck's public, present-only links, for people with `share`. A new link shows
+ * its URL once (the server keeps only a hash); the list shows every link with its round, expiry and last use, and
+ * revokes one.
  */
 import { $, esc, shortDate, modal, copyText, toast } from './util.js';
 

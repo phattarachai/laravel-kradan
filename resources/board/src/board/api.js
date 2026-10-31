@@ -57,7 +57,7 @@ export function KradanStore(boot) {
       xhr.onerror = () => reject(new Error('network'));
       xhr.send(form);
     }),
-    /* a deck's public links (manage only); a new one carries its url, the only time the token is shown */
+    /* a deck's public links (for `share`); a new one carries its url, the only time the token is shown */
     shares: slug => call('GET', `boards/${seg(slug)}/shares`),
     createShare: (slug, body) => call('POST', `boards/${seg(slug)}/shares`, body),
     revokeShare: id => call('DELETE', `shares/${id}`),

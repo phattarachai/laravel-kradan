@@ -272,7 +272,7 @@ final readonly class BoardPresenter
             'brand' => (array) config('kradan.brand'),
             'theme' => $this->theme(),
             'locale' => (string) config('kradan.locale', 'th'),
-            'user' => [...Kradan::present($user), 'can' => ['manage' => Kradan::allows($user, Ability::Manage), 'edit' => Kradan::allows($user, Ability::Edit)]],
+            'user' => [...Kradan::present($user), 'can' => ['manage' => Kradan::allows($user, Ability::Manage), 'share' => Kradan::allows($user, Ability::Share), 'edit' => Kradan::allows($user, Ability::Edit)]],
             'csrf' => csrf_token(),
             'routes' => ['api' => url(trim((string) config('kradan.path'), '/').'/api'), 'index' => route('kradan.index')],
         ];

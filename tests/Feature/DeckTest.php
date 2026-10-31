@@ -89,6 +89,16 @@ it('injects the deck runtime into a deck page, strips the local preview block, a
         ->and($decision)->not->toContain('deck.js')->not->toContain('deck.css');
 });
 
+it('lets only a deck\'s print view open the print dialog', function (): void {
+    $base = deckBase(publishDeck());
+    $page = deckBase(publishRound());
+
+    get($base.'index.html?k=print')->assertOk()->assertHeader('Content-Security-Policy', 'sandbox allow-scripts allow-modals');
+    get($base.'index.html')->assertOk()->assertHeader('Content-Security-Policy', 'sandbox allow-scripts');
+    get($page.'index.html?k=print')->assertOk()->assertHeader('Content-Security-Policy', 'sandbox allow-scripts');
+    get($page.'screen.html?k=print')->assertOk()->assertHeader('Content-Security-Policy', 'sandbox allow-scripts');
+});
+
 it('serves the deck runtime under the signed prefix, sandboxed', function (): void {
     $base = deckBase(publishDeck());
 
@@ -113,7 +123,7 @@ it('tells the board who may edit a deck in place (reserved for the next phase)',
 
     $boot = bootOf(actingAs(kradanUser())->get('/kradan/arch-deck')->assertOk()->getContent());
 
-    expect($boot['user']['can'])->toBe(['manage' => true, 'edit' => false])
+    expect($boot['user']['can'])->toBe(['manage' => true, 'share' => true, 'edit' => false])
         ->and($boot['board']['kind'])->toBe('deck');
 });
 
@@ -135,16 +145,50 @@ describe('public links', function (): void {
         $this->deleteJson("/kradan/api/shares/{$made['id']}")->assertOk()->assertJsonPath('share.active', false);
     });
 
-    it('refuses people without manage, and boards that are not decks', function (): void {
+    it('gives share to whoever has view when the host leaves it unanswered', function (Closure $auth): void {
         publishDeck();
-        publishRound();
-        actingAs(kradanUser());
+        Kradan::auth($auth);
+        $user = kradanUser();
 
-        $this->postJson('/kradan/api/boards/t188-manual-so/shares')->assertUnprocessable();
+        $made = actingAs($user)->postJson('/kradan/api/boards/arch-deck/shares', ['days' => 30])->assertCreated()->json('share');
+        actingAs($user)->getJson('/kradan/api/boards/arch-deck/shares')->assertOk()->assertJsonCount(1, 'shares');
+        actingAs($user)->deleteJson("/kradan/api/shares/{$made['id']}")->assertOk()->assertJsonPath('share.active', false);
+
+        $boot = bootOf(actingAs($user)->get('/kradan/arch-deck')->assertOk()->getContent());
+        expect($boot['user']['can'])->toMatchArray(['manage' => false, 'share' => true]);
+    })->with([
+        'null for share' => [fn ($user, string $ability): ?bool => $ability === 'share' ? null : $ability === 'view'],
+        'a match with no share arm' => [fn ($user, string $ability): bool => match ($ability) {
+            'view' => true, 'manage', 'edit' => false
+        }],
+    ]);
+
+    it('refuses share to people the host says no to, people without view, and guests', function (): void {
+        publishDeck();
+        $made = app(ShareLinks::class)->create(Board::query()->where('slug', 'arch-deck')->firstOrFail());
+        $id = $made['share']->id;
+        $user = kradanUser();
 
         Kradan::auth(fn ($user, string $ability): bool => $ability === 'view');
-        $this->postJson('/kradan/api/boards/arch-deck/shares')->assertForbidden();
-        $this->getJson('/kradan/api/boards/arch-deck/shares')->assertForbidden();
+        actingAs($user)->postJson('/kradan/api/boards/arch-deck/shares')->assertForbidden();
+        actingAs($user)->getJson('/kradan/api/boards/arch-deck/shares')->assertForbidden();
+        actingAs($user)->deleteJson("/kradan/api/shares/{$id}")->assertForbidden();
+
+        Kradan::auth(fn ($user, string $ability): ?bool => $ability === 'share' ? null : false);
+        actingAs($user)->postJson('/kradan/api/boards/arch-deck/shares')->assertForbidden();
+        actingAs($user)->deleteJson("/kradan/api/shares/{$id}")->assertForbidden();
+
+        auth()->logout();
+        expect($this->postJson('/kradan/api/boards/arch-deck/shares')->status())->toBeIn([401, 403])
+            ->and($this->deleteJson("/kradan/api/shares/{$id}")->status())->toBeIn([401, 403])
+            ->and(Share::query()->count())->toBe(1)
+            ->and(Share::query()->firstOrFail()->revoked_at)->toBeNull();
+    });
+
+    it('makes links to decks only', function (): void {
+        publishRound();
+
+        actingAs(kradanUser())->postJson('/kradan/api/boards/t188-manual-so/shares')->assertUnprocessable();
     });
 
     it('opens the deck in present mode without a login, a session or the board', function (): void {

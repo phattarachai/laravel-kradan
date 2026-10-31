@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { parseHTML } from 'linkedom';
 import { fitScale, buildSteps, shownAt, step, clampAt, linkSpec, edgePoint, connector, morphName, modeOf } from '../src/deck/core.js';
 import { createDeck } from '../src/deck/runtime.js';
-import { keyAction, presentUrl } from '../src/present.js';
+import { keyAction, presentUrl, printDeck, createPresenter } from '../src/present.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const APP = 'https://app.example.com';
@@ -75,6 +75,8 @@ test('a morph name is safe for view-transition-name, and the mode follows the fr
   assert.equal(modeOf('?k=present&n=3', true), 'present');
   assert.equal(modeOf('?k=thumb', true), 'thumb');
   assert.equal(modeOf('?k=evil', true), 'review');
+  assert.equal(modeOf('?k=print', false), 'print', 'the print view is a tab of its own');
+  assert.equal(modeOf('?k=print', true), 'print');
 });
 
 /* ---------- the runtime on a page ---------- */
@@ -120,6 +122,57 @@ test('review stacks every slide with every build shown, and draws the links', ()
   const label = document.querySelector('[data-k-link="a b"]');
   assert.equal(label.style.left, '300px');
   assert.ok(document.querySelector('[data-k-link="a z"]').hasAttribute('data-k-off'));
+});
+
+test('print lays out every slide with every build, then prints once the page and its fonts are ready', async () => {
+  const { deck, document, win, listeners } = page('print');
+  const printed = [];
+  Object.assign(win, { print: () => printed.push(1), setTimeout, clearTimeout, requestAnimationFrame: fn => setTimeout(fn, 0) });
+  document.fonts = { ready: Promise.resolve() };
+  deck.listen();
+  deck.start();
+  const root = document.documentElement;
+  assert.ok(root.classList.contains('k-print') && !root.classList.contains('k-one'));
+  assert.equal(document.querySelectorAll('[data-dp-step].k-on').length, 2);
+  assert.ok(document.querySelector('[data-dp-step]').classList.contains('k-first'), 'the first slide takes no page break before it');
+  assert.ok(document.querySelector('[data-k-node="b"]').hasAttribute('data-k-shown'));
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(printed.length, document.readyState === 'complete' ? 1 : 0, 'nothing prints before the page has loaded');
+  (listeners.load || []).forEach(fn => fn());
+  await new Promise(r => setTimeout(r, 20));
+  assert.equal(printed.length, 1);
+  assert.equal(document.querySelectorAll('.k-paths path').length, 1, 'links are drawn before printing');
+});
+
+test('print CSS: one 1920×1080 page per slide, no margins, backgrounds kept, builds hidden only one slide at a time', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'resources/board/src/deck.css'), 'utf8');
+  assert.match(css, /@page \{ size: 1920px 1080px; margin: 0; \}/);
+  assert.match(css, /html\.k-print \{ print-color-adjust: exact;/);
+  assert.match(css, /html\.k-print \[data-dp-step\]:not\(\.k-first\) \{ break-before: page; \}/);
+  for (const m of css.matchAll(/([^{}]+)\{[^{}]*visibility: hidden[^{}]*\}/g)) {
+    assert.match(m[1], /html\.k-one|data-k-off/, `${m[1].trim()} hides something in print`);
+  }
+});
+
+test('PDF opens the print view in a tab of its own, from the board and the share page', () => {
+  const opened = [];
+  const win = { open: (...a) => opened.push(a) };
+  printDeck('https://c.example/kradan/f/1/2/ab/index.html', win);
+  assert.deepEqual(opened, [['https://c.example/kradan/f/1/2/ab/index.html?k=print', '_blank', 'noopener']]);
+
+  const { window, document } = parseHTML('<html><body></body></html>');
+  const at = { open: (...a) => opened.push(a), addEventListener() {}, removeEventListener() {} };
+  const deckWin = { postMessage() {} };
+  Object.defineProperty(window.HTMLIFrameElement.prototype, 'contentWindow', { get: () => deckWin, configurable: true });
+  for (const printable of [false, true]) {
+    const p = createPresenter({ win: at, doc: document, pageUrl: 'https://c.example/x/index.html', origins: ['https://c.example'], printable, labels: { pdf: 'PDF' } });
+    p.open(1, { full: false });
+    const b = document.querySelector('[data-p="pdf"]');
+    assert.equal(!!b, printable);
+    b?.dispatchEvent(new window.Event('click', { bubbles: true }));
+    p.close();
+  }
+  assert.deepEqual(opened.at(-1), ['https://c.example/x/index.html?k=print', '_blank', 'noopener']);
 });
 
 test('present shows one slide, holds a link back until its end is built, and reports to the parent', () => {

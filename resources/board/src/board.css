@@ -505,6 +505,12 @@ svg.k-item .hd { fill: #fff; stroke: #1c7ed6; stroke-width: 1.5; pointer-events:
 .k-presentb { display: inline-flex; align-items: center; gap: 6px; background: var(--k-accent); border-color: var(--k-accent); color: #fff; font-weight: 600; }
 .k-presentb:hover { background: var(--k-accent); filter: brightness(1.08); }
 .k-presentb svg { width: 14px; height: 14px; fill: currentColor; }
+.k-pdfb, .k-shareb { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; background: transparent; color: inherit; }
+.kradan .k-bar .k-pdfb, .kradan .k-bar .k-shareb { border-color: var(--chrome-line); color: var(--chrome-ink); }
+.kradan .k-bar .k-pdfb:hover, .kradan .k-bar .k-shareb:not([aria-disabled="true"]):hover { background: var(--chrome-hover); }
+.k-pdfb svg, .k-shareb svg { width: 14px; height: 14px; }
+.k-shareb[aria-disabled="true"] { opacity: .45; cursor: default; }
+.k-pdfb[hidden], .k-shareb[hidden] { display: none; }
 .k-strip { display: grid; gap: 4px; }
 .k-side a.k-thumb { display: grid; grid-template-columns: 22px 1fr; grid-template-rows: auto auto; gap: 4px 6px; align-items: start; padding: 6px 8px 8px 4px; }
 .k-thumb .n { grid-row: 1 / 3; font-size: 12px; color: var(--faint); text-align: right; padding-top: 2px; }

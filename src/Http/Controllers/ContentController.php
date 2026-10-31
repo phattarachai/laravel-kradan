@@ -22,6 +22,10 @@ use Phattarachai\Kradan\Support\StepParser;
  */
 final readonly class ContentController
 {
+    private const string SANDBOX = 'sandbox allow-scripts';
+
+    private const string PRINT_SANDBOX = 'sandbox allow-scripts allow-modals';
+
     private const array TYPES = [
         'html' => 'text/html; charset=utf-8',
         'htm' => 'text/html; charset=utf-8',
@@ -72,11 +76,25 @@ final readonly class ContentController
         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
         $contents = (string) RoundPublisher::disk()->get($file);
 
+        if (! in_array($extension, ['html', 'htm'], strict: true)) {
+            return $this->respond($contents, 200, $extension);
+        }
+
         return $this->respond(
-            in_array($extension, ['html', 'htm'], strict: true) ? $this->prepareHtml($contents, $request, $round, $expires, $signature) : $contents,
+            $this->prepareHtml($contents, $request, $round, $expires, $signature),
             200,
             $extension,
+            self::printing($request, $contents) ? self::PRINT_SANDBOX : self::SANDBOX,
         );
+    }
+
+    /**
+     * A deck's print view (`?k=print`, the board's PDF button) opens the print dialog itself, which a sandbox
+     * allows only with allow-modals. Every other page keeps the bare sandbox.
+     */
+    private static function printing(Request $request, string $html): bool
+    {
+        return $request->query('k') === 'print' && self::isDeck($html);
     }
 
     private function file(int $roundId, ?string $path): ?string
@@ -142,11 +160,11 @@ final readonly class ContentController
             : $this->respond('Not found', 404, 'txt');
     }
 
-    private function respond(string $body, int $status, string $extension): Response
+    private function respond(string $body, int $status, string $extension, string $sandbox = self::SANDBOX): Response
     {
         return response($body, $status, [
             'Content-Type' => self::TYPES[$extension] ?? 'application/octet-stream',
-            'Content-Security-Policy' => 'sandbox allow-scripts',
+            'Content-Security-Policy' => $sandbox,
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'no-referrer',
             'Cache-Control' => $status === 200 ? 'private, max-age=300' : 'no-store',

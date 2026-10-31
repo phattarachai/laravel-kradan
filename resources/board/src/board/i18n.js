@@ -39,6 +39,8 @@ const th = {
   share_create: 'สร้างลิงก์', share_once: 'คัดลอกลิงก์ไว้ตอนนี้ ลิงก์นี้แสดงครั้งเดียว', copy_link: 'คัดลอกลิงก์', share_none: 'ยังไม่มีลิงก์',
   share_until: 'ใช้ได้ถึง {date}', share_expired: 'หมดอายุแล้ว', share_revoked: 'ยกเลิกแล้ว', share_revoke: 'ยกเลิก',
   share_used: 'เปิดล่าสุด {date}', share_unused: 'ยังไม่มีคนเปิด', decks: 'สไลด์',
+  share: 'แชร์', share_tip: 'สร้างลิงก์สาธารณะให้คนนอกดูสไลด์นี้ได้โดยไม่ต้องล็อกอิน', share_deck_only: 'ลิงก์สาธารณะใช้ได้กับสไลด์เท่านั้น',
+  pdf_tip: 'บันทึกเป็น PDF: เปิดหน้าพิมพ์ แล้วเลือก Save as PDF',
   /* index */
   search: 'ค้นหาชื่อ เลขงาน หรือหัวข้อ', open: 'เปิดอยู่', history: 'ประวัติ', board: 'กระดาน', last_push: 'ส่งล่าสุด',
   answered: 'ตอบแล้ว', viewers: 'คนดู', no_boards: 'ยังไม่มีกระดาน', no_match: 'ไม่พบกระดานที่ตรงกับ “{q}”',
@@ -84,6 +86,8 @@ const en = {
   share_create: 'Create link', share_once: 'Copy the link now: it is shown only once', copy_link: 'Copy link', share_none: 'No links yet',
   share_until: 'works until {date}', share_expired: 'expired', share_revoked: 'revoked', share_revoke: 'Revoke',
   share_used: 'last opened {date}', share_unused: 'not opened yet', decks: 'Decks',
+  share: 'Share', share_tip: 'Make a public link anyone can watch this deck from, without signing in', share_deck_only: 'Public links are for decks only',
+  pdf_tip: 'Save as PDF: opens the print view, then choose Save as PDF',
   search: 'Search title, task or step', open: 'Open', history: 'History', board: 'Board', last_push: 'Last push',
   answered: 'Answered', viewers: 'Viewers', no_boards: 'No boards yet', no_match: 'No board matches “{q}”',
   people_n: '{n} people', nobody: 'No answers yet',

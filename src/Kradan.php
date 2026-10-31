@@ -9,6 +9,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Support\Facades\Auth;
 use Phattarachai\Kradan\Enums\Ability;
+use UnhandledMatchError;
 
 /**
  * The host registers who may open Kradan, and how a user is shown:
@@ -20,7 +21,7 @@ final class Kradan
 {
     public const string VERSION = '0.2.1';
 
-    /** @var (Closure(Authenticatable, string): bool)|null */
+    /** @var (Closure(Authenticatable, string): ?bool)|null */
     private static ?Closure $authUsing = null;
 
     /** @var (Closure(Authenticatable): array{id: mixed, name: string, avatar?: ?string})|null */
@@ -30,7 +31,8 @@ final class Kradan
     private static array $users = [];
 
     /**
-     * @param  Closure(Authenticatable, string): bool  $callback  receives the user and `view` or `manage`
+     * @param  Closure(Authenticatable, string): ?bool  $callback  receives the user and `view`, `manage`, `share` or
+     *                                                             `edit`; null for `share` means as `view`
      */
     public static function auth(Closure $callback): void
     {
@@ -53,7 +55,16 @@ final class Kradan
         }
 
         if (self::$authUsing instanceof Closure) {
-            return (bool) call_user_func(self::$authUsing, $user, $ability->value);
+            try {
+                $answer = call_user_func(self::$authUsing, $user, $ability->value);
+            } catch (UnhandledMatchError $unhandled) {
+                throw_unless($ability->fallback() instanceof Ability, $unhandled);
+                $answer = null;
+            }
+
+            $fallback = $ability->fallback();
+
+            return $answer === null && $fallback instanceof Ability ? self::allows($user, $fallback) : (bool) $answer;
         }
 
         return app()->environment('local');

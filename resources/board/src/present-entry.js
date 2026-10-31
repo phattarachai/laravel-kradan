@@ -6,8 +6,8 @@ import { createPresenter } from './present.js';
 import { allowedOrigins } from './bridge.js';
 
 const LABELS = {
-  th: { prev: 'ก่อนหน้า (←)', next: 'ถัดไป (→)', full: 'เต็มจอ (F)', close: 'ปิด' },
-  en: { prev: 'Previous (←)', next: 'Next (→)', full: 'Fullscreen (F)', close: 'Close' },
+  th: { prev: 'ก่อนหน้า (←)', next: 'ถัดไป (→)', full: 'เต็มจอ (F)', close: 'ปิด', pdf: 'บันทึกเป็น PDF' },
+  en: { prev: 'Previous (←)', next: 'Next (→)', full: 'Fullscreen (F)', close: 'Close', pdf: 'Save as PDF' },
 };
 
 const boot = JSON.parse(document.getElementById('kradan-share')?.textContent || '{}');
@@ -16,6 +16,7 @@ if (boot.page_url) {
     pageUrl: boot.page_url,
     origins: allowedOrigins(boot.page_url, location.origin),
     closable: false,
+    printable: true,
     labels: { ...(LABELS[document.documentElement.lang] || LABELS.th), title: boot.title || '' },
     onMove: n => history.replaceState(null, '', `?present=${n}`),
   });
