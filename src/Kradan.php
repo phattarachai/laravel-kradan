@@ -18,7 +18,7 @@ use Phattarachai\Kradan\Enums\Ability;
  */
 final class Kradan
 {
-    public const string VERSION = '0.2.0';
+    public const string VERSION = '0.2.1';
 
     /** @var (Closure(Authenticatable, string): bool)|null */
     private static ?Closure $authUsing = null;
