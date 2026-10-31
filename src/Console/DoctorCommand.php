@@ -101,15 +101,24 @@ final class DoctorCommand extends Command
         return $missing === [] ? null : 'Run `php artisan migrate`; missing: '.implode(', ', $missing).'.';
     }
 
+    /**
+     * A probe file at the disk's root, never inside `kradan/`: a local disk makes directories private (0700), so
+     * a `kradan/` the doctor made as a login user would shut out the web server's user that writes rounds.
+     */
     private function disk(): ?string
     {
         $disk = RoundPublisher::disk();
-        $probe = 'kradan/.doctor';
-        $disk->put($probe, 'ok');
-        $ok = $disk->get($probe) === 'ok';
-        $disk->delete($probe);
+        $probe = '.kradan-doctor-'.bin2hex(random_bytes(4));
 
-        return $ok ? null : 'Could not write and read back a file.';
+        try {
+            $ok = $disk->put($probe, 'ok') && $disk->get($probe) === 'ok';
+        } catch (Throwable) {
+            $ok = false;
+        } finally {
+            $disk->delete($probe);
+        }
+
+        return $ok ? null : 'Could not write and read back a file. Rounds are written by the web server\'s user: check that it owns the disk\'s folder.';
     }
 
     private function assets(): ?string
