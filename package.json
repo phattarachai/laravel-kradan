@@ -1,6 +1,6 @@
 {
   "name": "laravel-kradan-board",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Browser side of phattarachai/laravel-kradan: the board, the index page and the frame agent. Built into dist/ and committed.",
