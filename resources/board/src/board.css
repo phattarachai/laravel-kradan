@@ -124,36 +124,39 @@ img.k-logo { background: none; }
 .k-canvas.tool-hand iframe, .k-canvas.spacepan iframe, .k-canvas.tool-pin iframe, .k-canvas.tool-box iframe, .k-canvas.tool-edit iframe, .k-canvas.dragging iframe { pointer-events: none; }
 .k-canvas.editing iframe { pointer-events: auto !important; }
 .k-canvas.editing .pinlayer { pointer-events: none !important; }
-.k-board { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; display: flex; flex-direction: column; gap: calc(28px / var(--z, 1)); }
+.k-board { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; display: flex; flex-direction: column; gap: calc(28px / var(--lz, 1)); }
 .grps { display: flex; gap: 80px; align-items: flex-start; }
-.k-board.col .grps { flex-direction: column; gap: calc(48px / var(--z, 1)); }
-/* the question on the canvas, at one size on screen; width:0 + min-width:100% wraps it at the screens' width
-   without widening the board */
+.k-board.col .grps { flex-direction: column; gap: calc(48px / var(--lz, 1)); }
+/* the question, the option heads and the captions read at one size on screen when zoomed out, and grow with the
+   screens when zoomed in, up to 2× (owner, 2026-11-01). --lz is the zoom they divide by: --z below 1, --z/2 past 2.
+   Pins and handles stay on --z, one size on screen. width:0 + min-width:100% wraps the question at the screens'
+   width without widening the board */
+.k-canvas { --lz: calc(var(--z, 1) / clamp(1, var(--z, 1), 2)); }
 .qhead { width: 0; min-width: 100%; user-select: none; }
-.qhead .qin { max-width: calc(820px / var(--z, 1)); }
-.qhead .kick { font-size: calc(12px / var(--z, 1)); font-weight: 600; color: var(--mute); margin-bottom: calc(2px / var(--z, 1)); }
-.qhead h1 { margin: 0; font-size: calc(22px / var(--z, 1)); line-height: 1.35; font-weight: 600; }
-.qhead .qsub { margin: calc(6px / var(--z, 1)) 0 0; font-size: calc(15px / var(--z, 1)); line-height: 1.55; color: var(--mute); }
-.qhead .upd { margin-top: calc(6px / var(--z, 1)); font-size: calc(13px / var(--z, 1)); color: var(--upd); font-weight: 500; }
-.qhead .qopt { margin-top: calc(10px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); line-height: 1.5; }
+.qhead .qin { max-width: calc(820px / var(--lz, 1)); }
+.qhead .kick { font-size: calc(12px / var(--lz, 1)); font-weight: 600; color: var(--mute); margin-bottom: calc(2px / var(--lz, 1)); }
+.qhead h1 { margin: 0; font-size: calc(22px / var(--lz, 1)); line-height: 1.35; font-weight: 600; }
+.qhead .qsub { margin: calc(6px / var(--lz, 1)) 0 0; font-size: calc(15px / var(--lz, 1)); line-height: 1.55; color: var(--mute); }
+.qhead .upd { margin-top: calc(6px / var(--lz, 1)); font-size: calc(13px / var(--lz, 1)); color: var(--upd); font-weight: 500; }
+.qhead .qopt { margin-top: calc(10px / var(--lz, 1)); font-size: calc(14px / var(--lz, 1)); line-height: 1.5; }
 .qhead .qopt b { font-weight: 600; }
 .qhead .qopt span { color: var(--mute); }
 .qhead .qopt .k-optsw { display: inline-flex; gap: .3em; margin-right: .6em; vertical-align: middle; }
 .qhead .qopt .k-optsw .key { min-width: 1.8em; height: 1.6em; padding: 0 .35em; border-radius: .4em; background: #fff; border: 1px solid var(--line); color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .qhead .qopt .k-optsw .key.on { background: var(--k-accent); border-color: var(--k-accent); color: #fff; }
-.grp-t { width: 0; min-width: 100%; font-size: calc(13px / var(--z, 1)); line-height: 1.5; color: var(--mute); }
-.grp { display: flex; flex-direction: column; gap: calc(8px / var(--z, 1)); }
-.grp-h { display: flex; align-items: center; gap: calc(8px / var(--z, 1)); font-size: calc(14px / var(--z, 1)); min-height: calc(28px / var(--z, 1)); white-space: nowrap; overflow: hidden; }
+.grp-t { width: 0; min-width: 100%; font-size: calc(14px / var(--lz, 1)); line-height: 1.55; color: var(--mute); }
+.grp { display: flex; flex-direction: column; gap: calc(8px / var(--lz, 1)); }
+.grp-h { display: flex; align-items: center; gap: calc(8px / var(--lz, 1)); font-size: calc(16px / var(--lz, 1)); min-height: calc(30px / var(--lz, 1)); white-space: nowrap; overflow: hidden; }
 .grp-h .key { display: inline-grid; place-items: center; min-width: 1.6em; height: 1.6em; border-radius: .4em; background: #fff; border: 1px solid var(--line); font-weight: 600; padding: 0 .35em; }
 .grp.picked .grp-h .key { background: var(--k-accent); border-color: var(--k-accent); color: #fff; }
-.grp-h .lbl { overflow: hidden; text-overflow: ellipsis; }
-.grp-h .k-headwho { color: var(--mute); font-size: calc(12px / var(--z, 1)); margin-left: auto; }
-.grp-h .pick { border: 1px solid var(--line); background: #fff; border-radius: .55em; padding: .1em .7em; font-size: calc(13px / var(--z, 1)); color: var(--mute); flex: none; }
+.grp-h .lbl { overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.grp-h .k-headwho { color: var(--mute); font-size: calc(12px / var(--lz, 1)); margin-left: auto; }
+.grp-h .pick { border: 1px solid var(--line); background: #fff; border-radius: .55em; padding: .1em .7em; font-size: calc(13px / var(--lz, 1)); color: var(--mute); flex: none; }
 .grp-h .k-headwho:empty + .pick, .grp-h .lbl + .pick { margin-left: auto; }
 .grp.picked .grp-h .pick { color: var(--k-accent); border-color: var(--k-accent); }
 .shots { display: flex; gap: 40px; align-items: flex-start; }
-figure.k-fr { margin: 0; display: flex; flex-direction: column; gap: calc(6px / var(--z, 1)); }
-figure.k-fr figcaption { display: flex; gap: calc(8px / var(--z, 1)); font-size: calc(12px / var(--z, 1)); color: var(--mute); white-space: nowrap; overflow: hidden; }
+figure.k-fr { margin: 0; display: flex; flex-direction: column; gap: calc(6px / var(--lz, 1)); }
+figure.k-fr figcaption { display: flex; gap: calc(8px / var(--lz, 1)); font-size: calc(12px / var(--lz, 1)); color: var(--mute); white-space: nowrap; overflow: hidden; }
 figure.k-fr figcaption .cap { color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
 figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none; }
 .vp { position: relative; overflow: hidden; background: #fff; border: 1px solid #d6d9de; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05); }
@@ -215,6 +218,22 @@ figure.k-fr figcaption .dim { margin-left: auto; color: var(--faint); flex: none
 .k-opt:has(input:checked) .k-optmark { background: var(--k-accent); border-color: var(--k-accent); }
 .k-opt:has(input:checked) .k-optmark svg { opacity: 1; }
 
+
+/* a question in words only, as a survey card in the middle of the canvas (owner, 2026-11-01); --fz is the zoom */
+.k-form { position: absolute; inset: 0; overflow: auto; cursor: auto; padding: 40px 24px; display: flex; }
+.k-form-in { zoom: var(--fz, 1); box-sizing: border-box; width: 720px; max-width: calc(100% / var(--fz, 1)); margin: auto; padding: 36px 40px 40px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05), 0 12px 32px rgba(0,0,0,.05); }
+.k-form .k-kicker { font-size: 13px; font-weight: 600; color: var(--mute); margin-bottom: 4px; }
+.k-form h1 { margin: 0; font-size: 26px; line-height: 1.4; font-weight: 600; }
+.k-form .upd { margin-top: 6px; font-size: 14px; color: var(--upd); font-weight: 500; }
+.k-form .qsub { margin: 8px 0 0; font-size: 17px; line-height: 1.6; color: var(--mute); }
+.k-form .k-ol { margin-top: 28px; gap: 12px; }
+.k-form .k-opt { grid-template-columns: 44px minmax(0, 1fr) 28px; gap: 16px; padding: 18px 20px; }
+.k-form .k-optkey { width: 44px; height: 44px; border-radius: 12px; font-size: 19px; }
+.k-form .k-optmark { width: 28px; height: 28px; margin-top: 8px; }
+.k-form .k-optbody { gap: 6px; padding-top: 2px; }
+.k-form .k-opt .lb { font-size: 18px; }
+.k-form .k-opt .tx { font-size: 16px; line-height: 1.6; white-space: pre-line; }
+.k-form .k-opt .tr { font-size: 15px; line-height: 1.6; }
 
 .k-who { font-size: 12px; color: var(--mute); }
 .k-who b { font-weight: 500; color: var(--ink); }
