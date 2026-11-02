@@ -50,6 +50,40 @@ export function textTarget(el) {
 
 const firstLine = (s, n = 40) => String(s || '').trim().split('\n')[0].trim().slice(0, n);
 
+/* an option is words only when its body is a few elements of text with no picture, control or colour: an empty
+   element is a slot a script fills, so it counts as a picture, and a box may only be a pale, colourless sheet around
+   a sentence (a chip or a coloured badge is a design). A question whose options are all words reads as a survey on
+   the canvas instead of screens (owner, 2026-11-01). data-dp-form on the step forces it, ="off" stops it */
+const VISUAL = 'img, svg, canvas, video, iframe, picture, object, input, select, textarea, button, table, hr';
+const MAX_TEXT_ELEMENTS = 8;
+const SHEET_TEXT = 20;
+const channels = c => (String(c).match(/^rgba?\(([^)]*)\)$/)?.[1] || '').split(/[\s,/]+/).filter(Boolean).map(Number);
+const clear = c => { const [, , , a = 1] = channels(c); return c === 'transparent' || a === 0; };
+const grey = (c, floor) => { const [r, g, b] = channels(c); return r !== undefined && Math.max(r, g, b) - Math.min(r, g, b) <= 16 && Math.min(r, g, b) >= floor; };
+function looksDrawn(el) {
+  const text = el.textContent.trim();
+  if (!text && el.tagName !== 'BR') { return true; }
+  const cs = el.ownerDocument.defaultView?.getComputedStyle?.(el);
+  if (!cs) { return /background|border|shadow/i.test(el.getAttribute('style') || ''); }
+  const sides = ['Top', 'Right', 'Bottom', 'Left'].filter(side => parseFloat(cs[`border${side}Width`]) > 0 && cs[`border${side}Style`] !== 'none');
+  const filled = !clear(cs.backgroundColor) || (cs.backgroundImage || 'none') !== 'none';
+  if (!filled && !sides.length && (cs.boxShadow || 'none') === 'none') { return false; }
+  const sheet = text.length >= SHEET_TEXT && (cs.backgroundImage || 'none') === 'none'
+    && (clear(cs.backgroundColor) || grey(cs.backgroundColor, 230)) && sides.every(side => grey(cs[`border${side}Color`], 0));
+  return !sheet;
+}
+export function wordsOnly(opt) {
+  const els = [...opt.querySelectorAll('*')];
+  return els.length <= MAX_TEXT_ELEMENTS && !opt.querySelector(`${VISUAL}, [data-dp-frames]`) && !els.some(looksDrawn);
+}
+/* the words of an option, a line per block so a sheet of three lines stays three lines */
+function plainText(el) {
+  const blocks = [...el.querySelectorAll('div, p, li')].filter(b => !b.querySelector('div, p, li'));
+  const flat = b => b.textContent.replace(/\s+/g, ' ').trim();
+  const lines = blocks.map(flat).filter(Boolean);
+  return lines.join('').replace(/\s/g, '').length === flat(el).replace(/\s/g, '').length ? lines.join('\n') : flat(el);
+}
+
 /* the steps of a review page, read from the same markup as the harness and the workbench */
 export function readSteps(doc) {
   const taken = new Set();
@@ -66,11 +100,13 @@ export function readSteps(doc) {
       cap: b.previousElementSibling?.classList.contains('lbl') ? b.previousElementSibling.textContent.trim() : '',
     }));
     const opts = [...s.querySelectorAll('[data-dp-option]')];
+    const asked = s.dataset.dpForm;
+    const form = opts.length > 0 && (asked === undefined ? opts.every(wordsOnly) : asked !== 'off');
     return {
       index, key, group, title, sub: (s.dataset.sub || '').trim(),
-      kind: opts.length ? 'question' : 'screen',
+      kind: opts.length ? 'question' : 'screen', form,
       frames: opts.length ? [] : frames(s),
-      options: opts.map(o => ({ key: (o.dataset.key || '').trim(), title: (o.dataset.label || '').trim(), trade: (o.dataset.trade || '').trim(), frames: frames(o) })),
+      options: opts.map(o => ({ key: (o.dataset.key || '').trim(), title: (o.dataset.label || '').trim(), trade: (o.dataset.trade || '').trim(), frames: frames(o), ...(form ? { text: plainText(o) } : {}) })),
     };
   });
 }

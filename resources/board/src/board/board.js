@@ -124,9 +124,9 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
         : [{ crop: true, si, key }];
       return {
         key: s.key, group: s.group || '', title: s.title || '', sub: s.sub || d.sub || '',
-        pickable: opts.length > 0, index: d.index ?? si,
+        pickable: opts.length > 0, index: d.index ?? si, form: opts.length > 0 && !!d.form,
         options: opts.length
-          ? opts.map(o => ({ key: o.key, label: o.title || o.label || '', trade: o.trade || '', shots: shots(o.frames, o.key) }))
+          ? opts.map(o => ({ key: o.key, label: o.title || o.label || '', trade: o.trade || '', text: o.text || '', shots: shots(o.frames, o.key) }))
           : [{ key: '', label: '', trade: '', shots: shots(d.frames, '') }],
       };
     });
@@ -396,8 +396,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     renderBar();
     $('#sync').setAttribute('aria-pressed', ui.sync);
     $('#minib').setAttribute('aria-pressed', ui.mini);
-    $('#arr').style.display = ui.mode === 'real' || DECK ? 'none' : '';
-    $('#sync').style.display = $('#viewb').style.display = DECK ? 'none' : '';
+    $('#arr').style.display = ui.mode === 'real' || DECK || st.form ? 'none' : '';
+    $('#sync').style.display = $('#viewb').style.display = DECK || st.form ? 'none' : '';
     $('#presentb').hidden = !DECK;
     /* แชร์ holds a deck's public links and its PDF; a decision board has neither, so the button stays greyed out
        there (for people who could share) to say why */
@@ -687,6 +687,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     const st = step();
     const cv = $('#canvas');
     bridge.clear();
+    cv.classList.toggle('formmode', !!st.form);
+    if (st.form) { renderForm(st); return; }
     const groups = plan();
     cv.innerHTML = `<div class="k-board" id="board">${questionHtml(st)}<div class="grps" id="grps">${groups.map((g, gi) => groupHtml(st, g, gi)).join('')}</div></div>
       <div class="k-hint">${t('hint')}</div>
@@ -713,6 +715,31 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     items.render();
     paintColor();
     paintUndo();
+  }
+  /* a question asked in words only reads like a survey: one card in the middle of the canvas, the options as the
+     panel's vote cards with what each one means, nothing to pan or draw on. Zoom scales the card (owner, 2026-11-01) */
+  function renderForm(st) {
+    const cv = $('#canvas');
+    frames = [];
+    cv.innerHTML = `<div class="k-form" id="form"><div class="k-form-in">
+      ${st.group && st.group !== st.title ? `<div class="k-kicker">${esc(st.group)}</div>` : ''}<h1>${esc(st.title)}</h1>
+      ${looked.upd.has(ui.step) ? `<div class="upd">${isNew(st) ? t('new_since') : t('updated_since')}</div>` : ''}
+      ${st.sub ? `<p class="qsub">${esc(st.sub)}</p>` : ''}
+      <div class="k-ol">${formOptions(st)}</div></div></div>`;
+    fitForm();
+  }
+  /* the card opens as large as the canvas comfortably holds, whatever the screens' zoom was */
+  const FORM_Z = { min: 0.75, max: 2, fitMax: 1.35, width: 820 };
+  function fitForm() {
+    view.z = clamp(($('#canvas').clientWidth - 96) / FORM_Z.width, 1, FORM_Z.fitMax);
+    applyView();
+  }
+  function formOptions(st) {
+    const keys = myKeys(st.key);
+    return st.options.map(o => `<label class="k-opt"><input type="checkbox" name="pick" value="${esc(o.key)}" ${keys.includes(o.key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}>
+      <span class="k-optkey">${esc(o.key)}</span>
+      <span class="k-optbody"><span class="lb">${esc(o.label)}</span>${o.text ? `<span class="tx">${esc(o.text)}</span>` : ''}${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${pickers(st.key, o.key)}</span>
+      <span class="k-optmark">${CHECK}</span></label>`).join('');
   }
   /* มือจับ กดในจอ | ปักโน้ต แก้คำ | โน้ต ข้อความ ปากกา ลูกศร สี่เหลี่ยม วงรี | สี */
   function toolbar() {
@@ -756,8 +783,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     });
   }
 
-  /* the question sits on the canvas above its screens, at one size on screen, so the eye reads top to bottom instead
-     of across to the panel (owner, 2026-10-28). At 1:1 it also names the option on show and its trade-off, with a key
+  /* the question sits on the canvas above its screens, so the eye reads top to bottom instead of across to the panel
+     (owner, 2026-10-28); it grows with a zoom-in like the screens (board.css --lz). At 1:1 it also names the option on show and its trade-off, with a key
      per option to switch */
   function questionHtml(st) {
     const n = ui.step, o = st.pickable && ui.mode === 'real' ? currentOpt(st) : null;
@@ -792,6 +819,8 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       const w = $('.k-headwho', g);
       if (w) { w.innerHTML = pickers(st.key, g.dataset.key, ''); }
     });
+    const ol = $('#form .k-ol');
+    if (ol) { ol.innerHTML = formOptions(st); }
     renderSide();
     panelSoon();
   }
@@ -817,6 +846,14 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
   let repaintTimer;
   function applyView() {
+    const form = $('#form');
+    if (form) {
+      view.z = clamp(view.z, FORM_Z.min, FORM_Z.max);
+      form.style.setProperty('--fz', view.z);
+      $('#zpct').textContent = Math.round(view.z * 100) + '%';
+      $('#fitb').setAttribute('aria-pressed', ui.zoom === 'fit');
+      return;
+    }
     const board = $('#board');
     if (!board) { return; }
     board.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.z})`;
@@ -840,6 +877,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     });
   }
   function fit() {
+    if ($('#form')) { fitForm(); return; }
     const cv = $('#canvas'), board = $('#board');
     if (!board) { return; }
     const pad = 32, cw = cv.clientWidth - pad * 2, ch = cv.clientHeight - pad * 2 - 60;
@@ -864,7 +902,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
   function zoomAt(cx, cy, factor) {
     const r = $('#canvas').getBoundingClientRect();
-    const px = cx - r.left, py = cy - r.top, z2 = clamp(view.z * factor, 0.05, 4);
+    const px = cx - r.left, py = cy - r.top, z2 = $('#form') ? clamp(view.z * factor, FORM_Z.min, FORM_Z.max) : clamp(view.z * factor, 0.05, 4);
     view.x = px - (px - view.x) * z2 / view.z;
     view.y = py - (py - view.y) * z2 / view.z;
     view.z = z2;
@@ -1464,7 +1502,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   document.addEventListener('contextmenu', e => {
     const row = !e.shiftKey && e.target.closest('#side [data-board]');
     if (row) { e.preventDefault(); openBoardMenu(e.clientX, e.clientY, row.dataset.board); return; }
-    if (e.shiftKey || !e.target.closest('#canvas')) { return; }
+    if (e.shiftKey || !e.target.closest('#canvas') || e.target.closest('#form')) { return; }
     closeCtx();
     if (items.contextMenu(e)) { return; }
     e.preventDefault();
@@ -1476,6 +1514,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   document.addEventListener('wheel', e => {
     closeCtx();
     if (!e.target.closest('#canvas')) { return; }
+    if (e.target.closest('#form') && !e.ctrlKey && !e.metaKey) { return; }
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) { zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01)); } else { pan(-e.deltaX, -e.deltaY); }
   }, { passive: false });
@@ -1506,6 +1545,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   document.addEventListener('pointerdown', e => {
     if (pop && !e.target.closest('.k-pop') && !e.target.closest('.pinlayer')) { closePop(true); }
     if (threadPop && !e.target.closest('.k-tpop, .pinmark, .boxmark')) { closeThread(); }
+    if (e.target.closest('#form')) { return; }
     if (items.pointerDown(e)) { return; }
     const cv = $('#canvas');
     const h = e.target.closest('.handle');

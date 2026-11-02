@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAgent, validParent, boot } from '../src/agent.js';
+import { createAgent, validParent, boot, readSteps } from '../src/agent.js';
 
 const APP = 'https://app.example.com';
 
@@ -158,4 +158,45 @@ test('a page that grows after load reports its new height once', () => {
   w.doc.body.scrollHeight = 4200;
   observers[0].fn();
   assert.deepEqual(w.posted.map(p => [p.origin, p.msg.type, p.msg.height]), [[APP, 'resized', 4200]]);
+});
+
+test('a question whose options are words only reads as a form, with each option\'s words', async () => {
+  const { parseHTML } = await import('linkedom');
+  const { document } = parseHTML(`<body>
+    <section data-dp-step data-title="Words">
+      <div data-dp-option data-key="1" data-label="Move"><div style="padding:16px" class="faint">The menu gets   shorter</div></div>
+      <div data-dp-option data-key="2" data-label="Stay"></div>
+    </section>
+    <section data-dp-step data-title="Screens">
+      <div data-dp-option data-key="A" data-label="Mock"><div data-v="A"></div></div>
+      <div data-dp-option data-key="B" data-label="Badge"><span style="background:#e00;color:#fff">ด่วน</span></div>
+    </section>
+    <section data-dp-step data-title="Control"><div data-dp-option data-key="A" data-label="Button"><button>Save</button></div></section>
+    <section data-dp-step data-title="Forced" data-dp-form><div data-dp-option data-key="A"><img src="a.png" alt=""></div></section>
+    <section data-dp-step data-title="Kept" data-dp-form="off"><div data-dp-option data-key="A">Words</div></section>
+    <section data-dp-step data-title="Screen"><p>Just a screen</p></section>
+  </body>`);
+  const steps = readSteps(document);
+  assert.deepEqual(steps.map(s => [s.title, s.form]), [['Words', true], ['Screens', false], ['Control', false], ['Forced', true], ['Kept', false], ['Screen', false]]);
+  assert.deepEqual(steps[0].options.map(o => o.text), ['The menu gets shorter', '']);
+  assert.equal('text' in steps[1].options[0], false);
+});
+
+test('a pale sheet around sentences is still words, a coloured chip is a design', async () => {
+  const { parseHTML } = await import('linkedom');
+  const { document, window } = parseHTML(`<body>
+    <section data-dp-step data-title="Sheet">
+      <div data-dp-option data-key="1"><div class="sheet"><div>The picker lists web products only</div><div class="muted">Old codes stay</div></div></div>
+    </section>
+    <section data-dp-step data-title="Chip"><div data-dp-option data-key="A"><span class="chip">Urgent</span></div></section>
+  </body>`);
+  const none = { backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none', boxShadow: 'none' };
+  ['Top', 'Right', 'Bottom', 'Left'].forEach(side => Object.assign(none, { [`border${side}Width`]: '0px', [`border${side}Style`]: 'none', [`border${side}Color`]: 'rgb(0, 0, 0)' }));
+  const boxed = (bg, border) => ({ ...none, backgroundColor: bg, ...Object.fromEntries(['Top', 'Right', 'Bottom', 'Left'].flatMap(side => [[`border${side}Width`, '1px'], [`border${side}Style`, 'solid'], [`border${side}Color`, border]])) });
+  window.getComputedStyle = el => el.classList.contains('sheet') ? boxed('rgb(255, 255, 255)', 'rgb(226, 228, 232)')
+    : el.classList.contains('chip') ? boxed('rgb(220, 38, 38)', 'rgb(220, 38, 38)') : none;
+  document.defaultView.getComputedStyle = window.getComputedStyle;
+  const steps = readSteps(document);
+  assert.deepEqual(steps.map(s => s.form), [true, false]);
+  assert.equal(steps[0].options[0].text, 'The picker lists web products only\nOld codes stay');
 });
