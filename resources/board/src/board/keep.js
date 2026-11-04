@@ -3,7 +3,7 @@
  *   - a box has a key: a composer by its step and what it answers, an edit by its comment, a host's box by data-keep
  *   - a composer or an edit that differs from what it started with is kept per step until it is sent
  *   - the box being typed in gets its focus and caret back
- * A host's data-keep box (ภาพรวม) saves itself, so only the render in between keeps it.
+ * A host's data-keep box saves itself, so only the render in between keeps it.
  */
 const BOXES = 'textarea';
 

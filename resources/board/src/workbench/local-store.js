@@ -283,16 +283,13 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
       const image = /^image\//.test(file.type);
       return newItem({ ...body, kind: image ? 'image' : 'file', file: { name: file.name, type: file.type, size: file.size, url: f.url, thumb: image ? f.url : null, path: f.path } });
     },
-    /* one person's review, in the shape the design skill reads (reviewLocal), with ภาพรวม and the compact line */
+    /* one person's review, in the shape the design skill reads (reviewLocal), with the compact line and a ภาพรวม note saved before the box went */
     exportMd: async () => {
       const r = ROUNDS.at(-1), st = await stateFor(r);
       const { picks, comments } = toPayload(st, mapperFor(latest.steps), me);
       return reviewLocal({ title: latest.title, steps: latest.steps, picks, comments, items: items().filter(it => (it.round ?? r.number) <= r.number), overall: st.overall });
     },
     roundText: async (slug, number) => { const r = roundOf(number); return r?.dir ? fetchText(new URL(`rounds/${r.dir}/review.md`, MAIN).href) : ''; },
-    /* ภาพรวม: one free note for the whole page, kept in the round's state as before */
-    overall: () => upgrade(get(stateKey(ROUNDS.at(-1).title)) || {}).overall || '',
-    setOverall: text => writeLatest(st => { st.overall = text; }),
 
     /* for the workbench's ext: what ส่ง and the page manager need */
     slug: SLUG,

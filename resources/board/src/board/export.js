@@ -116,7 +116,7 @@ export function exportMd({ board, round, picks = [], comments = [], items = [], 
 /*
  * The review of one person (the design workbench, caps.multiUser false), in the shape the design skill and Claude
  * read (workbench.md, "What comes back"): no names, the picks as "A + B", ↳ notes, then 📍/▭/✎ lines, then what was
- * added; ภาพรวม at the end, and the compact "Q1:A+B  Q2:ข้าม" line last.
+ * added; a ภาพรวม note saved before the box was removed at the end, and the compact "Q1:A+B  Q2:ข้าม" line last.
  */
 const LOCAL = {
   th: { all: 'ทั้งหมด', skip: 'ข้าม', read: 'อ่านแล้ว', overall: 'Overall', arrow: 'ชี้ที่', rect: 'ตีกรอบ', ellipse: 'วงไว้', stroke: 'วาดเส้น', near: 'ใกล้',
