@@ -52,6 +52,12 @@ final readonly class BoardController
         $viewer = Viewer::query()->firstOrNew(['board_id' => $board->id, 'user_id' => $this->userId()]);
         $viewer->last_seen_at = Date::now();
         $viewer->seen_prints = [...($viewer->seen_prints ?? []), ...(array) $request->validated('prints_seen', [])];
+
+        if ($request->filled('step')) {
+            $viewer->step_key = $request->string('step')->toString();
+            $viewer->round_number = $request->integer('round');
+        }
+
         $viewer->save();
 
         $round = $board->rounds()->where('number', $request->integer('round'))->first();

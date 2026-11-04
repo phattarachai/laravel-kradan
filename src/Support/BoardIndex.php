@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Phattarachai\Kradan\Support;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Phattarachai\Kradan\Models\Board;
 use Phattarachai\Kradan\Models\Round;
@@ -48,7 +49,18 @@ final readonly class BoardIndex
             'answered' => $round instanceof Round ? $this->answered($round) : 0,
             'viewers' => $this->presenter->viewers($board),
             'updated' => $round instanceof Round && $this->updated($round, $this->presenter->seenPrints($board, $user)),
+            'last_activity_at' => $this->lastActivityAt($board, $round),
         ];
+    }
+
+    /**
+     * The latest push, or the latest answer, comment or item, whichever came last.
+     */
+    private function lastActivityAt(Board $board, ?Round $round): ?string
+    {
+        $times = array_filter([$round?->pushed_at->toIso8601String(), BoardChanges::at($board), $board->updated_at?->toIso8601String()]);
+
+        return collect($times)->sortBy(fn (string $at): int => Date::parse($at)->getTimestamp())->last();
     }
 
     private function answered(Round $round): int

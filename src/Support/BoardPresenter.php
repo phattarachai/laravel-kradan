@@ -128,7 +128,7 @@ final readonly class BoardPresenter
     /**
      * Who was on the board in the last 15 minutes, newest first; `active` is the last 2 minutes.
      *
-     * @return list<array{user: array{id: mixed, name: string, avatar: ?string}, last_seen_at: string, active: bool}>
+     * @return list<array{user: array{id: mixed, name: string, avatar: ?string}, last_seen_at: string, active: bool, step: ?string, round: ?int}>
      */
     public function viewers(Board $board): array
     {
@@ -143,6 +143,8 @@ final readonly class BoardPresenter
                 'user' => Kradan::userById($viewer->user_id),
                 'last_seen_at' => $viewer->last_seen_at->toIso8601String(),
                 'active' => $viewer->last_seen_at->greaterThanOrEqualTo($now->copy()->subSeconds(self::ACTIVE_SECONDS)),
+                'step' => $viewer->step_key,
+                'round' => $viewer->round_number,
             ])
             ->values()
             ->all();

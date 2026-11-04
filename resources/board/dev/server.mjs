@@ -219,7 +219,7 @@ BOARDS.filter(b => b.status === 'open').slice(0, 3).forEach(seed);
 
 /* ---------- payloads (the shapes in board-payload.md) ---------- */
 const viewersOf = b => Object.entries(b.viewers)
-  .map(([uid, v]) => ({ user: userOf(uid), last_seen_at: v.last_seen_at, active: Date.now() - Date.parse(v.last_seen_at) < 120000, recent: Date.now() - Date.parse(v.last_seen_at) < 900000 }))
+  .map(([uid, v]) => ({ user: userOf(uid), last_seen_at: v.last_seen_at, active: Date.now() - Date.parse(v.last_seen_at) < 120000, recent: Date.now() - Date.parse(v.last_seen_at) < 900000, step: v.step ?? null, round: v.round ?? null }))
   .sort((a, c) => c.last_seen_at.localeCompare(a.last_seen_at));
 const boardUrl = b => `/kradan/${b.slug}`;
 const answeredIn = (b, r) => new Set([...Object.values(b.picks[r.number] || {}).map(p => p.user.id), ...b.comments.filter(c => c.round === r.number && !c.deleted).map(c => c.user.id)]);
@@ -258,6 +258,7 @@ function indexRows(me) {
       round: { number: r.number, title: r.title, pushed_at: r.pushed_at }, steps: r.steps.map(s => s.title),
       answered: answeredIn(b, r).size, viewers: viewersOf(b).filter(v => v.recent),
       updated: !!seen && r.steps.some(s => seen[s.key] !== r.prints[s.key]),
+      last_activity_at: [r.pushed_at, b.changedAt].filter(Boolean).sort().at(-1),
     };
   });
 }
@@ -402,6 +403,7 @@ async function api(req, res, url, me) {
     const v = (b.viewers[me] ||= { seen_prints: {} });
     v.last_seen_at = new Date().toISOString();
     v.seen_prints = { ...(v.seen_prints || {}), ...(body?.prints_seen || {}) };
+    if (body?.step) { v.step = body.step; v.round = body.round; }
     return sendJson(res, 200, { viewers: viewersOf(b), changed_at: b.changedAt });
   }
   if ((m = p.match(/^boards\/([^/]+)\/decide$/)) && req.method === 'POST') {
