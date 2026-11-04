@@ -195,6 +195,46 @@ it('lets only the author edit or delete a comment', function (): void {
         ->and(Comment::withTrashed()->count())->toBe(1);
 });
 
+it('tells the others which slide a viewer has open, and keeps it when a beat names none', function (): void {
+    publishRound();
+    $wipa = kradanUser('วิภา');
+
+    actingAs($wipa)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['round' => 1, 'step' => SCREEN])->assertOk();
+    actingAs($wipa)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['round' => 1])->assertOk();
+    Date::setTestNow(Date::now()->addSecond());
+
+    actingAs(kradanUser('ต้น'))->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['round' => 1])
+        ->assertOk()
+        ->assertJsonPath('viewers.1.user.name', 'วิภา')
+        ->assertJsonPath('viewers.1.step', SCREEN)
+        ->assertJsonPath('viewers.1.round', 1)
+        ->assertJsonPath('viewers.0.step', null);
+});
+
+it('moving between slides is not a change to the board, so nobody refreshes for it', function (): void {
+    publishRound();
+    $wipa = kradanUser('วิภา');
+    $changed = fn (?string $step = null) => actingAs($wipa)->postJson('/kradan/api/boards/t188-manual-so/heartbeat', ['round' => 1, 'step' => $step])->json('changed_at');
+
+    $before = $changed(SCREEN);
+    Date::setTestNow(Date::now()->addMinute());
+
+    expect($changed(QUESTION))->toBe($before);
+});
+
+it('lists when each board last changed: a push, then a comment after it', function (): void {
+    publishRound();
+    $user = kradanUser();
+    $lastActivity = fn (): ?string => actingAs($user)->getJson('/kradan/api/boards')->assertOk()->json('boards.0.last_activity_at');
+
+    $pushed = $lastActivity();
+    Date::setTestNow(Date::now()->addHour());
+    actingAs($user)->postJson('/kradan/api/boards/t188-manual-so/rounds/1/comments', ['step' => SCREEN, 'body' => 'ดูแล้ว'])->assertSuccessful();
+
+    expect($lastActivity())->not->toBe($pushed)
+        ->and(Date::parse($lastActivity())->getTimestamp())->toBe(Date::now()->getTimestamp());
+});
+
 it('lists viewers of the last 15 minutes on heartbeat, and merges the prints each has seen', function (): void {
     publishRound();
     $somchai = kradanUser('สมชาย');

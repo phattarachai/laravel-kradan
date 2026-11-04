@@ -29,7 +29,7 @@ const th = {
   hint: 'ซูม ⌘ หรือ Ctrl + เลื่อน ดับเบิลคลิกจอเพื่อซูมไปที่จอนั้น',
   width: 'กว้าง', page_width: 'หน้ากว้าง {w}', drag_width: 'ลากเพื่อปรับความกว้าง',
   dev_desktop: 'เดสก์ท็อป', dev_laptop: 'โน้ตบุ๊ก', dev_tablet: 'แท็บเล็ต', dev_phone: 'มือถือ',
-  last_seen: 'ดูล่าสุด {date}', here_now: 'เปิดอยู่ตอนนี้', you: 'คุณ',
+  last_seen: 'ดูล่าสุด {date}', here_now: 'เปิดอยู่ตอนนี้', viewing: 'กำลังดู: {title}', follow: 'กดเพื่อตาม', unfollow: 'กำลังตาม กดเพื่อเลิก', you: 'คุณ',
   cant_open: 'เปิดกระดานนี้ไม่ได้ ({why})', save_failed: 'บันทึกไม่ได้ ลองอีกครั้ง', offline: 'ต่อเซิร์ฟเวอร์ไม่ได้',
   read_only: 'ดูอย่างเดียว', steps_here: 'ข้อในกระดานนี้', answered_n: 'ตอบแล้ว {done} / {total}', boards: 'กระดาน', all_boards: 'ทุกกระดาน', waiting: 'รอตอบ', text_only: 'มีแต่คำตอบ', text_only_sub: 'มีแต่คำตอบ หน้าจอของรอบนี้ไม่ได้เก็บไว้', boards_more: 'กระดานอื่น {n}', open_new_tab: 'เปิดในแท็บใหม่', archived_board: 'ย้าย {name} ไปประวัติแล้ว',
   /* decks */
@@ -42,7 +42,7 @@ const th = {
   share: 'แชร์', share_deck_only: 'ลิงก์สาธารณะใช้ได้กับสไลด์เท่านั้น',
   pdf_tip: 'บันทึกเป็น PDF: เปิดหน้าพิมพ์ แล้วเลือก Save as PDF', pdf_save: 'บันทึกเป็น PDF',
   /* index */
-  search: 'ค้นหาชื่อ เลขงาน หรือหัวข้อ', open: 'เปิดอยู่', history: 'ประวัติ', board: 'กระดาน', last_push: 'ส่งล่าสุด',
+  search: 'ค้นหาชื่อ เลขงาน หรือหัวข้อ', open: 'เปิดอยู่', history: 'ประวัติ', board: 'กระดาน', last_push: 'อัปเดตล่าสุด',
   answered: 'ตอบแล้ว', viewers: 'คนดู', no_boards: 'ยังไม่มีกระดาน', no_match: 'ไม่พบกระดานที่ตรงกับ “{q}”',
   people_n: '{n} คน', nobody: 'ยังไม่มีคนตอบ',
 };
@@ -77,7 +77,7 @@ const en = {
   hint: 'Zoom with ⌘ or Ctrl + scroll. Double-click a screen to zoom to it.',
   width: 'Width', page_width: 'Page width {w}', drag_width: 'Drag to resize',
   dev_desktop: 'Desktop', dev_laptop: 'Laptop', dev_tablet: 'Tablet', dev_phone: 'Phone',
-  last_seen: 'Last seen {date}', here_now: 'Here now', you: 'You',
+  last_seen: 'Last seen {date}', here_now: 'Here now', viewing: 'Viewing: {title}', follow: 'Click to follow', unfollow: 'Following, click to stop', you: 'You',
   cant_open: 'Could not open this board ({why})', save_failed: 'Could not save, try again', offline: 'Cannot reach the server',
   read_only: 'Read only', steps_here: 'Steps on this board', answered_n: 'Answered {done} / {total}', boards: 'Boards', all_boards: 'All boards', waiting: 'Waiting', text_only: 'answers only', text_only_sub: 'answers only, the screens of this round weren’t kept', boards_more: '{n} more', open_new_tab: 'Open in a new tab', archived_board: '{name} moved to history',
   slides: 'Slides', present: 'Present', present_tip: 'Present full screen (F)', fullscreen: 'Fullscreen (F)', present_end: 'End the show (Esc)',
@@ -88,7 +88,7 @@ const en = {
   share_used: 'last opened {date}', share_unused: 'not opened yet', decks: 'Decks',
   share: 'Share', share_deck_only: 'Public links are for decks only',
   pdf_tip: 'Save as PDF: opens the print view, then choose Save as PDF', pdf_save: 'Save as PDF',
-  search: 'Search title, task or step', open: 'Open', history: 'History', board: 'Board', last_push: 'Last push',
+  search: 'Search title, task or step', open: 'Open', history: 'History', board: 'Board', last_push: 'Last updated',
   answered: 'Answered', viewers: 'Viewers', no_boards: 'No boards yet', no_match: 'No board matches “{q}”',
   people_n: '{n} people', nobody: 'No answers yet',
 };

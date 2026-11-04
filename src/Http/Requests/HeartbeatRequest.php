@@ -13,6 +13,7 @@ final class HeartbeatRequest extends FormRequest
     {
         return [
             'round' => ['nullable', 'integer'],
+            'step' => ['nullable', 'string', 'max:512'],
             'prints_seen' => ['nullable', 'array', 'max:500'],
             'prints_seen.*' => ['string', 'max:64'],
         ];

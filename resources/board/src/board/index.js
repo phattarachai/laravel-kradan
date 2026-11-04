@@ -15,6 +15,7 @@ export function mountIndex(boot, root) {
   /* decks have their own tab and no decided flow; ประวัติ is decided decision boards */
   const isDeck = b => b.kind === 'deck';
   const isPast = b => !isDeck(b) && b.status !== 'open';
+  const lastAt = b => b.last_activity_at || b.round?.pushed_at || b.updated_at;
 
   root.innerHTML = `<div class="k-index">
     <header class="k-bar">${corner(boot)}<span class="k-sp"></span><span class="k-avs">${avatar(ME, { tip: ME.name })}</span></header>
@@ -37,7 +38,7 @@ export function mountIndex(boot, root) {
   }
 
   function row(b) {
-    const date = b.status !== 'open' && b.decided_at ? t(b.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(b.decided_at) }) : shortDate(b.round?.pushed_at || b.updated_at);
+    const date = b.status !== 'open' && b.decided_at ? t(b.status === 'decided' ? 'decided_on' : 'archived_on', { date: shortDate(b.decided_at) }) : shortDate(lastAt(b), true);
     const answered = typeof b.answered === 'number' ? (b.answered ? t('people_n', { n: b.answered }) : t('nobody')) : '';
     /* label is the title with the task in front unless the title already starts with it; the task isn't repeated below */
     return `<tr><td><a class="t" href="${esc(b.url)}">${esc(b.label || b.title)}</a><div class="r">${esc([b.label ? '' : b.task_ref, b.round ? t('round_n', { n: b.round.number }) : '', isDeck(b) ? `${(b.steps || []).length} ${t('slides')}` : ''].filter(Boolean).join(' · '))}</div></td>
@@ -50,7 +51,7 @@ export function mountIndex(boot, root) {
   function render() {
     const open = boards.filter(b => !isDeck(b) && !isPast(b)), past = boards.filter(isPast), decks = boards.filter(isDeck);
     const list = ({ history: past, decks }[ui.tab] || open).filter(matches)
-      .sort((a, b) => String(b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.round?.pushed_at || a.updated_at || '')));
+      .sort((a, b) => String(lastAt(b) || '').localeCompare(String(lastAt(a) || '')));
     const focus = document.activeElement?.id === 'q';
     $('#main').innerHTML = `<div class="k-tool"><span class="k-tabs"><button data-tab="open" aria-pressed="${ui.tab === 'open'}">${t('open')} <span class="tnum">${open.length}</span></button>${decks.length ? `<button data-tab="decks" aria-pressed="${ui.tab === 'decks'}">${t('decks')} <span class="tnum">${decks.length}</span></button>` : ''}<button data-tab="history" aria-pressed="${ui.tab === 'history'}">${t('history')} <span class="tnum">${past.length}</span></button></span>
       <label class="k-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="q" type="search" value="${esc(ui.q)}" placeholder="${esc(t('search'))}" autocomplete="off"></label></div>

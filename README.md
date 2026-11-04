@@ -98,7 +98,7 @@ KRADAN_LOGIN_ROUTE=filament.admin.auth.login
   content prefix; every other file only downloads, so nothing uploaded runs on your app's origin.
 - **History and presence.** Who viewed (at most one entry per person per 30 minutes), picked, commented and pinned.
   Avatars show who is on the board now, over a Reverb presence channel when your app broadcasts with Reverb, or
-  from a 30-second heartbeat otherwise. The browser connects to the host, port and scheme of the
+  from a heartbeat otherwise (every 30 seconds, every 5 while someone else is on the board). An avatar also sits on the slide that person has open, and clicking it in the top bar follows them from slide to slide. The browser connects to the host, port and scheme of the
   `reverb.apps` entry with your broadcasting key, so an app that publishes to Reverb on loopback still
   sends browsers to its public address.
 
