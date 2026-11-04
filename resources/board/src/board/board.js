@@ -160,9 +160,11 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const edits = key => threads(key).filter(c => c.edit);
   const pinNo = c => pinned(c.step).indexOf(c) + 1;
   function pickLabel(st, keys) { return keys.length > 1 && keys.length === st.options.length ? t('all') : keys.join(' + '); }
-  /* someone answered a step with a pick, a ข้าม/อ่านแล้ว tick or any comment */
-  const answeredBy = (uid, key) => picksFor(key).some(p => String(p.user.id) === String(uid) && (p.options.length || p.seen))
-    || COMMENTS.some(c => c.step === key && (String(c.user.id) === String(uid) || (c.replies || []).some(r => String(r.user.id) === String(uid))));
+  /* someone left a comment, a pin, an edit, or anything on the canvas (a note, a drawing, a file) on a step */
+  const remarkedBy = (uid, key) => COMMENTS.some(c => c.step === key && (String(c.user.id) === String(uid) || (c.replies || []).some(r => String(r.user.id) === String(uid))))
+    || items?.forStep(key).some(it => !it.draft && String(it.user?.id) === String(uid));
+  /* someone answered a step with a pick, a ข้าม/อ่านแล้ว tick or a remark */
+  const answeredBy = (uid, key) => picksFor(key).some(p => String(p.user.id) === String(uid) && (p.options.length || p.seen)) || remarkedBy(uid, key);
 
   /* ---------- มีอัปเดต: this viewer's seen_prints against the round's prints ---------- */
   const looked = { upd: new Set(), pending: {} };
@@ -607,7 +609,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
           <span class="k-optkey">${esc(o.key)}</span>
           <span class="k-optbody"><span class="lb">${esc(o.label)}</span>${o.trade ? `<span class="tr">${esc(o.trade)}</span>` : ''}${pickers(key, o.key)}</span>
           <span class="k-optmark">${CHECK}</span></label>`).join('')}</div>` : ''}
-      ${`<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length && caps.multiUser ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
+      ${!st.pickable && remarkedBy(ME.id, key) ? '' : `<label class="k-seen"><input type="checkbox" name="seen" ${mySeen(key) ? 'checked' : ''} ${CAN_PICK() ? '' : 'disabled'}><span>${st.pickable ? `${t('skip')}<br><span class="tr">${t('skip_sub')}</span>` : t('read_box')}</span>${seenBy.length && caps.multiUser ? `<span class="k-avs k-pickers">${seenBy.map(p => avatar(p.user, { cls: 'sm', tip: p.user.name })).join('')}</span>` : ''}</label>`}
       <div class="k-hr"></div>
       ${tabsHtml(count)}
       <div class="k-ppane" role="tabpanel" id="ppane-comments" aria-labelledby="ptab-comments" ${panelTab === 'comments' ? '' : 'hidden'}>

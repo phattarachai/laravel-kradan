@@ -116,11 +116,15 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     const r = ROUNDS.at(-1);
     s.savedAt = new Date(now()).toISOString();
     set(stateKey(r.title), s);
-    const done = latest.steps.filter((_, i) => answered(s, i + 1)).length;
-    const sum = get(`wb:sum:${PATH}`);
-    set(`wb:sum:${PATH}`, { title: r.title, done, total: latest.steps.length, sentAt: sum?.title === r.title ? sum.sentAt || '' : '' });
+    saveSum(s);
     changedAt = s.savedAt;
     listeners.forEach(fn => fn());
+  }
+  function saveSum(s) {
+    const r = ROUNDS.at(-1), marked = new Set(items().filter(it => !it.draft).map(it => it.step));
+    const done = latest.steps.filter((st, i) => answered(s, i + 1) || marked.has(st.key)).length;
+    const sum = get(`wb:sum:${PATH}`);
+    set(`wb:sum:${PATH}`, { title: r.title, done, total: latest.steps.length, sentAt: sum?.title === r.title ? sum.sentAt || '' : '' });
   }
   async function writeLatest(fn) {
     const r = ROUNDS.at(-1);
@@ -217,7 +221,7 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     const url = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(file); });
     return { url, path: '', name: file.name };
   }
-  const putItems = list => { set(ITEMS_KEY, list); changedAt = new Date(now()).toISOString(); listeners.forEach(fn => fn()); };
+  const putItems = list => { set(ITEMS_KEY, list); saveSum(upgrade(get(stateKey(ROUNDS.at(-1).title)) || {})); changedAt = new Date(now()).toISOString(); listeners.forEach(fn => fn()); };
   const newItem = body => {
     const list = items(), at = new Date(now()).toISOString();
     const it = { ...body, id: Math.max(now(), ...list.map(x => x.id + 1)), round: ROUNDS.at(-1).number, user: me, mine: true, created_at: at, updated_at: at, reply_count: 0 };

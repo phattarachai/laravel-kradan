@@ -30,6 +30,13 @@ function env(seed = {}, more = {}) {
   return { store, read: k => JSON.parse(map.get(k) || 'null'), write: (k, v) => map.set(k, JSON.stringify(v)) };
 }
 
+test('a note on the canvas counts in the page list\'s answered number', async () => {
+  const { store, read } = env();
+  const b = await store.board(store.slug);
+  await store.createItem(store.slug, { step: b.rounds[2].steps[2].key, kind: 'sticky', text: 'ขอย้าย', x: 0, y: 0 });
+  assert.equal(read('wb:sum:/design/2610-90-wb-demo/index.html').done, 1);
+});
+
 test('the board payload has the shapes of 2-board-payload.md, read from the page and rounds.json', async () => {
   const { store } = env();
   const b = await store.board(store.slug);

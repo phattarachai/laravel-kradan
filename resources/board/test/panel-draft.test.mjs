@@ -224,6 +224,35 @@ test('a host\'s box (ภาพรวม) keeps what was typed before its own sav
   assert.equal(box().value, 'ใหม่จากที่อื่น');
 });
 
+/* a screen step (no options) that already holds something of mine needs no อ่านแล้ว tick */
+const screenRound = { number: 1, prints: {}, steps: [{ key: 's', title: 'หน้าจอ', options: [], shots: [] }] };
+const rowOf = b => b.$('[data-step="1"]');
+
+test('a note on the canvas answers a screen step, so อ่านแล้ว is not asked for', async () => {
+  const note = { id: 9, step: 's', kind: 'sticky', text: 'recent ไว้ทางขวา', x: 0, y: 0, user: { ...ME }, mine: true, created_at: '', updated_at: '', reply_count: 0 };
+  const b = await mount({ seed: { rounds: [screenRound], items: [note] } });
+  assert.ok(rowOf(b).classList.contains('done'));
+  assert.equal(b.$('#panel input[name="seen"]'), null);
+});
+
+test('someone else\'s note leaves my screen step unanswered, with อ่านแล้ว still there', async () => {
+  const note = { id: 9, step: 's', kind: 'sticky', text: 'ของนก', x: 0, y: 0, user: { ...OTHER }, created_at: '', updated_at: '', reply_count: 0 };
+  const b = await mount({ seed: { rounds: [screenRound], items: [note] } });
+  assert.ok(rowOf(b).classList.contains('todo'));
+  assert.ok(b.$('#panel input[name="seen"]'));
+});
+
+test('อ่านแล้ว shows on a screen step until it has my comment, and stays on a question', async () => {
+  const comment = { id: 5, step: 's', parent_id: null, item_id: null, user: { ...ME }, mine: true, body: 'ขอย้าย', pin: null, edit: null, created_at: '', updated_at: '', replies: [] };
+  const bare = await mount({ seed: { rounds: [screenRound] } });
+  assert.ok(bare.$('#panel input[name="seen"]'));
+  const commented = await mount({ seed: { rounds: [screenRound], comments: [comment] } });
+  assert.ok(rowOf(commented).classList.contains('done'));
+  assert.equal(commented.$('#panel input[name="seen"]'), null);
+  const question = await mount({ seed: { comments: [{ ...comment, step: 'a' }] } });
+  assert.ok(question.$('#panel input[name="seen"]'), 'ข้ามข้อนี้ stays: a comment does not choose for a question');
+});
+
 /* T192 round 2: the workbench session's Chrome retry */
 test('typed, a click on empty panel space, then a click on an option: the draft is kept', async () => {
   const b = await mount();
