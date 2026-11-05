@@ -3,12 +3,16 @@
  *   - the heartbeat (every mode): POST …/heartbeat every 30 s answers `viewers` with last_seen_at
  *   - the Reverb presence channel (presence.mode = reverb): who is connected right now
  * Active = seen in the last 2 min or on the channel. Faded = the last 15 min. Older drops off the row.
+ * Each beat also says which slide this person has open. While someone else is active the beat runs every 5 s, so
+ * their avatar moves between slides without Reverb; alone on a board it stays at the slow heartbeat.
  */
 import { esc, shortDate } from './util.js';
 import { t } from './i18n.js';
 
 export const ACTIVE_MS = 2 * 60 * 1000;
 export const RECENT_MS = 15 * 60 * 1000;
+export const FAST_BEAT_MS = 5 * 1000;
+export const MOVED_BEAT_MS = 1000;
 
 /* first letters: "สมชาย ใจดี" → "สใ", "Somchai Jaidee" → "SJ"; Thai vowels that sit before a consonant are skipped */
 export function initials(name) {
@@ -17,9 +21,9 @@ export function initials(name) {
   return (words.length > 1 ? first(words[0]) + first(words[1]) : first(words[0] || '?')).toUpperCase();
 }
 
-export function avatar(user, { cls = '', tip = '' } = {}) {
+export function avatar(user, { cls = '', tip = '', follow = null } = {}) {
   const img = user?.avatar ? `<img src="${esc(user.avatar)}" alt="" referrerpolicy="no-referrer">` : esc(initials(user?.name));
-  return `<span class="k-av ${cls}" data-tip="${esc(tip || user?.name || '')}">${img}</span>`;
+  return `<span class="k-av ${cls}" data-tip="${esc(tip || user?.name || '')}"${follow === null ? '' : ` data-follow="${esc(follow)}"`}>${img}</span>`;
 }
 
 /* viewers → the avatar row: active first, then faded, others dropped; never the signed-in user */
@@ -40,25 +44,54 @@ export function avatarRow(viewers, opts = {}) {
   const max = opts.max || 5;
   const shown = row.slice(0, max);
   const more = row.length - shown.length;
-  return shown.map(v => avatar(v.user, {
-    cls: v.state === 'recent' ? 'away' : '',
-    tip: `${v.user.name} ${v.state === 'active' && opts.online?.has(String(v.user.id)) ? t('here_now') : t('last_seen', { date: shortDate(v.last_seen_at, true) })}`,
-  })).join('') + (more > 0 ? `<span class="k-more tnum" data-tip="${esc(row.slice(max).map(v => v.user.name).join(', '))}">+${more}</span>` : '');
+  return shown.map(v => {
+    const place = v.state === 'active' ? opts.place?.(v) : null;
+    const seen = v.state === 'active' && opts.online?.has(String(v.user.id)) ? t('here_now') : t('last_seen', { date: shortDate(v.last_seen_at, true) });
+    const following = String(opts.following) === String(v.user.id);
+    return avatar(v.user, {
+      cls: [v.state === 'recent' ? 'away' : '', following ? 'following' : ''].join(' ').trim(),
+      tip: [`${v.user.name} ${place?.text || seen}`, place?.can ? t(following ? 'unfollow' : 'follow') : ''].filter(Boolean).join(' · '),
+      follow: place?.can ? v.user.id : null,
+    });
+  }).join('') + (more > 0 ? `<span class="k-more tnum" data-tip="${esc(row.slice(max).map(v => v.user.name).join(', '))}">+${more}</span>` : '');
+}
+
+/* step key → the people active on it now, on this round only: a key can mean a different slide in another round */
+export function bySlide(viewers, { me, round, online, now } = {}) {
+  const slides = new Map();
+  rowOf(viewers, { me, online, now })
+    .filter(v => v.state === 'active' && v.step && v.round === round)
+    .forEach(v => slides.set(v.step, [...(slides.get(v.step) || []), v]));
+  return slides;
+}
+
+/* the avatars on one slide's thumbnail: three, then +N */
+export function slideAvatars(row = [], max = 3) {
+  const more = row.length - max;
+  return row.slice(0, max).map(v => avatar(v.user, { cls: 'sm', tip: v.user.name })).join('')
+    + (more > 0 ? `<span class="k-more tnum" data-tip="${esc(row.slice(max).map(v => v.user.name).join(', '))}">+${more}</span>` : '');
+}
+
+/* slow alone, fast with company; a hidden tab doesn't beat at all, so it waits the slow way */
+export function nextBeatMs({ viewers, me, online, hidden, slowMs, now }) {
+  const company = rowOf(viewers, { me, online, now }).some(v => v.state === 'active');
+  return company && !hidden ? FAST_BEAT_MS : slowMs;
 }
 
 /*
  * Keeps the viewers list fresh. `onChange(viewers, online)` runs after every heartbeat and channel event.
  * `seen()` returns the prints to report with the next beat (and clears them).
  */
-export function startPresence({ boot, api, slug, round, onChange, onBeat, seen }) {
-  const state = { viewers: [], online: new Set(), echo: null, timer: null };
+export function startPresence({ boot, api, slug, round, me, where, onChange, onBeat, seen }) {
+  const state = { viewers: [], online: new Set(), echo: null, timer: null, moved: null };
   const changed = () => onChange?.(state.viewers, state.online);
 
   async function beat() {
     if (document.visibilityState === 'hidden') { return; }
     const prints = seen?.() || null;
     try {
-      const r = await api.heartbeat(slug, round, prints && Object.keys(prints).length ? prints : null);
+      const at = where?.() || {};
+      const r = await api.heartbeat(slug, at.round ?? round, prints && Object.keys(prints).length ? prints : null, at.step);
       if (Array.isArray(r?.viewers)) { state.viewers = r.viewers; changed(); }
       onBeat?.(r || {});
     } catch { /* next beat */ }
@@ -92,16 +125,30 @@ export function startPresence({ boot, api, slug, round, onChange, onBeat, seen }
     });
   }
 
+  function schedule() {
+    clearTimeout(state.timer);
+    const slowMs = (+boot.presence?.heartbeat || 30) * 1000;
+    const wait = nextBeatMs({ viewers: state.viewers, me, online: state.online, hidden: document.visibilityState === 'hidden', slowMs });
+    state.timer = setTimeout(() => { beat().finally(schedule); }, wait);
+    state.timer.unref?.();
+  }
+  /* this person changed slide: say so soon, once, however many slides they flick through */
+  function moved() {
+    clearTimeout(state.moved);
+    state.moved = setTimeout(beat, MOVED_BEAT_MS);
+    state.moved.unref?.();
+  }
+
   function start(initial) {
     state.viewers = initial || [];
     changed();
     beat();
-    state.timer = setInterval(beat, (+boot.presence?.heartbeat || 30) * 1000);
+    schedule();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { beat(); } });
     joinReverb();
     /* faded and dropped avatars change with time alone */
     setInterval(changed, 30 * 1000);
   }
 
-  return { start, beat, state };
+  return { start, beat, moved, state };
 }

@@ -19,7 +19,7 @@ use UnhandledMatchError;
  */
 final class Kradan
 {
-    public const string VERSION = '0.4.0';
+    public const string VERSION = '0.5.0';
 
     /** @var (Closure(Authenticatable, string): ?bool)|null */
     private static ?Closure $authUsing = null;

@@ -9,7 +9,7 @@ import { t } from './i18n.js';
 import { $, $$, esc, clamp, shortDate, when, toast, modal, copyText, getLocal, setLocal } from './util.js';
 import { KradanStore } from './api.js';
 import { createBridge, allowedOrigins } from '../bridge.js';
-import { avatar, avatarRow, startPresence } from './presence.js';
+import { avatar, avatarRow, bySlide, rowOf, slideAvatars, startPresence } from './presence.js';
 import { corner } from './icon.js';
 import { createItems, DRAW_TOOLS, STROKES, STICKIES } from './items.js';
 import { PANEL_TABS, tabOf, tabKey, panelCounts } from './panel-tabs.js';
@@ -495,7 +495,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       : s.pickable && keys.length ? `<span class="key">${esc(pickLabel(s, keys))}</span>`
       : mySeen(s.key) ? `<span class="key plain">${s.pickable ? t('skipped') : t('read')}</span>` : '';
     const tip = [s.title, everyone(s)].filter(Boolean).join(' · ');
-    return `<a href="#" class="r ${done ? 'done' : 'todo'}" data-step="${n}" aria-current="${n === ui.step}" title="${esc(tip)}">${mark}<span class="t">${esc(s.title)}</span>${noted ? '<i class="dot"></i>' : ''}${right}</a>`;
+    return `<a href="#" class="r ${done ? 'done' : 'todo'}" data-step="${n}" aria-current="${n === ui.step}" title="${esc(tip)}">${mark}<span class="t">${esc(s.title)}</span><span class="k-avs who" data-who="${n}"></span>${noted ? '<i class="dot"></i>' : ''}${right}</a>`;
   }
   /* the open boards sit on top, like Figma's Pages over Layers, all of them (owner, 2026-10-28): a board leaves the list
      when it is filed into history, from the title menu or a right-click here. Then the steps of this board */
@@ -513,7 +513,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   function boardsHtml() {
     if (!BOARDS?.length) { return ''; }
     const open = BOARDS.filter(b => b.status === 'open' || b.slug === B.slug)
-      .sort((a, b) => String(b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.round?.pushed_at || a.updated_at || '')));
+      .sort((a, b) => String(b.last_activity_at || b.round?.pushed_at || b.updated_at || '').localeCompare(String(a.last_activity_at || a.round?.pushed_at || a.updated_at || '')));
     /* a store may mark the rows that stay in view (the workbench: this page and the pages Claude waits on); the rest
        fold under อื่น N, which remembers whether it was open. Kradan marks none, so it lists them all */
     const marked = open.some(b => 'pinned' in b);
@@ -532,7 +532,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
       strip?.io?.disconnect();
       side.innerHTML = '<div id="sidetop"></div><div class="k-strip"></div>';
       const list = $('.k-strip', side);
-      list.innerHTML = STEPS.map((s, i) => `<a href="#" class="k-thumb" data-step="${i + 1}"><span class="n tnum">${i + 1}</span><span class="pv"></span><span class="tt"><span class="t">${esc(s.title)}</span><span class="meta"></span></span></a>`).join('');
+      list.innerHTML = STEPS.map((s, i) => `<a href="#" class="k-thumb" data-step="${i + 1}"><span class="n tnum">${i + 1}</span><span class="pv"></span><span class="k-avs who" data-who="${i + 1}"></span><span class="tt"><span class="t">${esc(s.title)}</span><span class="meta"></span></span></a>`).join('');
       const load = pv => {
         if (pv.firstChild) { return; }
         const ifr = newFrame({ tabIndex: -1, title: '' });
@@ -556,7 +556,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   const thumbUrl = n => { const u = new URL(pageUrl()); u.searchParams.set('k', 'thumb'); u.searchParams.set('n', n); return u.href; };
 
   function renderSide() {
-    if (DECK) { renderStrip(); return; }
+    if (DECK) { renderStrip(); paintWho(); return; }
     const mine = STEPS.filter(s => answeredBy(ME.id, s.key)).length;
     $('#side').innerHTML = boardsHtml()
       + `<div class="hd"><span>${t('steps_here')}</span><span class="sp"></span>${STEPS.length > 1 ? `<span class="num tnum">${esc(t('answered_n', { done: mine, total: STEPS.length }))}</span>` : ''}</div>`
@@ -567,6 +567,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
         return head + stepRow(s, i + 1);
       }).join('')
       + (ext.sideEnd ? ext.sideEnd(host) : '');
+    paintWho();
   }
 
   /* who picked an option: avatars, the name on hover (owner's pick B + C, 2026-10-27) */
@@ -1232,7 +1233,7 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     closeCtx();
     const el = document.createElement('div');
     el.className = 'k-ctx k-rmenu';
-    el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at), r.text_only ? t('text_only') : t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
+    el.innerHTML = [...B.rounds].reverse().map(r => `<button data-round="${r.number}"><span class="ck">${r.number === R.number ? '✓' : ''}</span><span class="rt"><b>${esc(r.title)}</b><span>${esc([shortDate(r.pushed_at, true), r.text_only ? t('text_only') : t('steps_n', { n: (r.steps || []).length })].join(' · '))}</span></span></button>`).join('')
       + `<hr><button data-allrounds><span class="ck"></span>${t('all_rounds')}</button>`
       + (DECK && caps.share && ME.can?.share ? `<button data-shares><span class="ck"></span>${t('share_links')}</button>` : '')
       + (caps.decide && !DECK && ME.can?.manage && B.status === 'open' && !OLD() ? `<button data-archive><span class="ck"></span>${t('archive')}</button>` : '');
@@ -1337,7 +1338,12 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   }
 
   /* ---------- tools, minimap, zoom-to ---------- */
-  function go(n) { lookAt(ui.step); ui.step = clamp(n, 1, STEPS.length); ui.opt = ''; render(); lookAt(ui.step); }
+  function go(n, { following = false } = {}) {
+    if (!following) { stopFollowing(); }
+    const moved = clamp(n, 1, STEPS.length) !== ui.step;
+    lookAt(ui.step); ui.step = clamp(n, 1, STEPS.length); ui.opt = ''; render(); lookAt(ui.step);
+    if (moved) { presence?.moved(); }
+  }
   function toolKey(code) {
     const tool = TOOLS.find(k => `Key${TOOL_KEYS[k]}` === code);
     if (tool) { setTool(tool); writeUrl(); return true; }
@@ -1599,10 +1605,46 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
   /* ---------- presence ---------- */
   let presence = null;
   let lastChanged = B.changed_at || null;
+  let followed = null;
+  /* where a viewer is, for their avatar: only someone on this round can be followed, a key means nothing across rounds */
+  function placeOf(v) {
+    if (!v.step) { return null; }
+    if (v.round !== R.number) { return { text: t('round_n', { n: v.round }), can: false }; }
+    const s = STEPS.find(x => x.key === v.step);
+    return s ? { text: t('viewing', { title: s.title }), can: true } : null;
+  }
   function renderAvatars(viewers, online) {
     if (!caps.presence) { return; }
-    $('#avs').innerHTML = avatarRow(viewers, { me: ME.id, online });
+    $('#avs').innerHTML = avatarRow(viewers, { me: ME.id, online, place: placeOf, following: followed });
+    paintWho();
+    followOn(viewers, online);
   }
+  /* repaints only the avatars: a thumbnail's frame must not be rebuilt, it would reload */
+  function paintWho() {
+    if (!caps.presence || !presence) { return; }
+    const slides = bySlide(presence.state.viewers, { me: ME.id, round: R.number, online: presence.state.online });
+    $$('[data-who]', $('#side')).forEach(el => { el.innerHTML = slideAvatars(slides.get(STEPS[+el.dataset.who - 1]?.key)); });
+  }
+  /* go along with the followed person; they left, or moved to another round: stop. The show keeps its own slide */
+  function followOn(viewers, online) {
+    if (followed === null) { return; }
+    const v = rowOf(viewers, { me: ME.id, online }).find(x => String(x.user.id) === String(followed));
+    if (!v || v.state !== 'active' || v.round !== R.number) { stopFollowing(); return; }
+    const n = STEPS.findIndex(s => s.key === v.step) + 1;
+    if (n && n !== ui.step && !presenting) { go(n, { following: true }); }
+  }
+  function stopFollowing() {
+    if (followed === null) { return; }
+    followed = null;
+    if (presence) { renderAvatars(presence.state.viewers, presence.state.online); }
+  }
+  $('#avs')?.addEventListener('click', e => {
+    const id = e.target.closest('[data-follow]')?.dataset.follow;
+    if (id === undefined) { return; }
+    if (String(followed) === id) { stopFollowing(); return; }
+    followed = id;
+    renderAvatars(presence.state.viewers, presence.state.online);
+  });
 
   /* ---------- what people add to the board (item 11) ---------- */
   function centerOn(el) {
@@ -1653,13 +1695,14 @@ export function mountBoard(boot, root, { store, ext = {} } = {}) {
     render();
     lookAt(ui.step);
     presence = startPresence({
-      boot, api, slug: B.slug, round: R.number,
+      boot, api, slug: B.slug, round: R.number, me: ME.id,
+      where: () => ({ round: R.number, step: STEPS[(presenting ? presenter.state.n : ui.step) - 1]?.key }),
       onChange: renderAvatars,
       seen: () => { const p = looked.pending; looked.pending = {}; return p; },
       /* live refresh: the heartbeat's changed_at moving on means someone wrote; a server without it is polled */
       onBeat: r => {
-        if (!r.changed_at) { refresh(); return; }
-        if (lastChanged && r.changed_at > lastChanged) { refresh(); }
+        if (r.changed_at === undefined) { refresh(); return; }
+        if (r.changed_at && r.changed_at > (lastChanged || '')) { refresh(); }
         lastChanged = r.changed_at;
       },
     });

@@ -36,7 +36,7 @@ export function KradanStore(boot) {
     comment: (slug, round, body) => call('POST', `boards/${seg(slug)}/rounds/${round}/comments`, body),
     editComment: (id, body) => call('PATCH', `comments/${id}`, { body }),
     deleteComment: id => call('DELETE', `comments/${id}`),
-    heartbeat: (slug, round, printsSeen) => call('POST', `boards/${seg(slug)}/heartbeat`, { round, ...(printsSeen ? { prints_seen: printsSeen } : {}) }),
+    heartbeat: (slug, round, printsSeen, step) => call('POST', `boards/${seg(slug)}/heartbeat`, { round, ...(printsSeen ? { prints_seen: printsSeen } : {}), ...(step ? { step } : {}) }),
     decide: slug => call('POST', `boards/${seg(slug)}/decide`, {}),
     createItem: (slug, body) => call('POST', `boards/${seg(slug)}/items`, body),
     patchItem: (id, body) => call('PATCH', `items/${id}`, body),

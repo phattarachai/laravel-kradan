@@ -14,6 +14,8 @@ use Override;
  * @property string $user_id
  * @property Carbon $last_seen_at
  * @property array<string, string>|null $seen_prints
+ * @property string|null $step_key
+ * @property int|null $round_number
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -22,7 +24,7 @@ final class Viewer extends KradanModel
     protected $table = 'kradan_viewers';
 
     /** @var list<string> */
-    protected $fillable = ['board_id', 'user_id', 'last_seen_at', 'seen_prints'];
+    protected $fillable = ['board_id', 'user_id', 'last_seen_at', 'seen_prints', 'step_key', 'round_number'];
 
     /** @return BelongsTo<Board, $this> */
     public function board(): BelongsTo
