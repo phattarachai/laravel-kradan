@@ -116,11 +116,15 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     const r = ROUNDS.at(-1);
     s.savedAt = new Date(now()).toISOString();
     set(stateKey(r.title), s);
-    const done = latest.steps.filter((_, i) => answered(s, i + 1)).length;
-    const sum = get(`wb:sum:${PATH}`);
-    set(`wb:sum:${PATH}`, { title: r.title, done, total: latest.steps.length, sentAt: sum?.title === r.title ? sum.sentAt || '' : '' });
+    saveSum(s);
     changedAt = s.savedAt;
     listeners.forEach(fn => fn());
+  }
+  function saveSum(s) {
+    const r = ROUNDS.at(-1), marked = new Set(items().filter(it => !it.draft).map(it => it.step));
+    const done = latest.steps.filter((st, i) => answered(s, i + 1) || marked.has(st.key)).length;
+    const sum = get(`wb:sum:${PATH}`);
+    set(`wb:sum:${PATH}`, { title: r.title, done, total: latest.steps.length, sentAt: sum?.title === r.title ? sum.sentAt || '' : '' });
   }
   async function writeLatest(fn) {
     const r = ROUNDS.at(-1);
@@ -217,7 +221,7 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
     const url = await new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsDataURL(file); });
     return { url, path: '', name: file.name };
   }
-  const putItems = list => { set(ITEMS_KEY, list); changedAt = new Date(now()).toISOString(); listeners.forEach(fn => fn()); };
+  const putItems = list => { set(ITEMS_KEY, list); saveSum(upgrade(get(stateKey(ROUNDS.at(-1).title)) || {})); changedAt = new Date(now()).toISOString(); listeners.forEach(fn => fn()); };
   const newItem = body => {
     const list = items(), at = new Date(now()).toISOString();
     const it = { ...body, id: Math.max(now(), ...list.map(x => x.id + 1)), round: ROUNDS.at(-1).number, user: me, mine: true, created_at: at, updated_at: at, reply_count: 0 };
@@ -283,16 +287,13 @@ export function LocalStore({ page, pagesUrl = 'pages.php', storage = globalThis.
       const image = /^image\//.test(file.type);
       return newItem({ ...body, kind: image ? 'image' : 'file', file: { name: file.name, type: file.type, size: file.size, url: f.url, thumb: image ? f.url : null, path: f.path } });
     },
-    /* one person's review, in the shape the design skill reads (reviewLocal), with ภาพรวม and the compact line */
+    /* one person's review, in the shape the design skill reads (reviewLocal), with the compact line and a ภาพรวม note saved before the box went */
     exportMd: async () => {
       const r = ROUNDS.at(-1), st = await stateFor(r);
       const { picks, comments } = toPayload(st, mapperFor(latest.steps), me);
       return reviewLocal({ title: latest.title, steps: latest.steps, picks, comments, items: items().filter(it => (it.round ?? r.number) <= r.number), overall: st.overall });
     },
     roundText: async (slug, number) => { const r = roundOf(number); return r?.dir ? fetchText(new URL(`rounds/${r.dir}/review.md`, MAIN).href) : ''; },
-    /* ภาพรวม: one free note for the whole page, kept in the round's state as before */
-    overall: () => upgrade(get(stateKey(ROUNDS.at(-1).title)) || {}).overall || '',
-    setOverall: text => writeLatest(st => { st.overall = text; }),
 
     /* for the workbench's ext: what ส่ง and the page manager need */
     slug: SLUG,

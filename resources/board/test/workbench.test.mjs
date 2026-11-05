@@ -27,8 +27,15 @@ function env(seed = {}, more = {}) {
     return { ok, status: ok ? 200 : 404, text: async () => (ok ? fs.readFileSync(file, 'utf8') : ''), json: async () => JSON.parse(fs.readFileSync(file, 'utf8')) };
   };
   const store = LocalStore({ page: PAGE, storage, fetch, parse: html => new DOMParser().parseFromString(html, 'text/html'), agentUrl: `${BASE}_workbench/agent.js`, origin: 'http://localhost', now: () => Date.parse('2026-10-28T10:00:00Z'), ...more });
-  return { store, read: k => JSON.parse(map.get(k) || 'null') };
+  return { store, read: k => JSON.parse(map.get(k) || 'null'), write: (k, v) => map.set(k, JSON.stringify(v)) };
 }
+
+test('a note on the canvas counts in the page list\'s answered number', async () => {
+  const { store, read } = env();
+  const b = await store.board(store.slug);
+  await store.createItem(store.slug, { step: b.rounds[2].steps[2].key, kind: 'sticky', text: 'ขอย้าย', x: 0, y: 0 });
+  assert.equal(read('wb:sum:/design/2610-90-wb-demo/index.html').done, 1);
+});
 
 test('the board payload has the shapes of 2-board-payload.md, read from the page and rounds.json', async () => {
   const { store } = env();
@@ -70,7 +77,7 @@ test('the old workbench keys carry over: picks, ข้าม, notes, pins, boxes
 });
 
 test('writes land in the old shape, so review.json and the old workbench read them', async () => {
-  const { store, read } = env();
+  const { store, read, write } = env();
   const b = await store.board(store.slug);
   const step = b.rounds[2].steps[0].key;
   assert.deepEqual((await store.pick(store.slug, 3, step, { options: ['A'], seen: false })).picks.map(p => p.options), [['A']]);
@@ -87,9 +94,8 @@ test('writes land in the old shape, so review.json and the old workbench read th
   assert.deepEqual(read(KEY).seen, { 2: true });
   await assert.rejects(store.pick(store.slug, 1, step, { options: ['A'] }), { status: 409 });
   const md = await store.exportMd();
-  await store.setOverall('ภาพรวมดี');
-  assert.equal(store.overall(), 'ภาพรวมดี');
-  assert.equal(read(KEY).overall, 'ภาพรวมดี');
+  /* a ภาพรวม note saved before the box was removed still goes out with the review */
+  write(KEY, { ...read(KEY), overall: 'ภาพรวมดี' });
   assert.equal(await store.exportMd(), 'Workbench demo รอบ 2\n\nตะกร้า\n1. ปุ่มยืนยัน → A\n   ↳ ข้อแรก\n   ↳ ข้อสอง\n   📍1 A “ส่งคำสั่งซื้อ”: แดงกว่านี้\n2. ยอดรวม → ข้าม\n\nหน้าจอ\n3. หน้ายืนยัน\n\nOverall\n   ↳ ภาพรวมดี\n\nQ1:A  Q2:ข้าม\n');
   const review = await store.review(true, [3]);
   assert.deepEqual([review.slug, review.sent, review.missing, review.steps[0].picks, review.steps[0].note, review.overall], ['2610-90-wb-demo', true, [3], ['A'], 'ข้อแรก\n\nข้อสอง', 'ภาพรวมดี']);
