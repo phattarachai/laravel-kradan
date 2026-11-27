@@ -164,6 +164,10 @@ A pushed folder needs an `index.html`. Pages use the markup of the design workbe
 `data-title` for each step, `data-dp-option` with `data-key` and `data-label` for options, `data-dp-group` for
 sections and `data-dp-frames` with `data-src` for live screens.
 
+The board shows each step or option cropped out of the page, with everything around it hidden. A top-level `<svg>`
+that only holds shared resources (gradients, symbols, clip paths, masks) stays rendered, so `fill="url(#id)"` still
+paints; mark any other shared element `data-dp-keep` to keep it through the crop.
+
 ## Decks
 
 A deck is a page whose `<body>` has `data-k-deck`. Each `<section data-dp-step data-title="…">` is one slide on a
