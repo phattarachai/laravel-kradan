@@ -200,3 +200,38 @@ test('a pale sheet around sentences is still words, a coloured chip is a design'
   assert.deepEqual(steps.map(s => s.form), [true, false]);
   assert.equal(steps[0].options[0].text, 'The picker lists web products only\nOld codes stay');
 });
+
+test('a crop hides the rest of the page but keeps its shared svg defs and anything marked data-dp-keep', async () => {
+  const { parseHTML } = await import('linkedom');
+  const { document, window } = parseHTML(`<html><head></head><body>
+    <svg id="defs" width="0" height="0"><defs><linearGradient id="g"><stop offset="0"/></linearGradient></defs><symbol id="s"></symbol><radialGradient id="r"></radialGradient><clipPath id="c"></clipPath></svg>
+    <svg id="icon" width="16" height="16"><linearGradient id="h"></linearGradient><rect fill="url(#h)"/></svg>
+    <div id="shared" data-dp-keep></div>
+    <header id="top">Title</header>
+    <style>body{}</style>
+    <main>
+      <section data-dp-step data-title="Logo">
+        <div data-dp-option data-key="A" id="a"><svg><rect fill="url(#g)"/></svg></div>
+        <div data-dp-option data-key="B" id="b"><svg><use href="#s"/></svg></div>
+      </section>
+    </main>
+  </body></html>`);
+  window.HTMLElement.prototype.getBoundingClientRect = () => ({ left: 0, top: 0, right: 100, bottom: 50 });
+  window.Element.prototype.getBoundingClientRect ||= window.HTMLElement.prototype.getBoundingClientRect;
+  const w = fakeWin();
+  const a = createAgent({ win: w.win, doc: document, parentOrigin: APP });
+  a.handlers.crop({ step: 0, option: 'A' });
+  const off = id => document.getElementById(id).hasAttribute('data-wb-off');
+  assert.equal(off('b'), true, 'the other option');
+  assert.equal(off('top'), true, 'the rest of the page');
+  assert.equal(off('icon'), true, 'an svg that draws something is page content');
+  assert.equal(off('defs'), false, 'the defs svg stays rendered, so url(#g) still paints');
+  assert.equal(document.getElementById('defs').hasAttribute('data-wb-defs'), true, 'and takes no room');
+  assert.equal(off('shared'), false);
+  assert.equal(document.querySelector('style').hasAttribute('data-wb-off'), false);
+
+  a.handlers.crop({ step: 0, option: 'B' });
+  assert.equal(off('a'), true);
+  assert.equal(off('b'), false, 'a new crop clears the last one');
+  assert.equal(document.querySelectorAll('[data-wb-defs]').length, 1);
+});

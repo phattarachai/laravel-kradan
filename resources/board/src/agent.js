@@ -37,6 +37,17 @@
  */
 
 const OFF = 'data-wb-off';
+const DEFS = 'data-wb-defs';
+const SVG_RESOURCES = new Set(['defs', 'symbol', 'lineargradient', 'radialgradient', 'clippath', 'mask', 'filter', 'pattern', 'title', 'desc']);
+
+/* what a crop must leave rendered: the page's scripts and styles, anything marked data-dp-keep, and an <svg> that only
+   holds shared resources. Chrome paints no fill="url(#id)" from a display:none element, so hiding a page's defs svg
+   emptied every gradient in the cropped option (thongbook 2611-30, 2026-11-28) */
+const isSvgResources = el => el.localName === 'svg' && el.children.length > 0
+  && [...el.children].every(c => SVG_RESOURCES.has(c.localName.toLowerCase()));
+function keptByCrop(el) {
+  return /^(SCRIPT|STYLE|LINK|TEMPLATE)$/i.test(el.tagName) || el.hasAttribute('data-dp-keep') || isSvgResources(el);
+}
 const MAX_EDIT = 200;
 
 /* the element whose own text sits at a point: what a pin names and what แก้คำ edits */
@@ -139,16 +150,17 @@ export function createAgent({ win, doc, parentOrigin }) {
       const st = steps[keyed ? keyed.index : +step || 0];
       const t = !st ? null : option ? [...st.querySelectorAll('[data-dp-option]')].find(o => o.dataset.key === option) : st;
       if (!t) { return { rect: null, height: docHeight() }; }
-      doc.querySelectorAll(`[${OFF}]`).forEach(el => el.removeAttribute(OFF));
+      doc.querySelectorAll(`[${OFF}], [${DEFS}]`).forEach(el => { el.removeAttribute(OFF); el.removeAttribute(DEFS); });
       if (!doc.getElementById('kradan-crop')) {
         const style = doc.createElement('style');
         style.id = 'kradan-crop';
-        style.textContent = `[${OFF}]{display:none!important}html,body{overflow:hidden!important}`;
+        style.textContent = `[${OFF}]{display:none!important}[${DEFS}]{position:absolute!important;width:0!important;height:0!important;overflow:hidden!important}html,body{overflow:hidden!important}`;
         doc.head.appendChild(style);
       }
       for (let el = t; el && el !== doc.body && el.parentElement; el = el.parentElement) {
         for (const c of el.parentElement.children) {
-          if (c !== el && !/^(SCRIPT|STYLE|LINK|TEMPLATE)$/.test(c.tagName)) { c.setAttribute(OFF, ''); }
+          if (c === el) { continue; }
+          if (!keptByCrop(c)) { c.setAttribute(OFF, ''); } else if (isSvgResources(c)) { c.setAttribute(DEFS, ''); }
         }
       }
       state.target = t;
